@@ -83,4 +83,7 @@ dependencies {
 
     // Réglages de calibrage persistés (offset caméra, IP/port cible, sensibilité)
     implementation(libs.androidx.datastore.preferences)
+
+    // Tests unitaires (JVM pur -- pas de dépendance Android, voir AndroidMoCap_tests_unitaires.md)
+    testImplementation(libs.junit)
 }

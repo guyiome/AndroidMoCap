@@ -38,6 +38,30 @@ class FaceLandmarkerHelper(
 
         /** Doit être téléchargé manuellement et placé dans app/src/main/assets -- voir le README. */
         private const val MODEL_ASSET_PATH = "face_landmarker.task"
+
+        /**
+         * Le regard des yeux (direction du globe oculaire) n'est pas fourni directement par
+         * MediaPipe -- seuls les blendshapes eyeLookUp/Down/In/Out (intensité 0-1) le sont. On les
+         * convertit ici en un angle approximatif [pitch, yaw, 0] par œil, envoyé dans les champs
+         * rightEye#/leftEye# du protocole iFacialMocap (distinct des blendshapes eux-mêmes, qui
+         * sont envoyés en plus). Extrait en fonction pure (`internal`, aucune dépendance MediaPipe
+         * ni Android) pour être testable en JVM -- une conversion de nom/signe erronée ici cause le
+         * même genre de bug silencieux déjà rencontré avec le nommage des blendshapes eyeSquint.
+         *
+         * Convention : yaw positif = regard vers la gauche du sujet, pitch positif = regard vers le haut.
+         * Angle max arbitraire (30°) à ajuster selon le rendu observé.
+         */
+        internal fun computeEyeGazeDegrees(blendshapes: List<BlendshapeScore>): Pair<FloatArray, FloatArray> {
+            fun score(name: String) = blendshapes.firstOrNull { it.name == name }?.score ?: 0f
+            val maxAngle = 30f
+
+            val leftPitch = (score("eyeLookUpLeft") - score("eyeLookDownLeft")) * maxAngle
+            val leftYaw = (score("eyeLookOutLeft") - score("eyeLookInLeft")) * maxAngle
+            val rightPitch = (score("eyeLookUpRight") - score("eyeLookDownRight")) * maxAngle
+            val rightYaw = (score("eyeLookInRight") - score("eyeLookOutRight")) * maxAngle
+
+            return floatArrayOf(leftPitch, leftYaw, 0f) to floatArrayOf(rightPitch, rightYaw, 0f)
+        }
     }
 
     private var faceLandmarker: FaceLandmarker? = null
@@ -134,26 +158,5 @@ class FaceLandmarkerHelper(
             )
         )
         onFrameProcessed(result.timestampMs())
-    }
-
-    /**
-     * Le regard des yeux (direction du globe oculaire) n'est pas fourni directement par MediaPipe --
-     * seuls les blendshapes eyeLookUp/Down/In/Out (intensité 0-1) le sont. On les convertit ici en
-     * un angle approximatif [pitch, yaw, 0] par œil, envoyé dans les champs rightEye#/leftEye# du
-     * protocole iFacialMocap (distinct des blendshapes eux-mêmes, qui sont envoyés en plus).
-     *
-     * Convention : yaw positif = regard vers la gauche du sujet, pitch positif = regard vers le haut.
-     * Angle max arbitraire (30°) à ajuster selon le rendu observé.
-     */
-    private fun computeEyeGazeDegrees(blendshapes: List<BlendshapeScore>): Pair<FloatArray, FloatArray> {
-        fun score(name: String) = blendshapes.firstOrNull { it.name == name }?.score ?: 0f
-        val maxAngle = 30f
-
-        val leftPitch = (score("eyeLookUpLeft") - score("eyeLookDownLeft")) * maxAngle
-        val leftYaw = (score("eyeLookOutLeft") - score("eyeLookInLeft")) * maxAngle
-        val rightPitch = (score("eyeLookUpRight") - score("eyeLookDownRight")) * maxAngle
-        val rightYaw = (score("eyeLookInRight") - score("eyeLookOutRight")) * maxAngle
-
-        return floatArrayOf(leftPitch, leftYaw, 0f) to floatArrayOf(rightPitch, rightYaw, 0f)
     }
 }

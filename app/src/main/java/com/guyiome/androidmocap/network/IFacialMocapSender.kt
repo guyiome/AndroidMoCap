@@ -26,6 +26,36 @@ class IFacialMocapSender(
         const val PORT = 49983
         private const val HANDSHAKE = "iFacialMocap_sahuasouryya9218sauhuiayeta91555dy3719"
         private const val STOP_HANDSHAKE = "iFacialMocap_UDPTCPSTOP_sahuasouryya9218sauhuiayeta91555dy3719"
+
+        /**
+         * Construit le message texte du protocole iFacialMocap à partir d'un résultat de tracking
+         * -- extrait en fonction pure (aucune dépendance socket/réseau) pour être testable en JVM,
+         * voir [send] qui en dépend pour construire le paquet UDP envoyé.
+         */
+        internal fun buildMessage(result: FaceTrackingResult): String = buildString {
+            for (blendshape in result.blendshapes) {
+                val name = toIFacialMocapName(blendshape.name) ?: continue
+                append(name)
+                append('-')
+                append((blendshape.score * 100f).toInt())
+                append('|')
+            }
+            // Pose de tête (matrice de transformation MediaPipe) + direction du regard (dérivée
+            // des blendshapes eyeLookUp/Down/In/Out). Position X/Y/Z pas encore branchée : zéro,
+            // sans casser le parseur côté récepteur.
+            val (pitch, yaw, roll) = result.headEulerDegrees
+            val (leftPitch, leftYaw, _) = result.leftEyeEulerDegrees
+            val (rightPitch, rightYaw, _) = result.rightEyeEulerDegrees
+            append("=head#$pitch,$yaw,$roll,0,0,0|rightEye#$rightPitch,$rightYaw,0|leftEye#$leftPitch,$leftYaw,0|")
+        }
+
+        /** MediaPipe utilise le suffixe "Left"/"Right" (ex. eyeBlinkLeft), iFacialMocap utilise "_L"/"_R". */
+        internal fun toIFacialMocapName(mediaPipeName: String): String? = when {
+            mediaPipeName == "_neutral" -> null
+            mediaPipeName.endsWith("Left") -> mediaPipeName.removeSuffix("Left") + "_L"
+            mediaPipeName.endsWith("Right") -> mediaPipeName.removeSuffix("Right") + "_R"
+            else -> mediaPipeName
+        }
     }
 
     private val running = AtomicBoolean(false)
@@ -79,36 +109,12 @@ class IFacialMocapSender(
         sendExecutor.execute {
             val sock = socket ?: return@execute
             try {
-                val message = buildString {
-                    for (blendshape in result.blendshapes) {
-                        val name = toIFacialMocapName(blendshape.name) ?: continue
-                        append(name)
-                        append('-')
-                        append((blendshape.score * 100f).toInt())
-                        append('|')
-                    }
-                    // Pose de tête (matrice de transformation MediaPipe) + direction du regard
-                    // (dérivée des blendshapes eyeLookUp/Down/In/Out). Position X/Y/Z pas encore
-                    // branchée : zéro, sans casser le parseur côté récepteur.
-                    val (pitch, yaw, roll) = result.headEulerDegrees
-                    val (leftPitch, leftYaw, _) = result.leftEyeEulerDegrees
-                    val (rightPitch, rightYaw, _) = result.rightEyeEulerDegrees
-                    append("=head#$pitch,$yaw,$roll,0,0,0|rightEye#$rightPitch,$rightYaw,0|leftEye#$leftPitch,$leftYaw,0|")
-                }
-                val bytes = message.toByteArray(Charsets.UTF_8)
+                val bytes = buildMessage(result).toByteArray(Charsets.UTF_8)
                 sock.send(DatagramPacket(bytes, bytes.size, address, PORT))
             } catch (e: Exception) {
                 // Cible momentanément injoignable : on laisse tomber cette frame plutôt que de bloquer.
             }
         }
-    }
-
-    /** MediaPipe utilise le suffixe "Left"/"Right" (ex. eyeBlinkLeft), iFacialMocap utilise "_L"/"_R". */
-    private fun toIFacialMocapName(mediaPipeName: String): String? = when {
-        mediaPipeName == "_neutral" -> null
-        mediaPipeName.endsWith("Left") -> mediaPipeName.removeSuffix("Left") + "_L"
-        mediaPipeName.endsWith("Right") -> mediaPipeName.removeSuffix("Right") + "_R"
-        else -> mediaPipeName
     }
 
     fun stopListening() {

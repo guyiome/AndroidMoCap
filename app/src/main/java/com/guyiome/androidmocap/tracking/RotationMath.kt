@@ -62,4 +62,23 @@ object RotationMath {
         val roll = Math.toDegrees(Math.atan2(m[3].toDouble(), m[4].toDouble())).toFloat()
         return floatArrayOf(pitch, yaw, roll)
     }
+
+    /**
+     * Combine en un seul appel testable les trois étapes faites à chaque frame dans
+     * [com.guyiome.androidmocap.ui.MainViewModel.handleTrackingResult] : annuler la rotation du
+     * téléphone lui-même depuis la calibration ([deviceDeltaMatrix]), puis exprimer le résultat
+     * relatif à la pose de tête de référence capturée à la calibration ([headRotationReference]).
+     * Extrait ici (plutôt que laissé inline dans le ViewModel) précisément pour pouvoir couvrir ce
+     * calcul -- le plus délicat de l'app, à l'origine de l'inversion d'axes déjà rencontrée -- par
+     * des tests unitaires indépendants d'Android.
+     */
+    fun composeCalibratedEuler(
+        headRotationMatrix: FloatArray,
+        deviceDeltaMatrix: FloatArray,
+        headRotationReference: FloatArray,
+    ): FloatArray {
+        val headCompensated = multiply(deviceDeltaMatrix, headRotationMatrix)
+        val finalRotation = multiply(transpose(headRotationReference), headCompensated)
+        return toEulerDegrees(finalRotation)
+    }
 }

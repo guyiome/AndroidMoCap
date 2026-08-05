@@ -1,6 +1,7 @@
 [versions]
 agp = "9.3.1"
 kotlin = "2.3.20"
+junit = "4.13.2"
 coreKtx = "1.19.0"
 lifecycleRuntimeKtx = "2.11.0"
 activityCompose = "1.13.0"
@@ -39,6 +40,9 @@ javaosc-core = { group = "com.illposed.osc", name = "javaosc-core", version.ref 
 
 # Persistance des réglages de calibrage
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastorePreferences" }
+
+# Tests unitaires (JVM pur, voir AndroidMoCap_tests_unitaires.md pour ce qui est couvert et pourquoi)
+junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

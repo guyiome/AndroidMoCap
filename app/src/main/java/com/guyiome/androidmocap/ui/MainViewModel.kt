@@ -235,13 +235,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val deviceDelta = deviceOrientationTracker?.rotationDeltaMatrix(deviceRotationReference)
             ?: RotationMath.IDENTITY_3X3
 
-        // On applique cette rotation à la pose de tête brute (relative à la caméra actuelle) pour
-        // annuler le mouvement du téléphone, puis on exprime le résultat relatif à la pose de
-        // référence capturée à la calibration (= le nouveau "zéro"). Une seule conversion en
-        // degrés à la toute fin, sur la matrice finale déjà composée.
-        val headCompensated = RotationMath.multiply(deviceDelta, result.headRotationMatrix)
-        val finalRotation = RotationMath.multiply(RotationMath.transpose(headRotationReference), headCompensated)
-        val calibratedEuler = RotationMath.toEulerDegrees(finalRotation)
+        // Annule le mouvement du téléphone puis exprime le résultat relatif à la pose de
+        // référence capturée à la calibration (= le nouveau "zéro") -- composition extraite dans
+        // RotationMath pour être testable indépendamment du ViewModel, voir
+        // RotationMath.composeCalibratedEuler.
+        val calibratedEuler = RotationMath.composeCalibratedEuler(
+            headRotationMatrix = result.headRotationMatrix,
+            deviceDeltaMatrix = deviceDelta,
+            headRotationReference = headRotationReference,
+        )
 
         val calibrated = result.copy(headEulerDegrees = calibratedEuler)
 

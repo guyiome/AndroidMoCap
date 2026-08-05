@@ -46,6 +46,16 @@ class CameraController(
         // quasiment jamais avoir plus d'une frame de retard en LIVE_STREAM, 3 laisse une marge de
         // sécurité sans risquer une file qui grossit indéfiniment si le device peine.
         private const val MAX_TRACKED_BITMAPS = 3
+
+        /**
+         * Dimensions (largeur, hauteur) du bitmap final une fois la rotation caméra appliquée --
+         * extrait en fonction pure (aucune dépendance Android) pour être testable en JVM, voir
+         * [processFrame] qui en dépend pour dimensionner le bitmap cible.
+         */
+        internal fun rotatedDimensions(width: Int, height: Int, rotationDegrees: Int): Pair<Int, Int> {
+            val swapDimensions = rotationDegrees == 90 || rotationDegrees == 270
+            return if (swapDimensions) height to width else width to height
+        }
     }
 
     private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
@@ -176,9 +186,7 @@ class CameraController(
             lastAcceptedFrameElapsedMs = nowElapsed
 
             val rotationDegrees = proxy.imageInfo.rotationDegrees
-            val swapDimensions = rotationDegrees == 90 || rotationDegrees == 270
-            val outWidth = if (swapDimensions) proxy.height else proxy.width
-            val outHeight = if (swapDimensions) proxy.width else proxy.height
+            val (outWidth, outHeight) = rotatedDimensions(proxy.width, proxy.height, rotationDegrees)
 
             val target = acquirePooledBitmap(outWidth, outHeight)
                 // Pool épuisé : MediaPipe a plusieurs frames de retard -- on laisse tomber celle-ci
