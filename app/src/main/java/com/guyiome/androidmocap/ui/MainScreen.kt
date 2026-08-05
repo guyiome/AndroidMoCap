@@ -29,6 +29,8 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.guyiome.androidmocap.sensors.BatteryMonitor
 import com.guyiome.androidmocap.sensors.IconOrientationTracker
@@ -76,23 +78,38 @@ fun MainScreen(
         }
     }
 
-    // Fait pivoter les icônes du HUD pour qu'elles restent lisibles quel que soit l'angle
-    // auquel le téléphone est tenu/posé (indépendant de la compensation de pose de tête).
-    DisposableEffect(context) {
-        val tracker = IconOrientationTracker(context) { degrees -> iconRotationDegrees = degrees.toFloat() }
-        tracker.enable()
-        onDispose { tracker.disable() }
-    }
-
-    // Surveille la batterie en continu -- utile en session longue, le téléphone étant souvent
-    // posé loin de l'utilisateur sur un support.
-    DisposableEffect(context) {
-        val monitor = BatteryMonitor(context) { percent, charging ->
+    // Fait pivoter les icônes du HUD (IconOrientationTracker) et surveille la batterie
+    // (BatteryMonitor, utile en session longue, le téléphone étant souvent posé loin de
+    // l'utilisateur sur un support). Rattachés au cycle de vie de l'Activity (ON_START/ON_STOP)
+    // plutôt que directement démarrés ici : un DisposableEffect(context) ne se redéclenche que si
+    // le composable quitte la composition, pas quand l'app passe juste en arrière-plan (l'Activity
+    // reste en mémoire) -- sans ça, ces deux-là continuaient à écouter capteur/broadcast batterie
+    // inutilement pendant que l'app n'était plus au premier plan.
+    DisposableEffect(lifecycleOwner, context) {
+        val iconTracker = IconOrientationTracker(context) { degrees -> iconRotationDegrees = degrees.toFloat() }
+        val batteryMonitor = BatteryMonitor(context) { percent, charging ->
             batteryPercent = percent
             isCharging = charging
         }
-        monitor.start()
-        onDispose { monitor.stop() }
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> {
+                    iconTracker.enable()
+                    batteryMonitor.start()
+                }
+                Lifecycle.Event.ON_STOP -> {
+                    iconTracker.disable()
+                    batteryMonitor.stop()
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            iconTracker.disable()
+            batteryMonitor.stop()
+        }
     }
 
     // Mode économie d'énergie : on ne peut pas vraiment éteindre l'écran (ça mettrait l'Activity

@@ -43,7 +43,7 @@ Deux grandes catégories reviennent tout du long. Le code **logique pur** (maths
 
 | Fichier | Élément couvert | Test(s) | Statut |
 |---|---|---|---|
-| `DeviceOrientationTracker.kt` | `rotationDeltaMatrix()`, `snapshotRotationMatrix()` | -- | ❌ Dépend de `SensorManager`/`SensorEvent` réels pour être exercées de bout en bout. La partie mathématique (multiplication/transposition) qu'elles délèguent à `RotationMath` est, elle, déjà couverte par `RotationMathTest`. Faible valeur à mocker `SensorManager` juste pour ce glue code. |
+| `DeviceOrientationTracker.kt` | `rotationDeltaMatrix()`, `snapshotRotationMatrix()`, `start()`/`stop()` | -- | ❌ Dépend de `SensorManager`/`SensorEvent` réels pour être exercées de bout en bout. La partie mathématique (multiplication/transposition) qu'elles délèguent à `RotationMath` est, elle, déjà couverte par `RotationMathTest`. Faible valeur à mocker `SensorManager` juste pour ce glue code. Depuis le point 5 (rapport technique), `start()`/`stop()` sont appelés par `MainViewModel` sur `ON_START`/`ON_STOP` du cycle de vie plutôt qu'une seule fois à l'initialisation -- même remarque, glue code non testable sans Robolectric. |
 | `IconOrientationTracker.kt` | `onOrientationChanged()` | -- | ❌ Wrapper direct d'`OrientationEventListener` (Android), aucune logique propre à isoler. |
 | `BatteryMonitor.kt` | `onReceive()` | -- | ❌ Wrapper direct de `BroadcastReceiver`/`ACTION_BATTERY_CHANGED`, nécessite un test instrumenté pour simuler un vrai broadcast. |
 
@@ -58,6 +58,8 @@ Deux grandes catégories reviennent tout du long. Le code **logique pur** (maths
 | Fichier | Élément couvert | Test(s) | Statut |
 |---|---|---|---|
 | `MainViewModel.kt` | Orchestration (caméra, capteurs, réseau, DataStore, minuteur éco...) | -- | ❌ Dépend d'`AndroidViewModel`/`Application` et de tous les composants ci-dessus. Volontairement laissé "fin" : sa seule logique non triviale (composition de la calibration) a été extraite dans `RotationMath.composeCalibratedEuler`, testée séparément -- stratégie à reconduire pour toute nouvelle logique ajoutée au ViewModel. |
+| `MainViewModel.kt` | `initializeTracking()` idempotent (`trackingInitialized`, point 6 du rapport technique) | -- | ❌ Un test pertinent demanderait d'instancier un `MainViewModel` réel (Application, ArCoreApk, ActivityManager...) et d'appeler `initializeTracking()` deux fois -- nécessite Robolectric. Garde à une ligne, risque de régression faible ; à couvrir si Robolectric est introduit pour d'autres besoins (ex. `AppSettingsStore`). |
+| `MainScreen.kt` | Rattachement d'`IconOrientationTracker`/`BatteryMonitor` au cycle de vie (`ON_START`/`ON_STOP`, point 5 du rapport technique) | -- | ❌ Composable Compose observant un vrai `Lifecycle` -- nécessite un test d'UI Compose ou Robolectric pour simuler des transitions de cycle de vie. Vérifié manuellement (voir note ci-dessous). |
 | `MainScreen.kt`, `MainHud.kt`, `SettingsScreen.kt`, `BlendshapeSelectionScreen.kt`, `BlendshapePanel.kt`, `PowerSaveOverlay.kt`, `LowBatteryAlert.kt`, `Theme.kt` | Composables | -- | ❌ Hors périmètre des tests unitaires JVM : nécessitent soit des tests d'UI Compose (`androidx.compose.ui.test`, instrumentés ou Robolectric), soit une vérification manuelle. Sujet séparé des "TUs" si souhaité plus tard. |
 
 ## Racine
@@ -69,6 +71,10 @@ Deux grandes catégories reviennent tout du long. Le code **logique pur** (maths
 ## Bilan actuel
 
 7 fichiers de test, tous en JVM pur (aucun appareil/émulateur requis) : `RotationMathTest`, `TrackingTierSelectorTest`, `BlendshapeCatalogTest`, `FaceLandmarkerHelperTest`, `IFacialMocapSenderTest`, `CameraControllerTest`, `VmcOscSenderTest`. Ils couvrent l'intégralité de la logique mathématique et de formatage identifiée comme la plus fragile (rotation/calibration, mapping de noms de blendshapes, regard des yeux, sélection de palier, dimensions de rotation caméra, regroupement des messages OSC), en s'appuyant sur quelques extractions de fonctions pures (visibilité `internal`) qui ne changent aucun comportement.
+
+## Points 5 et 6 (rapport technique) -- pas de test dédié, raison assumée
+
+Contrairement aux points 1, 2 et 4, les points 5 (capteurs/batterie pas alignés sur le cycle de vie) et 6 (`initializeTracking()` pas protégé contre un double appel) ne contenaient aucune logique pure à extraire -- uniquement du glue code Android (observation de `Lifecycle`, garde sur un booléen d'instance). Implémentés directement, sans étape rouge/verte JUnit au préalable, avec la raison documentée ci-dessus plutôt qu'un silence. Vérification manuelle recommandée après relance de l'app : mettre l'app en arrière-plan quelques secondes puis revenir dessus, et confirmer que le tracking reprend normalement (capteurs bien redémarrés) sans redémarrage complet.
 
 ## Règle pour la suite (TDD)
 

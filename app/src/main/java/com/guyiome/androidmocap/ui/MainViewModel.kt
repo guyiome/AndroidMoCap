@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.camera.view.PreviewView
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.guyiome.androidmocap.camera.CameraController
@@ -129,6 +131,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Minuteur d'inactivité avant bascule automatique en mode éco -- annulé/reprogrammé à chaque
     // toucher de l'écran (voir onUserInteraction) et à chaque changement de réglage.
     private var powerSaveTimerJob: Job? = null
+    // Garde contre un double appel à initializeTracking() (ex. permission caméra révoquée puis
+    // ré-accordée sans destruction de l'Activity) -- sans cette garde, un second appel recréait un
+    // FaceLandmarkerHelper et un CameraController complets par-dessus les précédents, sans jamais
+    // fermer/arrêter ceux-là (fuite du FaceLandmarker natif et du thread caméra dédié).
+    private var trackingInitialized = false
 
     init {
         // Lu dès le lancement (pas seulement une fois la permission caméra accordée) : le choix
@@ -170,8 +177,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** À appeler une fois la permission caméra accordée. */
+    /**
+     * À appeler une fois la permission caméra accordée. Idempotent (voir [trackingInitialized]) :
+     * un second appel ne fait rien plutôt que de recréer caméra/MediaPipe par-dessus les instances
+     * existantes.
+     */
     fun initializeTracking(lifecycleOwner: LifecycleOwner) {
+        if (trackingInitialized) return
+        trackingInitialized = true
+
         val context = getApplication<Application>()
         val capabilities = DeviceCapabilityDetector.detect(context)
         val tierConfig = TrackingTierSelector.select(capabilities)
@@ -210,7 +224,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             onError = ::handleError,
         )
 
-        deviceOrientationTracker = DeviceOrientationTracker(context).also { it.start() }
+        // Le capteur gyroscope tourne en continu tant qu'il est enregistré -- sans rattachement au
+        // cycle de vie, il continuait à écouter même l'app mise en arrière-plan (contrairement à
+        // CameraX, qui se coupe déjà tout seul via bindToLifecycle). On ne le garde actif qu'entre
+        // ON_START et ON_STOP, comme le fait CameraX pour la caméra.
+        val tracker = DeviceOrientationTracker(context)
+        deviceOrientationTracker = tracker
+        lifecycleOwner.lifecycle.addObserver(LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> tracker.start()
+                Lifecycle.Event.ON_STOP -> tracker.stop()
+                else -> Unit
+            }
+        })
     }
 
     fun startCamera(previewView: PreviewView) {
