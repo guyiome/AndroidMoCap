@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Simple visage stylisé + points de repère, symbolisant la capture de mouvement facial -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#7CE0FF"
+        android:strokeWidth="3"
+        android:pathData="M54,30 C68,30 78,42 78,56 C78,72 66,84 54,84 C42,84 30,72 30,56 C30,42 40,30 54,30 Z" />
+    <path android:fillColor="#7CE0FF" android:pathData="M44,52 m-3,0 a3,3 0,1 1,6 0 a3,3 0,1 1,-6 0" />
+    <path android:fillColor="#7CE0FF" android:pathData="M64,52 m-3,0 a3,3 0,1 1,6 0 a3,3 0,1 1,-6 0" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#7CE0FF"
+        android:strokeWidth="3"
+        android:pathData="M44,68 C48,73 60,73 64,68" />
+</vector>

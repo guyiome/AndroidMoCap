@@ -1,0 +1,20 @@
+*.iml
+.gradle/
+.kotlin/
+/local.properties
+.idea/
+.DS_Store
+# "/build" ne couvrait que le build à la racine -- ajouté "build/" (sans slash de tête) pour
+# aussi ignorer app/build/ et tout futur module, generé par Gradle/AGP (~250 Mo, ne doit jamais
+# être versionné).
+/build
+build/
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+app/release/
+app/debug/
+
+# Modèle MediaPipe téléchargé manuellement (voir README) : trop volumineux pour être versionné tel quel.
+app/src/main/assets/*.task

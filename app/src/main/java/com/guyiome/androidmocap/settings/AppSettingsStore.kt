@@ -1,0 +1,61 @@
+package com.guyiome.androidmocap.settings
+
+import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+
+private val Context.appSettingsDataStore by preferencesDataStore(name = "app_settings")
+
+/** Seuil par défaut (%) en dessous duquel l'alerte batterie faible s'affiche. */
+const val DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT = 20
+
+/** Délai par défaut (secondes) d'inactivité avant de basculer en mode économie d'énergie. */
+const val DEFAULT_POWER_SAVE_DELAY_SECONDS = 30
+
+/**
+ * Réglages généraux de l'app, persistés entre les lancements (contrairement à la sélection de
+ * blendshapes affichées, volontairement non persistée -- voir [MainUiState.selectedBlendshapeNames]).
+ */
+class AppSettingsStore(private val context: Context) {
+
+    private object Keys {
+        val LOW_BATTERY_THRESHOLD = intPreferencesKey("low_battery_threshold_percent")
+        val POWER_SAVE_MODE = booleanPreferencesKey("power_save_mode_enabled")
+        val POWER_SAVE_DELAY = intPreferencesKey("power_save_delay_seconds")
+    }
+
+    val lowBatteryThresholdPercent: Flow<Int> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[Keys.LOW_BATTERY_THRESHOLD] ?: DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT
+    }
+
+    suspend fun setLowBatteryThresholdPercent(percent: Int) {
+        context.appSettingsDataStore.edit { prefs -> prefs[Keys.LOW_BATTERY_THRESHOLD] = percent }
+    }
+
+    /**
+     * Autorise le passage automatique en mode économie d'énergie après [powerSaveDelaySeconds]
+     * d'inactivité (aucun toucher à l'écran) -- coupe alors l'aperçu caméra affiché (l'analyse
+     * MediaPipe continue normalement, elle ne dépend pas de l'aperçu) et assombrit l'écran au
+     * minimum. On en ressort au moindre toucher.
+     */
+    val powerSaveModeEnabled: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[Keys.POWER_SAVE_MODE] ?: false
+    }
+
+    suspend fun setPowerSaveModeEnabled(enabled: Boolean) {
+        context.appSettingsDataStore.edit { prefs -> prefs[Keys.POWER_SAVE_MODE] = enabled }
+    }
+
+    /** Délai d'inactivité (secondes) avant bascule automatique en mode économie d'énergie. */
+    val powerSaveDelaySeconds: Flow<Int> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[Keys.POWER_SAVE_DELAY] ?: DEFAULT_POWER_SAVE_DELAY_SECONDS
+    }
+
+    suspend fun setPowerSaveDelaySeconds(seconds: Int) {
+        context.appSettingsDataStore.edit { prefs -> prefs[Keys.POWER_SAVE_DELAY] = seconds }
+    }
+}
