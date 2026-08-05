@@ -10,7 +10,7 @@ import org.junit.Test
 class TrackingTierSelectorTest {
 
     @Test
-    fun `appareil haut de gamme avec ARCore -> palier OPTIMAL`() {
+    fun `appareil haut de gamme avec ARCore donne le palier OPTIMAL`() {
         val capabilities = DeviceCapabilities(
             arCoreSupported = true,
             mediaPerformanceClass = 31, // >= S
@@ -25,7 +25,7 @@ class TrackingTierSelectorTest {
     }
 
     @Test
-    fun `appareil haut de gamme sans ARCore -> palier STANDARD`() {
+    fun `appareil haut de gamme sans ARCore donne le palier STANDARD`() {
         val capabilities = DeviceCapabilities(
             arCoreSupported = false,
             mediaPerformanceClass = 31,
@@ -40,7 +40,7 @@ class TrackingTierSelectorTest {
     }
 
     @Test
-    fun `appareil d'entree de gamme -> palier COMPATIBLE, pas de delegue GPU`() {
+    fun `appareil d'entree de gamme donne le palier COMPATIBLE, pas de delegue GPU`() {
         val capabilities = DeviceCapabilities(
             arCoreSupported = false,
             mediaPerformanceClass = 0,
@@ -55,7 +55,7 @@ class TrackingTierSelectorTest {
     }
 
     @Test
-    fun `heuristique RAM-coeurs sans Media Performance Class declaree -> haut de gamme`() {
+    fun `heuristique RAM-coeurs sans Media Performance Class declaree donne haut de gamme`() {
         // mediaPerformanceClass == 0 (API < 31 ou non renseigné) : on retombe sur l'heuristique
         // RAM/cœurs (>= 8 cœurs et >= 6 Go), voir DeviceCapabilities.looksHighEnd.
         val capabilities = DeviceCapabilities(
@@ -69,7 +69,7 @@ class TrackingTierSelectorTest {
     }
 
     @Test
-    fun `ARCore supporte mais appareil bas de gamme -> palier COMPATIBLE quand meme`() {
+    fun `ARCore supporte mais appareil bas de gamme donne quand meme le palier COMPATIBLE`() {
         // ARCore seul ne suffit pas : il faut aussi looksHighEnd pour monter à OPTIMAL/STANDARD.
         val capabilities = DeviceCapabilities(
             arCoreSupported = true,
