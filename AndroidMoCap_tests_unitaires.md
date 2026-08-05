@@ -21,7 +21,8 @@ Deux grandes catégories reviennent tout du long. Le code **logique pur** (maths
 |---|---|---|---|
 | `IFacialMocapSender.kt` | `toIFacialMocapName()`, `buildMessage()` (extraites en `internal`, pures) | `IFacialMocapSenderTest.kt` | ✅ Couvert -- format déjà responsable d'un bug silencieux (nommage eyeSquint) avant cette session. |
 | `IFacialMocapSender.kt` | `startListening()`, `send()` (partie socket), `stopListening()` | -- | ❌ Dépend d'un vrai `DatagramSocket`/thread réseau -- nécessite un test instrumenté ou un socket factice. Non prioritaire, la partie à risque (le format du message) est déjà couverte séparément. |
-| `VmcOscSender.kt` | `send()`, `updateTarget()` | -- | ❌ Dépend d'un vrai `OSCPortOut`/UDP. Pas de logique pure à extraire pour l'instant (boucle triviale) -- si le regroupement en `OSCBundle` (piste d'optimisation du rapport technique) est implémenté, en extraire la construction pour la tester comme `IFacialMocapSender.buildMessage`. |
+| `VmcOscSender.kt` | `buildBundle()` (extraite `internal`, pure) | `VmcOscSenderTest.kt` | ✅ Couvert -- regroupe les messages `/Val` + `/Apply` en un seul `OSCBundle` (voir rapport technique, point 4) au lieu d'un paquet UDP par blendshape. |
+| `VmcOscSender.kt` | `send()` (partie socket), `updateTarget()`, `connect()` | -- | ❌ Dépend d'un vrai `OSCPortOut`/UDP -- nécessite un test instrumenté ou un socket factice. La partie à risque (le contenu du bundle) est déjà couverte séparément. |
 | `NetworkUtils.kt` | `getLocalIpAddress()` | -- | ❌ Dépend des interfaces réseau réelles de l'appareil (`NetworkInterface.getNetworkInterfaces()`) -- environnement-dépendant, faible valeur à mocker pour une simple lecture d'IP locale. |
 
 ## camera/
@@ -67,7 +68,7 @@ Deux grandes catégories reviennent tout du long. Le code **logique pur** (maths
 
 ## Bilan actuel
 
-7 fichiers de test, tous en JVM pur (aucun appareil/émulateur requis) : `RotationMathTest`, `TrackingTierSelectorTest`, `BlendshapeCatalogTest`, `FaceLandmarkerHelperTest`, `IFacialMocapSenderTest`, `CameraControllerTest`. Ils couvrent l'intégralité de la logique mathématique et de formatage identifiée comme la plus fragile (rotation/calibration, mapping de noms de blendshapes, regard des yeux, sélection de palier, dimensions de rotation caméra), en s'appuyant sur quelques extractions de fonctions pures (visibilité `internal`) qui ne changent aucun comportement.
+7 fichiers de test, tous en JVM pur (aucun appareil/émulateur requis) : `RotationMathTest`, `TrackingTierSelectorTest`, `BlendshapeCatalogTest`, `FaceLandmarkerHelperTest`, `IFacialMocapSenderTest`, `CameraControllerTest`, `VmcOscSenderTest`. Ils couvrent l'intégralité de la logique mathématique et de formatage identifiée comme la plus fragile (rotation/calibration, mapping de noms de blendshapes, regard des yeux, sélection de palier, dimensions de rotation caméra, regroupement des messages OSC), en s'appuyant sur quelques extractions de fonctions pures (visibilité `internal`) qui ne changent aucun comportement.
 
 ## Règle pour la suite (TDD)
 

@@ -1,6 +1,7 @@
 package com.guyiome.androidmocap.network
 
 import com.guyiome.androidmocap.tracking.FaceTrackingResult
+import com.illposed.osc.OSCBundle
 import com.illposed.osc.OSCMessage
 import com.illposed.osc.transport.OSCPortOut
 import java.net.InetAddress
@@ -16,6 +17,11 @@ import java.util.concurrent.Executors
  * "eyeBlinkLeft") -- c'est le format "PerfectSync" reconnu par VTube Studio/VSeeFace. Le protocole
  * étant sensible à la casse, ne pas modifier ces noms sans vérifier le mapping côté récepteur.
  *
+ * Tous les messages d'une frame sont regroupés en un seul `OSCBundle` (voir [buildBundle]) envoyé
+ * en un seul paquet UDP -- le regroupement en bundle fait partie du cœur du spec OSC, géré par
+ * n'importe quel récepteur OSC conforme (VTube Studio compris). Auparavant, un paquet UDP séparé
+ * était envoyé par blendshape (jusqu'à une cinquantaine par frame).
+ *
  * Tout l'envoi réseau passe par un unique thread dédié pour ne jamais bloquer le thread d'inférence
  * MediaPipe ni l'UI.
  */
@@ -26,6 +32,21 @@ class VmcOscSender(
     companion object {
         /** Port conventionnel du protocole VMC (cf. protocol.vmc.info) ; à adapter selon la config VTube Studio. */
         const val DEFAULT_PORT = 39539
+
+        /**
+         * Regroupe tous les messages `/VMC/Ext/Blend/Val` (un par blendshape) + le `/Apply` final
+         * dans un seul `OSCBundle` -- extrait en fonction pure (`internal`, aucune dépendance
+         * socket) pour être testable en JVM, voir [send] qui l'envoie en un seul paquet UDP au
+         * lieu d'un envoi séparé par blendshape (jusqu'à une cinquantaine par frame auparavant).
+         */
+        internal fun buildBundle(result: FaceTrackingResult): OSCBundle {
+            val bundle = OSCBundle()
+            for (blendshape in result.blendshapes) {
+                bundle.addPacket(OSCMessage("/VMC/Ext/Blend/Val", listOf(blendshape.name, blendshape.score)))
+            }
+            bundle.addPacket(OSCMessage("/VMC/Ext/Blend/Apply", emptyList<Any>()))
+            return bundle
+        }
     }
 
     private val sendExecutor: ExecutorService = Executors.newSingleThreadExecutor()
@@ -58,10 +79,7 @@ class VmcOscSender(
         sendExecutor.execute {
             val out = oscPortOut ?: return@execute
             try {
-                for (blendshape in result.blendshapes) {
-                    out.send(OSCMessage("/VMC/Ext/Blend/Val", listOf(blendshape.name, blendshape.score)))
-                }
-                out.send(OSCMessage("/VMC/Ext/Blend/Apply", emptyList<Any>()))
+                out.send(buildBundle(result))
             } catch (e: Exception) {
                 // Réseau momentanément indisponible : on laisse tomber cette frame plutôt que de bloquer.
             }
