@@ -64,6 +64,20 @@ object RotationMath {
     }
 
     /**
+     * Convertit un quaternion (x, y, z, w) en matrice de rotation 3x3 row-major -- même format que
+     * [rotation3x3FromColumnMajor4x4], pour rejoindre le pipeline de calibration existant
+     * ([composeCalibratedEuler]) sans le dupliquer. Préparé pour la fusion ARCore (phase 2, voir
+     * `AndroidMoCap_revue_technique.md` point 3) : `com.google.ar.core.Pose#getRotationQuaternion()`
+     * expose la pose de tête sous cette forme, contrairement à MediaPipe qui fournit directement une
+     * matrice 4x4. Suppose un quaternion déjà normalisé (c'est le cas de celui renvoyé par ARCore).
+     */
+    fun rotation3x3FromQuaternion(x: Float, y: Float, z: Float, w: Float): FloatArray = floatArrayOf(
+        1f - 2f * (y * y + z * z), 2f * (x * y - w * z), 2f * (x * z + w * y),
+        2f * (x * y + w * z), 1f - 2f * (x * x + z * z), 2f * (y * z - w * x),
+        2f * (x * z - w * y), 2f * (y * z + w * x), 1f - 2f * (x * x + y * y),
+    )
+
+    /**
      * Combine en un seul appel testable les trois étapes faites à chaque frame dans
      * [com.guyiome.androidmocap.ui.MainViewModel.handleTrackingResult] : annuler la rotation du
      * téléphone lui-même depuis la calibration ([deviceDeltaMatrix]), puis exprimer le résultat

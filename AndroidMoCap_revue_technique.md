@@ -67,6 +67,33 @@ attaché. Procédure complète (génération de la clé, secrets à créer) dans
 "Distribution". `versionCode`/`versionName` passés à `2`/`0.2.0`. Le point 8 (minify/R8) reste
 volontairement désactivé -- voir sa note mise à jour ci-dessus.
 
+### 13. Fusion ARCore (palier `OPTIMAL`, phase 2) -- conflit d'architecture identifié, design en cours
+
+En creusant ce que "brancher ARCore" impliquerait concrètement, un point bloquant est apparu, qui
+explique en partie pourquoi ce n'était encore qu'un commentaire dans le code : **ARCore Augmented
+Faces et CameraX se disputent le même accès caméra**. `ArCoreApk`/`Session` en mode Augmented Faces
+gère lui-même la capture caméra frontale en interne -- il ne consomme pas un flux `ImageAnalysis`
+qu'on lui donnerait, contrairement à MediaPipe. Or Camera2 (sous CameraX comme sous ARCore) n'autorise
+qu'un seul client actif sur une caméra donnée à la fois (l'API "shared camera" d'ARCore existe mais
+cible l'usage caméra arrière + suivi du monde, pas ce cas de figure caméra frontale + Augmented Faces).
+Impossible donc, tel quel, de laisser CameraX nourrir MediaPipe **et** de laisser ARCore tourner en
+parallèle sur la même caméra pour le palier `OPTIMAL`.
+
+Piste retenue pour la suite : basculer la source d'image côté `OPTIMAL` -- au lieu que CameraX
+alimente MediaPipe, laisser `Session` piloter la caméra, récupérer les frames via
+`Frame.acquireCameraImage()` (image YUV) pour les convertir en `MPImage` et continuer à nourrir
+MediaPipe (blendshapes) avec ce flux, et utiliser `AugmentedFace.centerPose` (position + quaternion)
+comme source de pose de tête à la place de `facialTransformationMatrixes()` -- CameraX ne serait alors
+simplement plus utilisé pour ce palier (il resterait tel quel pour `STANDARD`/`COMPATIBLE`). C'est un
+changement structurant côté `CameraController`/`FaceLandmarkerHelper`, pas un simple ajout.
+
+En attendant de pouvoir vérifier ça sur device (disponibilité réelle d'Augmented Faces variable selon
+les appareils, comportement de `acquireCameraImage()` à valider empiriquement), seule la brique de
+maths pure et sans risque a été préparée en TDD : `RotationMath.rotation3x3FromQuaternion(x, y, z, w)`
+convertit le quaternion `Pose#getRotationQuaternion()` d'ARCore vers le même format de matrice 3x3
+row-major que `rotation3x3FromColumnMajor4x4`, pour pouvoir rejoindre `composeCalibratedEuler` sans le
+dupliquer une fois le reste branché. Voir `AndroidMoCap_tests_unitaires.md`.
+
 ## Priorités suggérées (mise à jour)
 
-Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device (aucun impact visuel, juste un travail évité). Le point 10 est une simple mise à jour de documentation. Le point 3 reste un investissement plus lourd (ARCore phase 2 surtout) à ne déclencher que si le besoin se confirme. Le point 11 (signature + versionnage) est traité (point 12). Le point 8 (minify) reste pour plus tard, une fois les tests device de nouveau possibles.
+Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device (aucun impact visuel, juste un travail évité). Le point 10 est une simple mise à jour de documentation. Le point 3/13 (ARCore phase 2) est maintenant mieux cerné mais reste un investissement lourd et risqué à finir "à l'aveugle" -- la suite (bascule caméra CameraX→ARCore) attend un accès device. Le point 11 (signature + versionnage) est traité (point 12). Le point 8 (minify) reste pour plus tard, une fois les tests device de nouveau possibles.

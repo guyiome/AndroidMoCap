@@ -144,6 +144,32 @@ class RotationMathTest {
     }
 
     @Test
+    fun `rotation3x3FromQuaternion de l'identite donne la matrice identite`() {
+        // Quaternion identite : (x=0, y=0, z=0, w=1) -- convention ARCore Pose#getRotationQuaternion.
+        val result = RotationMath.rotation3x3FromQuaternion(0f, 0f, 0f, 1f)
+        for (i in 0 until 9) assertEquals(RotationMath.IDENTITY_3X3[i], result[i], delta)
+    }
+
+    @Test
+    fun `rotation3x3FromQuaternion pour 90 degres autour de Z correspond a la rotation Z equivalente`() {
+        // Prépare le terrain pour la fusion ARCore (phase 2, voir AndroidMoCap_revue_technique.md
+        // point 3) : ARCore expose la pose de tête sous forme de quaternion, pas de matrice --
+        // cette conversion doit rejoindre le même format 3x3 row-major que toEulerDegrees/
+        // composeCalibratedEuler pour pouvoir réutiliser le pipeline de calibration existant tel quel.
+        val half = Math.toRadians(45.0) // theta/2 pour theta = 90°
+        val quaternionZ90 = floatArrayOf(0f, 0f, Math.sin(half).toFloat(), Math.cos(half).toFloat())
+        val result = RotationMath.rotation3x3FromQuaternion(
+            quaternionZ90[0], quaternionZ90[1], quaternionZ90[2], quaternionZ90[3],
+        )
+        val expected = floatArrayOf(
+            0f, -1f, 0f,
+            1f, 0f, 0f,
+            0f, 0f, 1f,
+        )
+        for (i in 0 until 9) assertEquals(expected[i], result[i], delta)
+    }
+
+    @Test
     fun `composeCalibratedEuler annule la pose courante quand elle sert de reference`() {
         // Calibrer sur la pose actuelle (référence = pose de tête courante) doit ramener l'avatar
         // à zéro, quelle que soit l'inclinaison de la tête au moment de la calibration -- c'est

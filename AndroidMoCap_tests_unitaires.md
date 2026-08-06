@@ -8,7 +8,7 @@ Deux grandes catégories reviennent tout du long. Le code **logique pur** (maths
 
 | Fichier | Élément couvert | Test(s) | Statut |
 |---|---|---|---|
-| `RotationMath.kt` | `multiply`, `transpose`, `rotation3x3FromColumnMajor4x4`, `toEulerDegrees`, `composeCalibratedEuler` | `RotationMathTest.kt` | ✅ Couvert -- c'est la classe la plus délicate de l'app (origine de l'inversion d'axes déjà rencontrée), priorité n°1. |
+| `RotationMath.kt` | `multiply`, `transpose`, `rotation3x3FromColumnMajor4x4`, `toEulerDegrees`, `composeCalibratedEuler`, `rotation3x3FromQuaternion` | `RotationMathTest.kt` | ✅ Couvert -- c'est la classe la plus délicate de l'app (origine de l'inversion d'axes déjà rencontrée), priorité n°1. `rotation3x3FromQuaternion` est la brique préparatoire à la fusion ARCore (rapport technique, point 13) : convertit le quaternion `Pose#getRotationQuaternion()` d'ARCore vers le même format 3x3 que le reste du pipeline. |
 | `TrackingTier.kt` | `TrackingTierSelector.select()` | `TrackingTierSelectorTest.kt` | ✅ Couvert (fonction pure `DeviceCapabilities -> TierConfig`). |
 | `BlendshapeCatalog.kt` | `all`, `byCategory` | `BlendshapeCatalogTest.kt` | ✅ Couvert (cohérence structurelle : 52 entrées, pas de doublon, recouvrement catégorie/liste complète). |
 | `FaceLandmarkerHelper.kt` | `computeEyeGazeDegrees()` (extraite en `internal`, pure) | `FaceLandmarkerHelperTest.kt` | ✅ Couvert. |
@@ -82,6 +82,18 @@ Point d'attention pour la vérification manuelle sur device : la projection supp
 ## Points 5 et 6 (rapport technique) -- pas de test dédié, raison assumée
 
 Contrairement aux points 1, 2 et 4, les points 5 (capteurs/batterie pas alignés sur le cycle de vie) et 6 (`initializeTracking()` pas protégé contre un double appel) ne contenaient aucune logique pure à extraire -- uniquement du glue code Android (observation de `Lifecycle`, garde sur un booléen d'instance). Implémentés directement, sans étape rouge/verte JUnit au préalable, avec la raison documentée ci-dessus plutôt qu'un silence. Vérification manuelle recommandée après relance de l'app : mettre l'app en arrière-plan quelques secondes puis revenir dessus, et confirmer que le tracking reprend normalement (capteurs bien redémarrés) sans redémarrage complet.
+
+## Fusion ARCore (rapport technique, point 13) -- préparation en TDD, implémentation en attente
+
+Un point d'architecture bloquant a été identifié (accès caméra disputé entre ARCore Augmented Faces
+et CameraX, voir le rapport technique) : le branchement complet attend un accès device pour être
+validé sans risque de casser le tracking existant. Seule la brique de maths pure et indépendante de
+ce point d'architecture a été préparée dès maintenant, suivant le même principe que le reste de l'app
+(extraire la logique à risque en fonction pure, la couvrir en JUnit, avant de toucher au code Android
+qui l'entoure) : `RotationMath.rotation3x3FromQuaternion()`, testée par deux cas (quaternion identité,
+et rotation de 90° autour de Z comparée à la matrice de rotation Z déjà utilisée ailleurs dans les
+tests). Rien d'autre n'a été branché : pas de session ARCore créée, pas de changement sur
+`CameraController`/`FaceLandmarkerHelper`/`MainViewModel`.
 
 ## Règle pour la suite (TDD)
 

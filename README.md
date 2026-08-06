@@ -6,8 +6,9 @@ disponible selon l'appareil, et diffusion des blendshapes vers VTube Studio / Bl
 
 Ce dépôt couvre la **phase 1** (voir `AndroidMoCap_etude_options.md`) : CameraX + MediaPipe Face
 Landmarker, détection de palier, mode économie d'énergie, envoi VMC/iFacialMocap. L'intégration
-ARCore (fusion de pose de tête, phase 2) est préparée dans le code (`TrackingTier`,
-`DeviceCapabilities`) mais pas encore branchée.
+ARCore (fusion de pose de tête, phase 2, palier `OPTIMAL`) est préparée dans le code (`TrackingTier`,
+`DeviceCapabilities`) mais pas encore branchée -- voir `AndroidMoCap_revue_technique.md` point 3
+pour l'état de la réflexion.
 
 ## Avant d'ouvrir le projet
 
@@ -124,7 +125,9 @@ réglages au moment de l'installation.
 ## Prochaines étapes (voir l'étude et `AndroidMoCap_revue_technique.md` pour le détail)
 
 1. Valider fréquence/latence réelle sur quelques appareils de test.
-2. Brancher ARCore (pose de tête) en fusion avec MediaPipe pour le palier `OPTIMAL`.
+2. Brancher ARCore (pose de tête) en fusion avec MediaPipe pour le palier `OPTIMAL` -- voir
+   `AndroidMoCap_revue_technique.md` point 3 pour la piste retenue et le point d'architecture
+   ouvert (accès caméra partagé entre ARCore et CameraX).
 3. Ajouter le lissage temporel (One Euro Filter) sur les blendshapes.
 4. Rétrogradation dynamique de palier en cas de throttling thermique (`DeviceCapabilityDetector.isThermalThrottling`
    existe déjà, pas encore appelé en continu pendant la capture).
