@@ -24,3 +24,8 @@ app/src/main/assets/*.task
 *.keystore
 *.jks
 release.keystore
+
+# Brouillons de réflexion personnels, volontairement non commités (ex. pistes de monétisation) --
+# à la différence de AndroidMoCap_revue_technique.md/tests_unitaires.md qui font partie du suivi
+# public du projet.
+AndroidMoCap_brouillon_*.md

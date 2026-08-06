@@ -118,6 +118,45 @@ justement le point d'accroche du geste système). `androidx-activity-compose` é
 dépendance du projet, aucun ajout nécessaire. Aucune logique pure à extraire ici -- pur remaniement
 UI, pas de nouveau test unitaire.
 
+### 22. Licence du projet -- PolyForm Shield 1.0.0, avec CLA en prévision de contributeurs
+
+Constat de départ : aucun fichier `LICENSE` n'existait jusqu'ici, alors que le README parlait
+d'"open source" -- légalement, le code restait "tous droits réservés" par défaut. Décidé suite à
+une revue des options (permissif type MIT/Apache 2.0, copyleft type GPL/AGPL, source-available,
+dual licensing) : le projet adopte la **PolyForm Shield License 1.0.0** (voir `LICENSE`).
+
+Raisonnement : l'objectif prioritaire identifié est de se protéger contre le risque concret qu'un
+tiers reprenne le dépôt pour publier un produit concurrent (par exemple sur le Play Store, là où ce
+projet ne peut pas aller pour l'instant) -- risque d'autant plus réel que le comparatif
+concurrentiel a confirmé un vrai vide de marché (MeowFace disparu, aucun successeur). PolyForm
+Shield répond exactement à ce risque (interdiction de fournir un produit qui concurrence le
+logiciel) sans restreindre l'usage normal des utilisateurs visés. C'est ce dernier point qui a
+écarté PolyForm Noncommercial, envisagée d'abord : cette variante interdit tout usage commercial
+par les licenciés, ce qui aurait pu techniquement inclure l'usage par un streamer dont le contenu
+est monétisé -- exactement le public ciblé par l'app, donc contre-productif.
+
+Réversibilité actée en discussion : un changement de licence n'est jamais rétroactif (ce qui a déjà
+été distribué sous ces termes le reste pour toujours), et assouplir plus tard (vers Apache 2.0/MIT
+par exemple) est sans risque, alors que durcir après coup est structurellement fragile -- des
+précédents connus du secteur (Elasticsearch/OpenSearch, Terraform/OpenTofu, Redis/Valkey) montrent
+que la communauté peut simplement forker la dernière version permissive et continuer sous les
+anciens termes. D'où le choix de partir protecteur maintenant plutôt que l'inverse.
+
+Pour préparer un passage éventuel vers une licence plus permissive si le projet accepte des
+contributions externes un jour, un accord de licence contributeur (`CLA.md`, référencé depuis
+`CONTRIBUTING.md`) a été rédigé : chaque contribution garde son auteur comme détenteur des droits,
+mais accorde au mainteneur une licence assez large pour relicencier l'ensemble du projet plus tard
+sans avoir à retrouver individuellement chaque contributeur. Sans ce document, relicencier
+nécessiterait l'accord explicite de chaque personne ayant contribué au fil du temps.
+
+Non traité pour l'instant, à reprendre si un produit payant voit le jour : la mention
+`Licensor Line of Business:` prévue par PolyForm Shield, qui permettrait de protéger une ligne de
+métier précise (ex. "AndroidMoCap Pro") même en cas de pause ou d'arrêt -- n'a de sens que le jour
+où un tel produit existe réellement.
+
+Statut : décision actée et mise en œuvre -- `LICENSE`, `CLA.md`, `CONTRIBUTING.md` créés, `README.md`
+mis à jour (section Licence, correction de la mention "open source").
+
 ## Priorités suggérées (mise à jour)
 
 Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device (aucun impact visuel, juste un travail évité). Le point 10 est une simple mise à jour de documentation. Le point 3/13 (ARCore phase 2) est maintenant mieux cerné mais reste un investissement lourd et risqué à finir "à l'aveugle" -- la suite (bascule caméra CameraX→ARCore) attend un accès device. Le point 11 (signature + versionnage) est traité (point 12). Le point 8 (minify) reste pour plus tard, une fois les tests device de nouveau possibles. Le point 14 (vérification de mise à jour) est en backlog, pas urgent. Le point 15 (navigation retour) est traité. Le point 16 (dénomination du mode iFacialMocap) est traité. Le point 17 (CI build/tests sur PR) est traité.
