@@ -52,7 +52,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 
 | Point | Sujet | Statut |
 | --- | --- | --- |
-| 3 / 13 | Fusion ARCore (palier `OPTIMAL`) | **Intégrée sur `main` le 6 août 2026** (réimplémentée à neuf, pas mergée depuis `feature/arcore-fusion`), voir sa section dédiée -- compile et teste en JVM, **pas encore testée sur device** |
+| 3 / 13 | Fusion ARCore (palier `OPTIMAL`) | **Intégrée sur `main` et testée sur device le 6 août 2026** (réimplémentée à neuf, pas mergée depuis `feature/arcore-fusion`) -- tracking fonctionnel confirmé par l'utilisateur (crash, rotation et perf corrigés en cours de session), voir sa section dédiée pour le détail et les points mineurs restants |
 | 8 | Minify/R8 en release | Désactivé volontairement, en attente de tests device |
 | 14 | Vérification de mise à jour semi-automatique | Backlog, aucun code écrit |
 | 15 | Détection langue (cascade) | Conception actée, aucun code écrit -- prérequiert le throttling thermique continu (point 3/13). **Confirmé par observation device le 6 août 2026** : le mesh montre que `tongueOut` n'est pas du tout restitué par MediaPipe (pas juste peu fiable), cohérent avec sa présence dans `BlendshapeCatalog.unreliable`. |
@@ -244,6 +244,49 @@ que deviner :
 6. Le point 1 ci-dessus (rotation/miroir non corrigés) reste entièrement d'actualité malgré ce
    correctif -- la conversion YUV→RGB ne fait que rendre l'image lisible par MediaPipe, elle ne dit
    rien de son orientation.
+
+**Suivi device (6 août 2026, même jour, suite) : rotation corrigée, warning `Display geometry`
+corrigé, perf déportée sur thread dédié -- tracking fonctionnel confirmé par l'utilisateur.**
+
+- **`Session.setDisplayGeometry()` jamais appelé** (commit `22dae4b`) : omission par rapport au
+  boilerplate ARCore standard, cause confirmée du warning natif répété `view_manager_utils.cc:
+  Display geometry has an invalid width: 0`. `ArCoreHeadPoseTracker` mémorise maintenant les
+  dimensions du `GLSurfaceView` (`onSurfaceChanged`) et appelle `setDisplayGeometry(ROTATION_0, ...)`
+  dès qu'une session existe, quel que soit l'ordre d'arrivée (même patron que
+  `maybeBindCameraTexture()`).
+- **Rotation de l'image caméra** (commit `fdee8aa`) : lue via Camera2
+  `CameraCharacteristics.SENSOR_ORIENTATION` pour la caméra choisie par ARCore -- même source que
+  celle utilisée en interne par CameraX, pas une valeur devinée -- puis appliquée via
+  `rotateBitmap()` qui réutilise `CameraController.rotatedDimensions()` (fonction pure déjà
+  testée). **Confirmé fonctionnel par l'utilisateur** : tracking correctement orienté, et la
+  latence perçue s'est nettement améliorée du même coup -- le warning `aimatter_landmarks_3Dmesh.cc:
+  Not able to find preprocess rotation with expected timestamp` était vraisemblablement causé par
+  la même absence de rotation (probablement résolu, pas encore reconfirmé explicitement dans un
+  nouveau logcat).
+- **Conversion déportée sur thread dédié** (commit `a247b95`), sur demande explicite de
+  l'utilisateur : la conversion YUV→RGB + rotation (coûteuse, pixel par pixel) tournait en
+  synchrone sur le thread GL (`onDrawFrame`), ralentissant à la fois le rendu et la cadence de
+  `session.update()`. Déportée sur `imageProcessingExecutor` (thread unique dédié, même convention
+  que `CameraController.cameraExecutor`) ; `acquireCameraImage()` reste sur le thread GL (lié à
+  `session.update()`), seule la suite est déportée. Contre-pression explicite
+  (`pendingConversions`/`MAX_PENDING_CONVERSIONS = 1`) : une frame est abandonnée plutôt que mise
+  en file si le thread dédié a du retard -- **principe explicitement demandé par l'utilisateur** :
+  les données envoyées au récepteur (blendshapes/pose) doivent rester prioritaires et à jour, une
+  frame caméra sautée est préférable à un retard qui s'accumule.
+- **Récepteur (VBridger)** : déjà validé séparément par l'utilisateur en palier `STANDARD`
+  (CameraX) avant cette session -- pas encore revérifié spécifiquement avec la source caméra
+  ARCore, mais rien dans le pipeline de données (blendshapes, protocole réseau) n'a changé entre
+  les deux paliers, seule la source caméra/pose diffère.
+
+Risques restants après cette série de correctifs (mise à jour de la liste ci-dessus) :
+- Point 2 (vérification `ArCoreApk` synchrone) et point 3 (pas de `<queries>`) : inchangés, toujours
+  ouverts.
+- Point 4 (coût thermique du duo GL+MediaPipe) : partiellement atténué par le déport de thread
+  ci-dessus (le thread GL est moins chargé), mais le throttling thermique dynamique reste non
+  branché -- toujours pertinent pour une session longue.
+- Nouveau point mineur : `yuv420ToBitmap()` alloue toujours un `Bitmap` par frame (pas de pool de
+  réutilisation) -- non prioritaire vu le gain déjà obtenu par le déport de thread, à reconsidérer
+  seulement si un nouveau signal de coût apparaît.
 
 ### 14. Vérification de mise à jour semi-automatique -- à faire (backlog)
 
