@@ -313,6 +313,19 @@ ARCore réel ne pose pas de problème : le repli silencieux déjà en place
 automatique. Outil de diagnostic explicitement, pas une fonctionnalité utilisateur normale -- `DiagnosticsScreen`
 n'est donc plus tout à fait "en lecture seule" (doc du composant mise à jour).
 
+**Garde-fou ajouté (même jour, commit `f6ed0ea`)**, demande explicite de l'utilisateur après un
+premier test réussi en palier forcé `COMPATIBLE` : `TrackingTierSelector.compatibility(tier,
+capabilities)` (nouvelle fonction pure, testée) distingue une incompatibilité dure d'un simple
+risque de performance. Seule incompatibilité dure identifiée : `OPTIMAL` sans support ARCore réel
+(forcer ce palier ne ferait de toute façon que déclencher le repli silencieux déjà en place --
+autant l'empêcher clairement à la sélection). Tout palier plus exigeant que ce que la sélection
+automatique aurait choisi pour l'appareil est un simple risque de performance (fonctionne, peut
+chauffer/ramer) -- jamais un blocage ; dégrader volontairement (palier moins exigeant que
+l'automatique) n'est jamais un risque. Côté `DiagnosticsScreen` : puce désactivée si incompatible,
+icône d'avertissement ambre à côté du nom si risque de performance seulement -- même code couleur
+que l'avertissement des blendshapes peu fiables (`BlendshapeSelectionScreen`), cohérence visuelle
+avec le reste de l'app plutôt qu'un nouveau langage visuel.
+
 ### 14. Vérification de mise à jour semi-automatique -- à faire (backlog)
 
 Discuté suite au point 12 (distribution GitHub Releases) : pas de mise à jour automatique possible
