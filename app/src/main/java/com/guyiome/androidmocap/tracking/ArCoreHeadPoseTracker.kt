@@ -22,6 +22,7 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.NotYetAvailableException
+import com.google.ar.core.exceptions.SessionPausedException
 import com.google.ar.core.exceptions.UnavailableApkTooOldException
 import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException
 import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException
@@ -74,6 +75,17 @@ import javax.microedition.khronos.opengles.GL10
  * [yuv420ToBitmap] alloue toujours un nouveau `Bitmap` par frame (pas de pool de réutilisation
  * comme `CameraController.acquirePooledBitmap`) -- optimisation restante si nécessaire, non
  * prioritaire vu le gain déjà obtenu par le déport de thread.
+ *
+ * ⚠️ **Crash confirmé sur device (6 août 2026) et corrigé** : `FATAL EXCEPTION` sur le thread GL,
+ * `SessionPausedException` levée par `Session.update()` dans [onDrawFrame]. Cause : le thread de
+ * rendu du [GLSurfaceView] n'était jamais mis en pause avec le cycle de vie de l'app -- seule la
+ * `Session` ARCore l'était ([stop]) -- donc [onDrawFrame] continuait d'appeler `session.update()`
+ * après que la session ait déjà été mise en pause (ex. app passée en arrière-plan). Corrigé :
+ * [glSurfaceView] mémorisé (pas seulement reçu en paramètre transitoire de [attachTo]) pour piloter
+ * son cycle de vie (`onResume()`/`onPause()`) en même temps que celui de la `Session`, avec un
+ * ordre précis dans [stop] (voir sa doc) pour éliminer la course. Filet de sécurité additionnel
+ * dans [onDrawFrame] (`catch (SessionPausedException)`) au cas où la course subsisterait malgré
+ * tout (pas garantie éliminée à 100%, l'API ne le garantit pas).
  *
  * ⚠️ **Rotation, corrigée (6 août 2026)** : [cameraRotationDegrees] (lu via Camera2
  * `CameraCharacteristics.SENSOR_ORIENTATION`, voir [readCameraSensorOrientation]) est appliqué à
@@ -151,6 +163,9 @@ class ArCoreHeadPoseTracker(
     private val pendingConversions = AtomicInteger(0)
 
     @Volatile private var session: Session? = null
+    // Mémorisé (pas seulement reçu en paramètre transitoire de attachTo()) pour pouvoir piloter
+    // son cycle de vie (onResume()/onPause()) depuis start()/stop() -- voir ces deux méthodes.
+    @Volatile private var glSurfaceView: GLSurfaceView? = null
     @Volatile private var cameraTextureId: Int = 0
     // Dimensions du GLSurfaceView, connues seulement une fois onSurfaceChanged() appelé --
     // mémorisées pour pouvoir (re)appliquer setDisplayGeometry() dès qu'une session existe, quel
@@ -183,9 +198,16 @@ class ArCoreHeadPoseTracker(
      * indépendamment du fait que ce calque soit visuellement affiché ou non.
      */
     fun attachTo(glSurfaceView: GLSurfaceView) {
+        this.glSurfaceView = glSurfaceView
         glSurfaceView.setEGLContextClientVersion(2)
         glSurfaceView.setRenderer(this)
         glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+        // Cas où start() a déjà tourné avant que MainScreen ne compose la surface et appelle
+        // attachTo() (ordre normal : initializeTracking() appelle start() immédiatement, voir
+        // MainViewModel) -- le résumé explicite du thread de rendu n'avait alors pas encore pu se
+        // faire faute de GLSurfaceView existant, rattrapé ici. setRenderer() doit précéder
+        // onResume() (exigence GLSurfaceView), d'où l'ordre des lignes ci-dessus.
+        if (session != null) glSurfaceView.onResume()
     }
 
     /** Ajuste le débit cible à chaud, même principe que `CameraController.setTargetFps`. */
@@ -205,11 +227,27 @@ class ArCoreHeadPoseTracker(
             currentSession.resume()
         } catch (e: CameraNotAvailableException) {
             onError("Caméra déjà utilisée par une autre app, impossible de démarrer ARCore.")
+            return
         }
+        // Après la session, jamais avant (GLSurfaceView.onResume() a besoin d'un renderer déjà
+        // posé -- voir attachTo()). Peut être no-op si la surface n'existe pas encore, rattrapé
+        // alors par attachTo() lui-même.
+        glSurfaceView?.onResume()
     }
 
-    /** À appeler sur ON_STOP. */
+    /**
+     * À appeler sur ON_STOP. Ordre important, corrige un crash confirmé sur device (6 août 2026,
+     * `SessionPausedException` levée depuis [onDrawFrame] -- `session.update()` appelé après que
+     * la session ait déjà été mise en pause) : [GLSurfaceView.onPause] est appelé **avant**
+     * `session.pause()`, pour arrêter le thread de rendu (qui appelle `session.update()` à chaque
+     * frame) avant de mettre la session elle-même en pause, plutôt que l'inverse -- sans ça, une
+     * frame de rendu déjà en cours peut appeler `session.update()` sur une session tout juste mise
+     * en pause. [onDrawFrame] garde malgré tout un filet de sécurité (voir son `catch`) : cet ordre
+     * réduit la fenêtre de course sans prétendre l'éliminer totalement (`onPause()` n'est pas
+     * garanti sur le thread de rendu, purement synchrone).
+     */
     fun stop() {
+        glSurfaceView?.onPause()
         session?.pause()
     }
 
@@ -358,6 +396,13 @@ class ArCoreHeadPoseTracker(
             currentSession.update()
         } catch (e: CameraNotAvailableException) {
             onError("Caméra indisponible pour ARCore : ${e.message}")
+            return
+        } catch (e: SessionPausedException) {
+            // Filet de sécurité (crash confirmé sur device, 6 août 2026, voir stop()) : la
+            // session a été mise en pause entre le début de cette frame de rendu et cet appel --
+            // rien d'anormal, on saute simplement cette frame plutôt que de planter. L'ordre
+            // GLSurfaceView.onPause() avant session.pause() dans stop() réduit déjà la fréquence
+            // de ce cas, sans l'éliminer totalement (course intrinsèque, pas garantie par l'API).
             return
         }
 
