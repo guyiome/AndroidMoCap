@@ -120,4 +120,18 @@ UI, pas de nouveau test unitaire.
 
 ## Priorités suggérées (mise à jour)
 
-Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device (aucun impact visuel, juste un travail évité). Le point 10 est une simple mise à jour de documentation. Le point 3/13 (ARCore phase 2) est maintenant mieux cerné mais reste un investissement lourd et risqué à finir "à l'aveugle" -- la suite (bascule caméra CameraX→ARCore) attend un accès device. Le point 11 (signature + versionnage) est traité (point 12). Le point 8 (minify) reste pour plus tard, une fois les tests device de nouveau possibles. Le point 14 (vérification de mise à jour) est en backlog, pas urgent. Le point 15 (navigation retour) est traité.
+Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device (aucun impact visuel, juste un travail évité). Le point 10 est une simple mise à jour de documentation. Le point 3/13 (ARCore phase 2) est maintenant mieux cerné mais reste un investissement lourd et risqué à finir "à l'aveugle" -- la suite (bascule caméra CameraX→ARCore) attend un accès device. Le point 11 (signature + versionnage) est traité (point 12). Le point 8 (minify) reste pour plus tard, une fois les tests device de nouveau possibles. Le point 14 (vérification de mise à jour) est en backlog, pas urgent. Le point 15 (navigation retour) est traité. Le point 16 (dénomination du mode iFacialMocap) est traité.
+
+### 16. Dénomination du mode de connexion "iFacialMocap" -- ✅ corrigé
+
+Retour de test : le mode de connexion s'affichait comme "iFacialMocap" dans le sélecteur (chip)
+alors que l'app ne se connecte pas à cette application, elle implémente seulement un protocole
+compatible -- confusion possible côté propriété intellectuelle et côté utilisateur. Renommage des
+chaînes utilisateur uniquement (chip, titre de section, statut, sous-titre du menu réglages) pour
+mettre en avant le protocole/les récepteurs réels (VBridger, VSeeFace...) plutôt que le nom de
+l'app tierce, tout en gardant "iFacialMocap" en mention secondaire pour rester trouvable par
+quelqu'un qui chercherait spécifiquement ce terme (titre de section : "iFacialMocap — protocole
+compatible"). Chip : "UDP / VBridger". Statut : "Connexion UDP : …". Aucun identifiant interne
+touché : `ConnectionType.IFACIALMOCAP`, la classe `IFacialMocapSender` et ses constantes de
+handshake protocolaire restent inchangés -- ce sont des identifiants techniques, pas de la
+présentation utilisateur.

@@ -113,7 +113,7 @@ fun SettingsScreen(
 
 private fun connectionSubtitle(uiState: MainUiState): String = when (uiState.connectionType) {
     ConnectionType.VMC -> if (uiState.vmcEnabled) "VMC connecté à ${uiState.vmcTargetLabel}" else "VMC choisi, pas encore connecté"
-    ConnectionType.IFACIALMOCAP -> if (uiState.iFacialMocapListening) "iFacialMocap en écoute" else "iFacialMocap choisi, pas encore en écoute"
+    ConnectionType.IFACIALMOCAP -> if (uiState.iFacialMocapListening) "UDP / VBridger en écoute" else "UDP / VBridger choisi, pas encore en écoute"
     null -> "Aucun type choisi"
 }
 

@@ -90,7 +90,7 @@ fun ConnectionSettingsScreen(
                 FilterChip(
                     selected = uiState.connectionType == ConnectionType.IFACIALMOCAP,
                     onClick = { onSelectConnectionType(ConnectionType.IFACIALMOCAP) },
-                    label = { Text("iFacialMocap") },
+                    label = { Text("UDP / VBridger") },
                 )
             }
 
@@ -124,7 +124,7 @@ fun ConnectionSettingsScreen(
 
                 ConnectionType.IFACIALMOCAP -> {
                     Spacer(Modifier.height(24.dp))
-                    Text("iFacialMocap / VBridger", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                    Text("iFacialMocap — protocole compatible", color = Color.White, style = MaterialTheme.typography.titleMedium)
                     Text(
                         "IP du téléphone à saisir côté VBridger : ${uiState.localIpAddress}",
                         color = Color.White,
@@ -141,7 +141,7 @@ fun ConnectionSettingsScreen(
                         val status = uiState.iFacialMocapConnectedTo
                             ?.let { "connecté à $it" }
                             ?: "en attente du handshake VBridger…"
-                        Text("iFacialMocap : $status", color = Color(0xFF9FE7B0), modifier = Modifier.padding(top = 4.dp))
+                        Text("Connexion UDP : $status", color = Color(0xFF9FE7B0), modifier = Modifier.padding(top = 4.dp))
                     }
                 }
 
