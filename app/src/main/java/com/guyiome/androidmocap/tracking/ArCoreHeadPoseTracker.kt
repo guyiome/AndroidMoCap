@@ -8,6 +8,7 @@ import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.os.SystemClock
 import android.util.Log
+import android.view.Surface
 import com.google.ar.core.AugmentedFace
 import com.google.ar.core.CameraConfig
 import com.google.ar.core.CameraConfigFilter
@@ -66,6 +67,16 @@ import javax.microedition.khronos.opengles.GL10
  * device : détection MediaPipe dégradée et/ou overlay du mesh mal projeté. Ne pas corriger à
  * l'aveugle sans pouvoir observer le comportement réel sur un appareil.
  *
+ * ⚠️ **Warning natif confirmé sur device (6 août 2026), partiellement corrigé** : logcat
+ * utilisateur après le correctif YUV ci-dessus montrait en continu, à chaque frame, deux messages
+ * natifs -- `view_manager_utils.cc: Display geometry has an invalid width: 0` (corrigé : `Session`
+ * n'avait jamais reçu [Session.setDisplayGeometry], voir [maybeSetDisplayGeometry]) et
+ * `aimatter_landmarks_3Dmesh.cc: Not able to find preprocess rotation with expected timestamp`
+ * (cause distincte, **toujours pas résolue** -- probablement liée au même risque de
+ * rotation/miroir non géré ci-dessus, mais pas confirmé ; ne pas corriger à l'aveugle en ajoutant
+ * un `ImageProcessingOptions.rotationDegrees` deviné sans savoir la valeur correcte pour ce
+ * capteur). À revérifier au prochain retour device.
+ *
  * Raison d'être : ARCore Augmented Faces gère lui-même la capture caméra frontale en interne (via
  * `Session#setCameraTextureName`, qui nécessite un contexte GL) -- il ne peut donc pas cohabiter
  * avec CameraX sur la même caméra (Camera2 n'autorise qu'un seul client actif). Ce tracker pilote
@@ -104,6 +115,12 @@ class ArCoreHeadPoseTracker(
 
     @Volatile private var session: Session? = null
     @Volatile private var cameraTextureId: Int = 0
+    // Dimensions du GLSurfaceView, connues seulement une fois onSurfaceChanged() appelé --
+    // mémorisées pour pouvoir (re)appliquer setDisplayGeometry() dès qu'une session existe, quel
+    // que soit l'ordre d'arrivée entre la création de la session (start()) et celle de la surface
+    // GL, même principe que cameraTextureId/maybeBindCameraTexture() ci-dessous.
+    @Volatile private var lastKnownSurfaceWidth: Int = 0
+    @Volatile private var lastKnownSurfaceHeight: Int = 0
 
     @Volatile private var targetFps: Int = initialTargetFps.coerceAtLeast(1)
     @Volatile private var minFrameIntervalMs: Long = 1000L / targetFps
@@ -131,6 +148,7 @@ class ArCoreHeadPoseTracker(
         val currentSession = session ?: tryCreateSession()?.also {
             session = it
             maybeBindCameraTexture()
+            maybeSetDisplayGeometry()
         } ?: return
         try {
             currentSession.resume()
@@ -215,6 +233,21 @@ class ArCoreHeadPoseTracker(
         currentSession.setCameraTextureName(cameraTextureId)
     }
 
+    /**
+     * `Session#setDisplayGeometry()` -- jamais appelé avant ce correctif, cause confirmée sur
+     * device (logcat utilisateur, 6 août 2026) du warning natif répété en continu "Display
+     * geometry has an invalid width: 0". Rotation fixée à [Surface.ROTATION_0] : l'app est
+     * verrouillée portrait (voir `AndroidManifest.xml`), pas besoin de lire la rotation
+     * d'affichage réelle -- même hypothèse déjà faite ailleurs dans l'app pour la matrice de
+     * rotation caméra de `CameraController` (voir revue technique, point 20, si ce verrouillage
+     * change un jour sur tablette).
+     */
+    private fun maybeSetDisplayGeometry() {
+        val currentSession = session ?: return
+        if (lastKnownSurfaceWidth == 0 || lastKnownSurfaceHeight == 0) return
+        currentSession.setDisplayGeometry(Surface.ROTATION_0, lastKnownSurfaceWidth, lastKnownSurfaceHeight)
+    }
+
     // --- GLSurfaceView.Renderer : appelé depuis le thread GL dédié créé par GLSurfaceView, donc
     // TOUJOURS différent du thread principal -- même situation déjà gérée ailleurs dans l'app
     // (FaceLandmarkerHelper.onLiveStreamResult tourne aussi sur son propre thread de callback),
@@ -234,6 +267,9 @@ class ArCoreHeadPoseTracker(
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES20.glViewport(0, 0, width, height)
+        lastKnownSurfaceWidth = width
+        lastKnownSurfaceHeight = height
+        maybeSetDisplayGeometry()
     }
 
     override fun onDrawFrame(gl: GL10?) {
