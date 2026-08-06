@@ -261,17 +261,18 @@ corrigé, perf déportée sur thread dédié -- tracking fonctionnel confirmé p
   testée). **Confirmé fonctionnel par l'utilisateur** : tracking correctement orienté, et la
   latence perçue s'est nettement améliorée du même coup.
 - **Warning `aimatter_landmarks_3Dmesh.cc: Not able to find preprocess rotation with expected
-  timestamp`, hypothèse initiale infirmée** (commit `ac0ed9f`) : contrairement à ce qui était
-  supposé ci-dessus, ce warning **persiste identique** après le correctif de rotation (reconfirmé
-  sur device, même logcat que la rotation validée) -- pas causé par l'absence de rotation. Nouvelle
-  piste non vérifiée : le timestamp du message (ex. `792660266321`) est trop grand pour
-  `SystemClock.uptimeMillis()`, cohérent avec un timestamp en nanosecondes façon
-  `Frame.getTimestamp()` d'ARCore -- suggérerait une fonctionnalité interne (compensation de
-  rotation continue via IMU ?) jamais câblée, pas confirmé. Tracking reste fonctionnel malgré ce
-  warning, donc vraisemblablement bénin. **Prochaine étape pour trancher sans deviner un troisième
-  correctif à l'aveugle** : vérifier si le même warning apparaît aussi au palier `STANDARD`
-  (CameraX) sur le même appareil -- si oui, comportement préexistant de la lib sans rapport avec
-  cette intégration ; si non, spécifique à `ArCoreHeadPoseTracker` et à creuser plus loin.
+  timestamp`, hypothèse initiale infirmée puis confirmé spécifique à ARCore** (commits `ac0ed9f`,
+  `d1428a2`) : contrairement à ce qui était supposé, persistait identique après le correctif de
+  rotation -- pas causé par l'absence de rotation. **Tranché le même jour** grâce au sélecteur de
+  palier (point ci-dessus) : capture logcat continue sur un aller-retour `STANDARD` → `OPTIMAL` sur
+  le même appareil -- **0 occurrence en `STANDARD`** sur toute la session, **présent en continu dès
+  la première frame en `OPTIMAL`**. Confirme que c'est spécifique à `ArCoreHeadPoseTracker`, pas un
+  comportement préexistant de la lib. Nouvelle piste, plus précise mais toujours pas confirmée :
+  `frameTimeMs` (`SystemClock.uptimeMillis()`) y est généré *après* la conversion asynchrone (voir
+  déport sur thread dédié ci-dessus), donc décalé par rapport à l'instant réel de capture --
+  contrairement à `CameraController`, synchrone sur son propre thread caméra dédié. Tracking reste
+  fonctionnel malgré ce warning. Pas de troisième correctif tenté à l'aveugle -- la piste
+  nécessiterait de logger/comparer le timestamp réel passé à `detectAsync` avant d'agir.
 - **Conversion déportée sur thread dédié** (commit `a247b95`), sur demande explicite de
   l'utilisateur : la conversion YUV→RGB + rotation (coûteuse, pixel par pixel) tournait en
   synchrone sur le thread GL (`onDrawFrame`), ralentissant à la fois le rendu et la cadence de
