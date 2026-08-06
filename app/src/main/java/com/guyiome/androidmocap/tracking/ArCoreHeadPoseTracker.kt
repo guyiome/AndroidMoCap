@@ -2,6 +2,11 @@ package com.guyiome.androidmocap.tracking
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Matrix
+import android.graphics.RectF
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import android.media.Image
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
@@ -24,6 +29,7 @@ import com.google.ar.core.exceptions.UnavailableSdkTooOldException
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.MPImage
+import com.guyiome.androidmocap.camera.CameraController
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -126,6 +132,20 @@ class ArCoreHeadPoseTracker(
     @Volatile private var minFrameIntervalMs: Long = 1000L / targetFps
     private var lastAcceptedFrameElapsedMs: Long = 0L
 
+    // Rotation (degrés, horaire) à appliquer à l'image YUV brute pour l'amener à l'orientation
+    // portrait attendue par MediaPipe -- lue une fois la caméra ARCore sélectionnée (voir
+    // tryCreateSession) via Camera2 (CameraCharacteristics.SENSOR_ORIENTATION), l'app étant
+    // verrouillée portrait (device rotation toujours ROTATION_0, voir maybeSetDisplayGeometry).
+    // Même formule que celle utilisée en interne par CameraX pour une caméra frontale à
+    // destination fixe 0° (CameraOrientationUtil.getRelativeImageRotation, isOppositeFacing=true
+    // -> rotation relative = orientation du capteur telle quelle) -- sans miroir : le miroir reste
+    // géré uniquement à l'affichage (voir LandmarkProjection), jamais dans l'image envoyée à
+    // MediaPipe, même convention que CameraController. Confirmé nécessaire sur device (retour
+    // utilisateur 6 août 2026 : rotation visiblement absente avant ce correctif) mais formule non
+    // vérifiée visuellement -- à confirmer au prochain test (le mesh doit apparaître à l'endroit,
+    // tourner la tête doit bouger le mesh dans le sens intuitif).
+    @Volatile private var cameraRotationDegrees: Int = 0
+
     /**
      * À appeler avec le [GLSurfaceView] hébergé côté Compose (voir `MainScreen`). Requis par ARCore
      * (la caméra ne peut être pilotée que via une texture GL, voir `Session#setCameraTextureName`),
@@ -195,6 +215,7 @@ class ArCoreHeadPoseTracker(
                 return null
             }
             newSession.setCameraConfig(frontCameraConfigs[0])
+            cameraRotationDegrees = readCameraSensorOrientation(frontCameraConfigs[0].cameraId)
 
             val config = Config(newSession)
             config.setAugmentedFaceMode(Config.AugmentedFaceMode.MESH3D)
@@ -224,6 +245,24 @@ class ArCoreHeadPoseTracker(
             Log.e(TAG, "Session ARCore/Augmented Faces indisponible", e)
             onUnavailable("Configuration ARCore Augmented Faces refusée par cet appareil (${e.message}).")
             null
+        }
+    }
+
+    /**
+     * Lit `CameraCharacteristics.SENSOR_ORIENTATION` pour la caméra choisie par ARCore -- même
+     * source que celle utilisée par CameraX en interne pour calculer sa propre correction de
+     * rotation. Repli sur 0° si indisponible (device exotique, permission caméra révoquée entre
+     * temps...) plutôt que de planter -- au pire l'image reste dans l'orientation du capteur,
+     * comportement identique à avant ce correctif.
+     */
+    private fun readCameraSensorOrientation(cameraId: String): Int {
+        return try {
+            val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            cameraManager.getCameraCharacteristics(cameraId)
+                .get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
+        } catch (e: Exception) {
+            Log.w(TAG, "Impossible de lire l'orientation du capteur caméra ARCore, repli sur 0°", e)
+            0
         }
     }
 
@@ -312,7 +351,8 @@ class ArCoreHeadPoseTracker(
         // ici, synchrone, pas besoin de la garder ouverte jusqu'à ce que MediaPipe ait fini avec le
         // frame (contrairement à l'ancienne version, voir releaseFrame()).
         val bitmap = try {
-            yuv420ToBitmap(image)
+            val raw = yuv420ToBitmap(image)
+            if (cameraRotationDegrees == 0) raw else rotateBitmap(raw, cameraRotationDegrees)
         } catch (e: Exception) {
             Log.e(TAG, "Échec de conversion YUV -> Bitmap de l'image caméra ARCore", e)
             return
@@ -365,6 +405,29 @@ class ArCoreHeadPoseTracker(
         }
 
         return Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
+    }
+
+    /**
+     * Applique [rotationDegrees] (horaire) à [source] -- même technique que
+     * `CameraController.processFrame()` (`Matrix.postRotate` + remap des bounds pour centrer le
+     * résultat), et réutilise directement `CameraController.rotatedDimensions()` (fonction pure
+     * déjà testée en JVM) pour les dimensions de sortie plutôt que de dupliquer ce calcul. [source]
+     * est recyclé immédiatement après usage : deux `Bitmap` par frame (brut + tourné) sinon,
+     * inutile de garder le premier plus longtemps que nécessaire vu le coût mémoire déjà identifié
+     * comme risque de performance (voir kdoc de cette classe).
+     */
+    private fun rotateBitmap(source: Bitmap, rotationDegrees: Int): Bitmap {
+        val (outWidth, outHeight) = CameraController.rotatedDimensions(source.width, source.height, rotationDegrees)
+        val matrix = Matrix().apply {
+            postRotate(rotationDegrees.toFloat())
+            val bounds = RectF(0f, 0f, source.width.toFloat(), source.height.toFloat())
+            mapRect(bounds)
+            postTranslate(-bounds.left, -bounds.top)
+        }
+        val rotated = Bitmap.createBitmap(outWidth, outHeight, Bitmap.Config.ARGB_8888)
+        Canvas(rotated).drawBitmap(source, matrix, null)
+        source.recycle()
+        return rotated
     }
 
     private fun emitHeadPose(session: Session) {
