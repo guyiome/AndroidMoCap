@@ -78,11 +78,23 @@ import javax.microedition.khronos.opengles.GL10
  * ⚠️ **Rotation, corrigée (6 août 2026)** : [cameraRotationDegrees] (lu via Camera2
  * `CameraCharacteristics.SENSOR_ORIENTATION`, voir [readCameraSensorOrientation]) est appliqué à
  * l'image avant conversion -- confirmé nécessaire et fonctionnel sur device (retour utilisateur :
- * tracking correctement orienté après ce correctif, latence perçue également améliorée). Le
- * warning natif `aimatter_landmarks_3Dmesh.cc: Not able to find preprocess rotation with expected
- * timestamp`, observé en continu avant ce correctif, était vraisemblablement causé par la même
- * absence de rotation -- probablement résolu du même coup, à confirmer explicitement au prochain
- * accès au logcat (pas encore vérifié directement).
+ * tracking correctement orienté après ce correctif, latence perçue également améliorée).
+ *
+ * ⚠️ **Warning natif `aimatter_landmarks_3Dmesh.cc: Not able to find preprocess rotation with
+ * expected timestamp`, TOUJOURS présent après le correctif de rotation ci-dessus (reconfirmé sur
+ * device, logcat utilisateur, 6 août 2026)** -- l'hypothèse initiale ("causé par l'absence de
+ * rotation") est donc fausse, corrigée ici plutôt que laissée en l'état. Piste non vérifiée : le
+ * timestamp dans le message (ex. `792660266321`) est bien trop grand pour être le
+ * `SystemClock.uptimeMillis()` passé à `detectAsync` (qui serait de l'ordre de quelques centaines
+ * de milliers sur une session courte) -- cohérent en revanche avec un timestamp en **nanosecondes**
+ * façon `Frame.getTimestamp()` d'ARCore, ce qui suggérerait une fonctionnalité interne à la lib
+ * (peut-être une compensation de rotation continue basée sur l'IMU, distincte du simple
+ * `rotationDegrees` fixe) jamais câblée depuis cette classe -- hypothèse, pas confirmée. Tracking
+ * confirmé fonctionnel malgré ce warning (présent en continu depuis le tout premier test), donc
+ * vraisemblablement bénin, mais pas vérifié explicitement. Prochaine étape pour trancher : vérifier
+ * si le même warning apparaît aussi au palier `STANDARD` (CameraX) sur le même appareil -- si oui,
+ * comportement préexistant de la lib sans rapport avec ce fichier ; si non, spécifique à cette
+ * classe et à creuser plus loin. Ne pas tenter un troisième correctif à l'aveugle sans ce test.
  *
  * Raison d'être : ARCore Augmented Faces gère lui-même la capture caméra frontale en interne (via
  * `Session#setCameraTextureName`, qui nécessite un contexte GL) -- il ne peut donc pas cohabiter
