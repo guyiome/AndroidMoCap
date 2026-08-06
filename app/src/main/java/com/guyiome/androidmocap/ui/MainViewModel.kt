@@ -185,6 +185,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             appSettingsStore.faceMeshOverlayEnabled.collect { enabled ->
                 _uiState.update { it.copy(faceMeshOverlayEnabled = enabled) }
+                // faceLandmarkerHelper peut ne pas encore exister à ce stade (permission caméra
+                // pas encore accordée) -- initializeTracking() réapplique l'état courant une fois
+                // prêt, même logique que pour setPreviewEnabled côté caméra.
+                faceLandmarkerHelper?.setLandmarksNeeded(enabled)
             }
         }
     }
@@ -222,6 +226,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             onError = ::handleError,
         )
         helper.setup()
+        // Réapplique l'état courant du réglage (chargé depuis les préférences, potentiellement
+        // avant que le helper n'existe -- voir le collecteur dans init).
+        helper.setLandmarksNeeded(_uiState.value.faceMeshOverlayEnabled)
         faceLandmarkerHelper = helper
 
         _uiState.update { it.copy(activeDelegateIsGpu = helper.activeDelegateIsGpu) }

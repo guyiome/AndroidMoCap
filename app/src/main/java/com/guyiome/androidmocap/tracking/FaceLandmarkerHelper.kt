@@ -70,6 +70,16 @@ class FaceLandmarkerHelper(
     var activeDelegateIsGpu: Boolean = false
         private set
 
+    // Extraction du mesh (478 points) coûteuse pour rien tant que l'overlay optionnel n'est pas
+    // affiché (désactivé par défaut) -- @Volatile car modifié depuis le thread UI/ViewModel
+    // (setLandmarksNeeded) et lu depuis le thread de callback MediaPipe (onLiveStreamResult).
+    @Volatile private var landmarksNeeded: Boolean = false
+
+    /** À appeler quand l'overlay du mesh est activé/désactivé dans les réglages. */
+    fun setLandmarksNeeded(needed: Boolean) {
+        landmarksNeeded = needed
+    }
+
     fun setup() {
         if (tierConfig.preferGpuDelegate) {
             val gpuOk = tryCreateLandmarker(Delegate.GPU)
@@ -146,11 +156,12 @@ class FaceLandmarkerHelper(
         val (leftEyeEuler, rightEyeEuler) = computeEyeGazeDegrees(blendshapes)
 
         // Mesh complet (478 points -- surface + iris), coordonnées déjà normalisées [0,1] par
-        // MediaPipe -- gardé disponible en continu pour l'overlay optionnel (voir
-        // com.guyiome.androidmocap.ui.FaceMeshOverlay), qu'il soit affiché ou non à cet instant
-        // (le coût d'extraction est négligeable comparé au reste du pipeline).
+        // MediaPipe -- extrait uniquement si l'overlay optionnel (voir
+        // com.guyiome.androidmocap.ui.FaceMeshOverlay) est actif : contrairement aux blendshapes,
+        // ce mesh ne sert qu'à cet affichage, désactivé par défaut -- inutile de construire cette
+        // liste de 478 éléments à chaque frame pour la quasi-totalité des sessions.
         val landmarksOptional = result.faceLandmarks()
-        val landmarks = if (landmarksOptional.isNotEmpty()) {
+        val landmarks = if (landmarksNeeded && landmarksOptional.isNotEmpty()) {
             landmarksOptional[0].map { landmark -> landmark.x() to landmark.y() }
         } else {
             emptyList()
