@@ -157,9 +157,46 @@ où un tel produit existe réellement.
 Statut : décision actée et mise en œuvre -- `LICENSE`, `CLA.md`, `CONTRIBUTING.md` créés, `README.md`
 mis à jour (section Licence, correction de la mention "open source").
 
+### 23. Localisation complète de l'UI -- priorité, juste après la revue de la branche main en cours
+
+L'app a été construite au fil de l'eau entièrement en français : `strings.xml` ne contient que
+`app_name`, tout le texte utilisateur est écrit en dur dans les appels `Text(...)` Compose,
+directement dans les 14 fichiers du package `ui/` (plus quelques messages d'erreur dans
+`CameraController.kt` et `MainViewModel.kt`). Estimation après inspection : ~90-110 chaînes
+distinctes à sortir vers des ressources, 0% actuellement externalisé.
+
+Trois niveaux de difficulté identifiés :
+- La majorité (~60) sont des chaînes statiques simples -- extraction mécanique et peu risquée vers
+  `strings.xml` + `stringResource(R.string.x)`.
+- Une quinzaine sont des chaînes composées avec des valeurs dynamiques (ex. le sous-titre
+  "Palier ... · visage détecté/non détecté" de `SettingsScreen`/`DiagnosticsScreen`, ou "Délai
+  d'inactivité : Xs" de `DisplaySettingsScreen`) -- besoin de ressources à placeholders plutôt qu'un
+  remplacement 1:1, l'ordre des mots pouvant changer d'une langue à l'autre.
+- Les messages d'erreur de `MainViewModel.kt`/`CameraController.kt` posent un vrai souci
+  d'architecture : ni l'un ni l'autre n'est un `@Composable`, donc pas d'accès direct à
+  `stringResource()` -- il faudra soit leur passer un `Context`/`Application`, soit faire remonter
+  des identifiants de ressource jusqu'à la couche UI qui les résout à l'affichage.
+
+Les 7 libellés de `BlendshapeCategory` ("Sourcils", "Yeux"...) sont triviaux à extraire. À l'inverse,
+les 52 noms de blendshapes ARKit (`jawOpen`, `mouthSmileLeft`...) ne doivent PAS être traduits --
+c'est le vocabulaire du protocole, pas du texte d'affichage.
+
+Une fois l'extraction faite, il restera : un dossier `res/values-en/` avec les traductions,
+`android:localeConfig` dans le manifeste pour le sélecteur de langue par app (Android 13+), et une
+repasse visuelle de chaque écran en langue secondaire (dépend d'un accès device, comme le reste des
+vérifications visuelles en attente).
+
+Nature du travail : un seul commit "refactor" au sens de la règle de commit du projet (aucune
+nouvelle fonctionnalité, juste un découpage) -- mais qui touche tous les écrans, donc plus risqué à
+faire à l'aveugle sans pouvoir vérifier visuellement ensuite. La passe d'extraction elle-même peut
+démarrer sans device (validable structurellement) ; seule la vérification visuelle finale attend un
+accès device.
+
 ## Priorités suggérées (mise à jour)
 
 Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device (aucun impact visuel, juste un travail évité). Le point 10 est une simple mise à jour de documentation. Le point 3/13 (ARCore phase 2) est maintenant mieux cerné mais reste un investissement lourd et risqué à finir "à l'aveugle" -- la suite (bascule caméra CameraX→ARCore) attend un accès device. Le point 11 (signature + versionnage) est traité (point 12). Le point 8 (minify) reste pour plus tard, une fois les tests device de nouveau possibles. Le point 14 (vérification de mise à jour) est en backlog, pas urgent. Le point 15 (navigation retour) est traité. Le point 16 (dénomination du mode iFacialMocap) est traité. Le point 17 (CI build/tests sur PR) est traité.
+
+**Ordre de priorité actuel (mis à jour) :** 1) revue/merge des PR #5 et #6 et test de l'état actuel de la branche `main` dès qu'un accès device est possible ; 2) point 23 (localisation complète de l'UI), juste derrière -- peut démarrer (passe d'extraction) avant même la fin du point 1, seule la vérification visuelle finale dépend du device.
 
 ### 16. Dénomination du mode de connexion "iFacialMocap" -- ✅ corrigé
 
