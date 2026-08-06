@@ -1,0 +1,108 @@
+<resources>
+    <string name="app_name">AndroidMoCap</string>
+
+    <!-- Commun à plusieurs écrans -->
+    <string name="cd_back">Retour</string>
+    <string name="action_stop">Stop</string>
+    <string name="placeholder_unknown">…</string>
+    <string name="bool_yes">oui</string>
+    <string name="bool_no">non</string>
+
+    <!-- Catégories de blendshapes (BlendshapeCategory) -->
+    <string name="category_brow">Sourcils</string>
+    <string name="category_eye">Yeux</string>
+    <string name="category_cheek">Joues</string>
+    <string name="category_nose">Nez</string>
+    <string name="category_jaw">Mâchoire</string>
+    <string name="category_mouth">Bouche</string>
+    <string name="category_tongue">Langue</string>
+
+    <!-- Panneau de valeurs de blendshapes (écran principal) -->
+    <string name="blendshape_value_format">%1$s : %2$s</string>
+
+    <!-- Écran de sélection des blendshapes -->
+    <string name="blendshape_selection_title">Blendshapes affichées</string>
+    <string name="search_label">Rechercher</string>
+    <string name="cd_unreliable_blendshape">Fiabilité limitée chez MediaPipe</string>
+
+    <!-- Bandeau principal (MainHud) -->
+    <string name="cd_face_detected">Visage détecté</string>
+    <string name="cd_connected_tap_disconnect">Connecté -- appuyer pour déconnecter</string>
+    <string name="cd_disconnected_tap_connect">Non connecté -- appuyer pour connecter</string>
+    <string name="cd_calibrate">Mise à zéro</string>
+    <string name="settings_title">Réglages</string>
+    <string name="cd_low_battery">Batterie faible</string>
+
+    <!-- Permission caméra -->
+    <string name="camera_permission_rationale">La caméra frontale est nécessaire pour la capture faciale.</string>
+    <string name="action_grant_camera_permission">Autoriser la caméra</string>
+
+    <!-- Écran Connexion -->
+    <string name="connection_title">Connexion</string>
+    <string name="connection_type_label">Type de connexion (bouton de l\'écran principal)</string>
+    <string name="connection_type_vmc">VMC</string>
+    <string name="connection_type_udp_vbridger">UDP / VBridger</string>
+    <string name="connection_vmc_section_title">VMC (VTube Studio / Blender / Unity)</string>
+    <string name="connection_vmc_ip_label">IP du PC</string>
+    <string name="action_send">Envoyer</string>
+    <string name="connection_vmc_active_status">Envoi VMC actif vers %1$s</string>
+    <string name="connection_udp_section_title">iFacialMocap — protocole compatible</string>
+    <string name="connection_udp_ip_hint">IP du téléphone à saisir côté VBridger : %1$s</string>
+    <string name="action_listen">Écouter</string>
+    <string name="connection_udp_connected_to">connecté à %1$s</string>
+    <string name="connection_udp_waiting_handshake">en attente du handshake VBridger…</string>
+    <string name="connection_udp_status">Connexion UDP : %1$s</string>
+    <string name="connection_choose_type_hint">Choisis un type de connexion ci-dessus pour voir ses réglages.</string>
+
+    <!-- Écran Diagnostics -->
+    <string name="diagnostics_title">Diagnostics</string>
+    <string name="diagnostics_tier">Palier : %1$s</string>
+    <string name="diagnostics_delegate">Délégué : %1$s</string>
+    <string name="diagnostics_face_detected">Visage détecté : %1$s</string>
+    <string name="diagnostics_inference_latency">Latence inférence : %1$d ms</string>
+    <string name="diagnostics_calibrated">Pose neutre : calibrée</string>
+    <string name="diagnostics_not_calibrated">Pose neutre : non calibrée</string>
+
+    <!-- Écran Affichage & confort -->
+    <string name="display_settings_title">Affichage &amp; confort</string>
+    <string name="blendshape_selected_count">%1$d sélectionnée(s)</string>
+    <string name="blendshape_selection_persisted_suffix"> -- mémorisée</string>
+    <string name="blendshape_selection_not_persisted_suffix"> -- non conservé au redémarrage</string>
+    <string name="display_persist_selection_label">Mémoriser cette sélection au prochain lancement</string>
+    <string name="display_mesh_overlay_title">Overlay du mesh de tracking</string>
+    <string name="display_mesh_overlay_description">Superpose les points détectés par MediaPipe sur l\'aperçu caméra -- pratique pour vérifier la qualité du tracking sans dépendre de VTube Studio/Blender.</string>
+    <string name="display_power_save_title">Mode économie d\'énergie</string>
+    <string name="display_power_save_description">Après le délai ci-dessous sans toucher l\'écran : écran assombri, aperçu caméra masqué (le tracking et l\'envoi continuent normalement). Un simple toucher de l\'écran en ressort.</string>
+    <string name="display_power_save_delay">Délai d\'inactivité : %1$d s</string>
+    <string name="display_low_battery_threshold">Seuil d\'alerte batterie faible : %1$d%%</string>
+
+    <!-- Écran Fonctionnalités expérimentales -->
+    <string name="experimental_features_title">Fonctionnalités expérimentales</string>
+    <string name="experimental_features_placeholder">Aucune fonctionnalité expérimentale disponible pour l\'instant -- réservé pour la détection de la langue tirée et des joues gonflées (voir la revue technique).</string>
+
+    <!-- Menu Réglages (sous-titres) -->
+    <string name="settings_diagnostics_subtitle">Palier %1$s · visage %2$s</string>
+    <string name="state_face_detected">détecté</string>
+    <string name="state_face_not_detected">non détecté</string>
+    <string name="settings_vmc_connected_subtitle">VMC connecté à %1$s</string>
+    <string name="settings_vmc_not_connected_subtitle">VMC choisi, pas encore connecté</string>
+    <string name="settings_udp_listening_subtitle">UDP / VBridger en écoute</string>
+    <string name="settings_udp_not_listening_subtitle">UDP / VBridger choisi, pas encore en écoute</string>
+    <string name="settings_no_connection_type_subtitle">Aucun type choisi</string>
+    <string name="settings_display_subtitle">Blendshapes affichés, overlay du mesh, mode éco, seuil batterie</string>
+    <string name="settings_experimental_subtitle">Aucune pour l\'instant</string>
+
+    <!-- Erreurs (MainViewModel, non-@Composable, résolues via Context/Application) -->
+    <string name="error_vmc_ip_missing">Renseigne d\'abord une IP VMC dans les réglages.</string>
+    <string name="error_no_connection_type">Choisis un type de connexion dans les réglages.</string>
+    <string name="error_vmc_invalid_address">Adresse IP invalide ou injoignable : %1$s</string>
+    <string name="local_ip_unavailable">indisponible</string>
+
+    <!-- Erreurs caméra (CameraController, non-@Composable) -->
+    <string name="error_camera_analysis_bind_failed">Impossible de démarrer la caméra frontale : %1$s</string>
+    <string name="error_camera_preview_bind_failed">Impossible d\'afficher l\'aperçu caméra : %1$s</string>
+
+    <!-- Erreurs MediaPipe (FaceLandmarkerHelper, non-@Composable) -->
+    <string name="error_mediapipe_init_failed">Impossible d\'initialiser MediaPipe Face Landmarker (CPU et GPU en échec).</string>
+    <string name="error_mediapipe_unknown">Erreur MediaPipe inconnue</string>
+</resources>
