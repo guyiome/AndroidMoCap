@@ -93,20 +93,23 @@ import javax.microedition.khronos.opengles.GL10
  * tracking correctement orienté après ce correctif, latence perçue également améliorée).
  *
  * ⚠️ **Warning natif `aimatter_landmarks_3Dmesh.cc: Not able to find preprocess rotation with
- * expected timestamp`, TOUJOURS présent après le correctif de rotation ci-dessus (reconfirmé sur
- * device, logcat utilisateur, 6 août 2026)** -- l'hypothèse initiale ("causé par l'absence de
- * rotation") est donc fausse, corrigée ici plutôt que laissée en l'état. Piste non vérifiée : le
- * timestamp dans le message (ex. `792660266321`) est bien trop grand pour être le
- * `SystemClock.uptimeMillis()` passé à `detectAsync` (qui serait de l'ordre de quelques centaines
- * de milliers sur une session courte) -- cohérent en revanche avec un timestamp en **nanosecondes**
- * façon `Frame.getTimestamp()` d'ARCore, ce qui suggérerait une fonctionnalité interne à la lib
- * (peut-être une compensation de rotation continue basée sur l'IMU, distincte du simple
- * `rotationDegrees` fixe) jamais câblée depuis cette classe -- hypothèse, pas confirmée. Tracking
- * confirmé fonctionnel malgré ce warning (présent en continu depuis le tout premier test), donc
- * vraisemblablement bénin, mais pas vérifié explicitement. Prochaine étape pour trancher : vérifier
- * si le même warning apparaît aussi au palier `STANDARD` (CameraX) sur le même appareil -- si oui,
- * comportement préexistant de la lib sans rapport avec ce fichier ; si non, spécifique à cette
- * classe et à creuser plus loin. Ne pas tenter un troisième correctif à l'aveugle sans ce test.
+ * expected timestamp`, confirmé spécifique à cette classe (6 août 2026, capture logcat continue
+ * couvrant un aller-retour `STANDARD` → `OPTIMAL` sur le même appareil, via le sélecteur de palier
+ * de `DiagnosticsScreen`)** : **absent à 100% en `STANDARD`** (CameraX, aucune occurrence sur toute
+ * la session), **présent en continu dès la première frame en `OPTIMAL`** -- ce n'est donc ni un
+ * comportement préexistant de la lib ni lié à l'absence de rotation (hypothèse initiale, infirmée
+ * précédemment) : quelque chose de propre à ce fichier. Tracking reste fonctionnel malgré ce
+ * warning, donc vraisemblablement sans impact sur la justesse du résultat, mais pas vérifié plus
+ * finement (précision landmark par landmark) que par observation qualitative.
+ *
+ * Piste la plus probable, non confirmée : [emitCameraImage] génère `frameTimeMs` (`SystemClock.
+ * uptimeMillis()`) *après* la conversion asynchrone sur [imageProcessingExecutor], donc décalé par
+ * rapport à l'instant réel de capture -- contrairement à `CameraController`, qui appelle
+ * `detectAsync` de façon synchrone sur son propre thread caméra dédié, sans ce délai variable.
+ * Un mécanisme interne à MediaPipe/aimatter qui s'attend à un timestamp cohérent avec le rythme de
+ * capture réel pourrait expliquer un "cache miss" systématique ici. Reste à vérifier avant de
+ * corriger : ne pas déplacer la génération du timestamp à l'aveugle sans confirmer cette hypothèse
+ * (ex. logger la valeur réelle passée à `detectAsync` et la comparer au timestamp du message natif).
  *
  * Raison d'être : ARCore Augmented Faces gère lui-même la capture caméra frontale en interne (via
  * `Session#setCameraTextureName`, qui nécessite un contexte GL) -- il ne peut donc pas cohabiter
