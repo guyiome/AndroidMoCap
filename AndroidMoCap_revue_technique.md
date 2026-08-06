@@ -120,7 +120,7 @@ UI, pas de nouveau test unitaire.
 
 ## Priorités suggérées (mise à jour)
 
-Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device (aucun impact visuel, juste un travail évité). Le point 10 est une simple mise à jour de documentation. Le point 3/13 (ARCore phase 2) est maintenant mieux cerné mais reste un investissement lourd et risqué à finir "à l'aveugle" -- la suite (bascule caméra CameraX→ARCore) attend un accès device. Le point 11 (signature + versionnage) est traité (point 12). Le point 8 (minify) reste pour plus tard, une fois les tests device de nouveau possibles. Le point 14 (vérification de mise à jour) est en backlog, pas urgent. Le point 15 (navigation retour) est traité. Le point 16 (dénomination du mode iFacialMocap) est traité.
+Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device (aucun impact visuel, juste un travail évité). Le point 10 est une simple mise à jour de documentation. Le point 3/13 (ARCore phase 2) est maintenant mieux cerné mais reste un investissement lourd et risqué à finir "à l'aveugle" -- la suite (bascule caméra CameraX→ARCore) attend un accès device. Le point 11 (signature + versionnage) est traité (point 12). Le point 8 (minify) reste pour plus tard, une fois les tests device de nouveau possibles. Le point 14 (vérification de mise à jour) est en backlog, pas urgent. Le point 15 (navigation retour) est traité. Le point 16 (dénomination du mode iFacialMocap) est traité. Le point 17 (CI build/tests sur PR) est traité.
 
 ### 16. Dénomination du mode de connexion "iFacialMocap" -- ✅ corrigé
 
@@ -135,3 +135,23 @@ compatible"). Chip : "UDP / VBridger". Statut : "Connexion UDP : …". Aucun ide
 touché : `ConnectionType.IFACIALMOCAP`, la classe `IFacialMocapSender` et ses constantes de
 handshake protocolaire restent inchangés -- ce sont des identifiants techniques, pas de la
 présentation utilisateur.
+
+### 17. CI de build/tests sur chaque pull request -- ✅ corrigé
+
+Le seul workflow existant (`release.yml`) ne se déclenche que sur un tag `vX.Y.Z` : aucune
+vérification automatique ne tournait sur les PR (notamment celles de Dependabot), donc aucun
+signal objectif de compilation/tests avant une décision de merge -- constaté concrètement sur les
+PR #5 (MediaPipe tasks-vision) et #6 (Kotlin).
+
+Ajout de `.github/workflows/ci.yml` : se déclenche sur chaque pull request et chaque push sur
+`main`, installe le JDK 17, télécharge le modèle MediaPipe (comme `release.yml`), puis exécute
+`./gradlew testDebugUnitTest assembleDebug`. Utilise `gradle/actions/setup-gradle@v6` avec
+`cache-provider: basic` -- gratuit sur repo privé (l'option "enhanced" est encore en free preview
+et son statut sur repo privé n'est pas garanti, `basic` évite toute ambiguïté). Aucun secret
+utilisé (build debug non signé), donc sans risque même sur une PR externe/Dependabot.
+
+Limite à connaître : sur le plan GitHub Free, les "required status checks" (bloquer un merge tant
+que la CI n'est pas verte) ne sont disponibles que sur les dépôts publics, pas privés -- ce
+workflow reste donc **informatif** (un ✅/❌ visible sur chaque PR) mais pas **contraignant** : rien
+n'empêche techniquement un merge si le check échoue. Passer le dépôt en public lèverait cette
+limite gratuitement, mais c'est un choix distinct de distribution/visibilité, pas juste de CI.
