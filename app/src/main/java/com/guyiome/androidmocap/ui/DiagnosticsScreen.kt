@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,7 +28,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.guyiome.androidmocap.R
+import com.guyiome.androidmocap.tracking.TierCompatibility
 import com.guyiome.androidmocap.tracking.TrackingTier
+import com.guyiome.androidmocap.tracking.TrackingTierSelector
 
 /**
  * Diagnostics -- une des quatre catégories de [SettingsScreen] (voir rapport technique, point 21).
@@ -93,12 +96,37 @@ fun DiagnosticsScreen(
                     onClick = { onSetTierOverride(null) },
                     label = { Text(stringResource(R.string.diagnostics_tier_override_auto)) },
                 )
+                // Garde-fou (demande explicite, 6 août 2026) : un palier réellement incompatible
+                // avec l'appareil (ex. OPTIMAL sans ARCore -- déclencherait de toute façon le repli
+                // silencieux déjà en place, autant l'empêcher clairement) désactive sa puce plutôt
+                // que de laisser sélectionner quelque chose qui ne fera pas ce que l'utilisateur
+                // croit. Un simple risque de performance (palier plus exigeant que ce que
+                // l'automatique aurait choisi pour cet appareil) reste sélectionnable, juste
+                // signalé par une icône d'avertissement -- même code couleur que
+                // BlendshapeSelectionScreen pour les blendshapes peu fiables.
+                val capabilities = uiState.capabilities
                 TrackingTier.entries.forEach { tier ->
                     Spacer(Modifier.width(8.dp))
+                    val compatibility = capabilities?.let { TrackingTierSelector.compatibility(tier, it) }
+                        ?: TierCompatibility.OK
                     FilterChip(
                         selected = uiState.tierOverride == tier,
                         onClick = { onSetTierOverride(tier) },
-                        label = { Text(tier.name) },
+                        enabled = compatibility != TierCompatibility.INCOMPATIBLE,
+                        label = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(tier.name)
+                                if (compatibility == TierCompatibility.PERFORMANCE_RISK) {
+                                    Spacer(Modifier.width(4.dp))
+                                    Icon(
+                                        imageVector = Icons.Filled.WarningAmber,
+                                        contentDescription = stringResource(R.string.cd_tier_performance_risk),
+                                        tint = Color(0xFFFFB74D),
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                }
+                            }
+                        },
                     )
                 }
             }

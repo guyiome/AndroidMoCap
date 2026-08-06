@@ -111,4 +111,93 @@ class TrackingTierSelectorTest {
             TrackingTierSelector.select(capabilities, override = null),
         )
     }
+
+    // --- compatibility() : garde-fou du sélecteur manuel de palier (DiagnosticsScreen) ---
+
+    @Test
+    fun `OPTIMAL sans ARCore est INCOMPATIBLE, meme sur un appareil haut de gamme`() {
+        val capabilities = DeviceCapabilities(
+            arCoreSupported = false,
+            mediaPerformanceClass = 31,
+            cpuCoreCount = 8,
+            totalRamMb = 8000,
+        )
+        assertEquals(
+            TierCompatibility.INCOMPATIBLE,
+            TrackingTierSelector.compatibility(TrackingTier.OPTIMAL, capabilities),
+        )
+    }
+
+    @Test
+    fun `palier identique a la selection automatique est OK`() {
+        val capabilities = DeviceCapabilities(
+            arCoreSupported = true,
+            mediaPerformanceClass = 31,
+            cpuCoreCount = 8,
+            totalRamMb = 8000,
+        )
+        // Sélection automatique = OPTIMAL ici -- le forcer explicitement n'est pas un risque.
+        assertEquals(
+            TierCompatibility.OK,
+            TrackingTierSelector.compatibility(TrackingTier.OPTIMAL, capabilities),
+        )
+    }
+
+    @Test
+    fun `palier moins exigeant que l'automatique (degradation volontaire) est OK, jamais un risque`() {
+        val capabilities = DeviceCapabilities(
+            arCoreSupported = true,
+            mediaPerformanceClass = 31,
+            cpuCoreCount = 8,
+            totalRamMb = 8000,
+        )
+        // Sélection automatique = OPTIMAL ici -- forcer STANDARD ou COMPATIBLE dégrade
+        // volontairement, jamais un risque de performance.
+        assertEquals(
+            TierCompatibility.OK,
+            TrackingTierSelector.compatibility(TrackingTier.STANDARD, capabilities),
+        )
+        assertEquals(
+            TierCompatibility.OK,
+            TrackingTierSelector.compatibility(TrackingTier.COMPATIBLE, capabilities),
+        )
+    }
+
+    @Test
+    fun `OPTIMAL avec ARCore sur appareil bas de gamme est un risque de performance, pas un blocage`() {
+        val capabilities = DeviceCapabilities(
+            arCoreSupported = true,
+            mediaPerformanceClass = 0,
+            cpuCoreCount = 4,
+            totalRamMb = 3000,
+        )
+        // ARCore supporté (donc pas INCOMPATIBLE) mais appareil bas de gamme (sélection
+        // automatique = COMPATIBLE ici) -- OPTIMAL fonctionnera mais est plus exigeant.
+        assertEquals(
+            TierCompatibility.PERFORMANCE_RISK,
+            TrackingTierSelector.compatibility(TrackingTier.OPTIMAL, capabilities),
+        )
+    }
+
+    @Test
+    fun `STANDARD sur appareil bas de gamme est un risque de performance`() {
+        val capabilities = DeviceCapabilities(
+            arCoreSupported = false,
+            mediaPerformanceClass = 0,
+            cpuCoreCount = 4,
+            totalRamMb = 3000,
+        )
+        assertEquals(
+            TierCompatibility.PERFORMANCE_RISK,
+            TrackingTierSelector.compatibility(TrackingTier.STANDARD, capabilities),
+        )
+    }
+
+    @Test
+    fun `COMPATIBLE n'est jamais ni incompatible ni un risque, quel que soit l'appareil`() {
+        val lowEnd = DeviceCapabilities(arCoreSupported = false, mediaPerformanceClass = 0, cpuCoreCount = 4, totalRamMb = 3000)
+        val highEnd = DeviceCapabilities(arCoreSupported = true, mediaPerformanceClass = 31, cpuCoreCount = 8, totalRamMb = 8000)
+        assertEquals(TierCompatibility.OK, TrackingTierSelector.compatibility(TrackingTier.COMPATIBLE, lowEnd))
+        assertEquals(TierCompatibility.OK, TrackingTierSelector.compatibility(TrackingTier.COMPATIBLE, highEnd))
+    }
 }

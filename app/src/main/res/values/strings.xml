@@ -62,6 +62,7 @@
     <string name="diagnostics_tier_override_label">Force tier (diagnostics)</string>
     <string name="diagnostics_tier_override_auto">Automatic</string>
     <string name="diagnostics_tier_override_hint">Applies on next app launch</string>
+    <string name="cd_tier_performance_risk">More demanding than recommended for this device, may run hot or slow</string>
     <string name="diagnostics_delegate">Delegate: %1$s</string>
     <string name="diagnostics_face_detected">Face detected: %1$s</string>
     <string name="diagnostics_inference_latency">Inference latency: %1$d ms</string>
