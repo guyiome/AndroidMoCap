@@ -281,6 +281,24 @@ ailleurs très en avance (plusieurs commits non poussés, voir historique de ce 
 `git push` depuis la machine de l'utilisateur sera très probablement rejeté (non-fast-forward) et
 demandera un `git pull --rebase` (ou merge) avant de pouvoir pousser.
 
+**Suivi PR #5/#6 (mise à jour, même jour)** : rattrapage local complet des deux PR, chacune en
+commit dédié conformément à la convention "local d'abord" adoptée le même jour.
+- PR #6 (Kotlin 2.4.10) : bump reproduit localement (commit `b2755ee`) -- `testDebugUnitTest` +
+  `assembleDebug` → succès, seul warning est une dépréciation `LocalLifecycleOwner` préexistante et
+  sans rapport.
+- PR #5 (MediaPipe tasks-vision 1.0.0) : testée avant merge comme prévu -- l'artefact `1.0.0` se
+  résout correctement depuis Maven, `testDebugUnitTest` (49 tests/8 classes, 0 échec, dont
+  `FaceLandmarkerHelperTest`) et `assembleDebug` → succès, aucune rupture de compilation dans
+  `FaceLandmarkerHelper.kt` (seul point de contact avec l'API MediaPipe). Validation utilisateur
+  obtenue sur cette base ; bump commité (commit `d1d1dfc`). **Limite qui reste ouverte** : ces tests
+  JVM ne couvrent pas le comportement runtime réel (init MediaPipe, delegate GPU, callback
+  live-stream) -- à confirmer sur device dès qu'un accès est possible, avant de considérer le point
+  totalement clos.
+
+Les deux PR sont maintenant traitées côté dépôt local (commits prêts) ; il reste à les pousser depuis
+la machine de l'utilisateur (voir avertissement non-fast-forward ci-dessus) puis à les marquer/fermer
+côté GitHub.
+
 ### 24. Indicateur de fiabilité par blendshape -- ✅ corrigé (correspond au "point 17" de l'index ci-dessus)
 
 `BlendshapeCatalog.unreliable` : ensemble statique des blendshapes connus pour être mal restitués

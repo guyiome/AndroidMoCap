@@ -23,7 +23,7 @@ app/src/main/java/com/guyiome/androidmocap/
   ui/                    ViewModel + écrans Compose (HUD, réglages, overlay mesh)
 ```
 
-Stack : Kotlin 2.3.20, AGP 9.x, Jetpack Compose, CameraX, MediaPipe Tasks Vision (Face Landmarker),
+Stack : Kotlin 2.4.10, AGP 9.x, Jetpack Compose, CameraX, MediaPipe Tasks Vision 1.0.0 (Face Landmarker),
 ARCore (Augmented Faces, palier `OPTIMAL` seulement, non actif dans `main`), JavaOSC (protocole
 VMC), AndroidX DataStore (Preferences).
 
