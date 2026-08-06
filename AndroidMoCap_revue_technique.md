@@ -250,6 +250,20 @@ Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device
 
 **Ordre de priorité actuel (mis à jour) :** 1) revue/merge des PR #5 et #6 et test de l'état actuel de la branche `main` dès qu'un accès device est possible ; 2) point 23 (localisation complète de l'UI), juste derrière -- peut démarrer (passe d'extraction) avant même la fin du point 1, seule la vérification visuelle finale dépend du device.
 
+**Suivi PR #5/#6 (6 août 2026)** : PR #6 (Kotlin 2.3.20→2.4.10, risque jugé faible -- même clé de
+version pilote le plugin Compose, voir §CI ci-dessus) mergée sur GitHub (commit `030aae5`) suite à
+validation explicite de l'utilisateur. PR #5 (MediaPipe tasks-vision 0.10.35→1.0.0, première version
+stable, risque non vérifié) volontairement laissée ouverte, en attente de test device avant tout
+merge -- consigne explicite de ne pas y toucher sans validation.
+
+⚠️ Point d'attention pour le prochain push depuis la machine locale de l'utilisateur : ce merge a été
+fait directement sur GitHub, côté serveur, sans passer par ce dépôt local (aucun accès réseau
+`api.github.com`/push depuis ce sandbox). `origin/main` a donc avancé d'un commit que ni ce
+sandbox ni la machine locale de l'utilisateur ne possèdent encore, alors que la locale est par
+ailleurs très en avance (plusieurs commits non poussés, voir historique de ce document). Le prochain
+`git push` depuis la machine de l'utilisateur sera très probablement rejeté (non-fast-forward) et
+demandera un `git pull --rebase` (ou merge) avant de pouvoir pousser.
+
 ### 24. Indicateur de fiabilité par blendshape -- ✅ corrigé (correspond au "point 17" de l'index ci-dessus)
 
 `BlendshapeCatalog.unreliable` : ensemble statique des blendshapes connus pour être mal restitués
