@@ -38,13 +38,14 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 3 / 13 | Fusion ARCore (palier `OPTIMAL`) | Codée sur `feature/arcore-fusion`, pas mergée, pas testée sur device |
 | 8 | Minify/R8 en release | Désactivé volontairement, en attente de tests device |
 | 14 | Vérification de mise à jour semi-automatique | Backlog, aucun code écrit |
-| 15 | Détection langue (cascade) | Conception actée, aucun code écrit -- prérequiert le throttling thermique continu (point 3/13) |
-| 16 | Détection joues (cascade allégée) | Conception actée, aucun code écrit |
+| 15 | Détection langue (cascade) | Conception actée, aucun code écrit -- prérequiert le throttling thermique continu (point 3/13). **Confirmé par observation device le 6 août 2026** : le mesh montre que `tongueOut` n'est pas du tout restitué par MediaPipe (pas juste peu fiable), cohérent avec sa présence dans `BlendshapeCatalog.unreliable`. |
+| 16 | Détection joues (cascade allégée) | Conception actée, aucun code écrit. **Confirmé par observation device le 6 août 2026** : le mesh bouge très peu au gonflement des joues -- le signal géométrique disponible pour une cascade risque d'être faible/bruité, point d'attention à garder pour la conception détaillée. |
 | 17 | Indicateur de fiabilité par blendshape | **Implémenté sur `main`, voir point 24** (l'index le disait encore "aucun code écrit" par erreur) |
 | 18 | Persistance sélection blendshapes + valeur brute/ajustée | **Persistance implémentée sur `main`, voir point 25** -- le volet "valeur brute à côté de la valeur ajustée" reste en attente (dépend d'une pondération par blendshape jamais construite) |
 | 19 | Détection d'anomalie de calibrage (bouton rouge) | Conception actée, aucun code écrit |
 | 20 | Orientation grand écran / tablette | Constat documenté, aucune décision de mise en œuvre |
 | 21 | Tri en sous-écrans des réglages | **Implémenté sur `main`, voir point 26** (l'index le disait encore "aucun code écrit" par erreur) |
+| 28 | Fiabilisation du clignement des yeux avec lunettes | Idée de conception ouverte le 6 août 2026, voir section dédiée plus bas -- aucun code écrit |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Note : ce fichier ne contient pas (encore) les sections
@@ -339,3 +340,27 @@ que la CI n'est pas verte) ne sont disponibles que sur les dépôts publics, pas
 workflow reste donc **informatif** (un ✅/❌ visible sur chaque PR) mais pas **contraignant** : rien
 n'empêche techniquement un merge si le check échoue. Passer le dépôt en public lèverait cette
 limite gratuitement, mais c'est un choix distinct de distribution/visibilité, pas juste de CI.
+
+### 28. Fiabilisation du clignement des yeux avec lunettes -- idée ouverte, aucun code écrit
+
+Retour de test device (ROG Phone II) : le clignement reste bien visible sur le mesh (mouvement
+géométrique des paupières net) alors que l'utilisateur porte des lunettes -- un cas où les modèles
+de tracking facial souffrent souvent (reflets sur les verres, monture qui occulte partiellement
+l'œil, contour de l'œil moins net pour un modèle basé sur l'apparence). Question posée : peut-on
+exploiter ce signal géométrique, visiblement plus robuste ici que ce que le blendshape `eyeBlinkLeft/
+Right` de MediaPipe restitue peut-être en pratique avec lunettes, pour fiabiliser la détection ?
+
+Piste de conception (non actée, à creuser) : dans le même esprit que les cascades géométriques déjà
+prévues pour `tongueOut`/`cheekPuff` (points 15/16 de l'index ci-dessus), calculer un ratio
+d'ouverture de l'œil directement à partir des landmarks du contour de la paupière (mesh 478 points,
+déjà extrait quand l'overlay est actif -- sinon à extraire spécifiquement pour cet usage) et
+l'utiliser soit en repli quand le blendshape `eyeBlinkLeft/Right` est jugé peu fiable, soit en
+recalibrage/renforcement du score existant. Points d'attention avant de formaliser : (a) vérifier
+d'abord, avec et sans lunettes, si le score `eyeBlinkLeft/Right` de MediaPipe est réellement dégradé
+en pratique (l'observation actuelle porte sur le mesh, pas encore sur les valeurs de blendshape
+elles-mêmes affichées à l'écran) -- possible que MediaPipe compense déjà correctement en interne ;
+(b) un contour de paupière n'est pas trivial à isoler de façon fiable dans les 478 points sans
+étude préalable des indices de landmarks concernés ; (c) coût de calcul supplémentaire par frame à
+évaluer, dans le même esprit de sobriété batterie que le reste du pipeline (voir spec technique
+§budget batterie). Pas de priorité assignée pour l'instant -- observation à garder en tête pour une
+future session de conception détaillée, éventuellement avec les points 15/16.
