@@ -110,6 +110,11 @@ data class TrackingFrame(
     // Points du mesh facial (478, coordonnées normalisées) -- toujours peuplé (coût négligeable),
     // affiché uniquement si [MainUiState.faceMeshOverlayEnabled] est actif (voir MainScreen).
     val faceLandmarks: List<Pair<Float, Float>> = emptyList(),
+    // Dimensions de l'image analysée (espace de normalisation de [faceLandmarks]) -- nécessaires à
+    // FaceMeshOverlay/LandmarkProjection pour un placement correct quel que soit le ratio écran vs
+    // caméra. 0 tant qu'aucune frame n'a été traitée. Voir point 27 de la revue technique.
+    val imageWidthPx: Int = 0,
+    val imageHeightPx: Int = 0,
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -319,6 +324,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 allBlendshapes = calibrated.blendshapes,
                 inferenceTimeMs = calibrated.inferenceTimeMs,
                 faceLandmarks = calibrated.faceLandmarks,
+                imageWidthPx = calibrated.imageWidthPx,
+                imageHeightPx = calibrated.imageHeightPx,
             )
         }
         vmcSender?.send(calibrated)

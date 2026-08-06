@@ -163,6 +163,8 @@ fun MainScreen(
             if (uiState.faceMeshOverlayEnabled && !uiState.isPowerSaveActive) {
                 FaceMeshOverlay(
                     landmarks = trackingFrame.faceLandmarks,
+                    imageWidthPx = trackingFrame.imageWidthPx,
+                    imageHeightPx = trackingFrame.imageHeightPx,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

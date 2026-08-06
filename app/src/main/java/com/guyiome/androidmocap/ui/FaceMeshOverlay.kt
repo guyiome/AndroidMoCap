@@ -13,13 +13,19 @@ import androidx.compose.ui.graphics.Color
  * réglages ([MainUiState.faceMeshOverlayEnabled]) -- indépendante du futur aperçu 3D d'avatar
  * (piste séparée, plus lourde, pas encore implémentée).
  *
- * La projection écran ([LandmarkProjection.toScreenPoint]) suppose que ce calque occupe tout
- * l'écran au même rapport largeur/hauteur que l'image analysée par MediaPipe -- approximation
- * volontaire pour cette première version, à affiner si l'alignement visuel s'avère décalé sur
- * device (le recadrage exact appliqué par `PreviewView` n'est pas répliqué ici).
+ * La projection écran ([LandmarkProjection.toScreenPoint]) reproduit le recadrage centré
+ * ("FILL_CENTER") appliqué par `PreviewView` à partir des dimensions réelles de l'image analysée
+ * ([imageWidthPx]/[imageHeightPx]) -- nécessaire pour un alignement correct dès que le ratio de
+ * l'image caméra diffère de celui de l'écran (point 27, corrigé suite à un décalage constaté sur
+ * ASUS ROG Phone II).
  */
 @Composable
-fun FaceMeshOverlay(landmarks: List<Pair<Float, Float>>, modifier: Modifier = Modifier) {
+fun FaceMeshOverlay(
+    landmarks: List<Pair<Float, Float>>,
+    imageWidthPx: Int,
+    imageHeightPx: Int,
+    modifier: Modifier = Modifier,
+) {
     if (landmarks.isEmpty()) return
 
     Canvas(modifier = modifier) {
@@ -28,6 +34,8 @@ fun FaceMeshOverlay(landmarks: List<Pair<Float, Float>>, modifier: Modifier = Mo
             val (screenX, screenY) = LandmarkProjection.toScreenPoint(
                 normalizedX = normalizedX,
                 normalizedY = normalizedY,
+                imageWidthPx = imageWidthPx.toFloat(),
+                imageHeightPx = imageHeightPx.toFloat(),
                 canvasWidthPx = size.width,
                 canvasHeightPx = size.height,
                 // Caméra frontale : l'aperçu (PreviewView) est mirroré par CameraX, l'image

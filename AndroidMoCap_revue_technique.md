@@ -245,7 +245,7 @@ accès device.
 
 ## Priorités suggérées (mise à jour)
 
-Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device (aucun impact visuel, juste un travail évité). Le point 10 est traité (README réécrit). Le point 3/13 (ARCore phase 2) est maintenant mieux cerné mais reste un investissement lourd et risqué à finir "à l'aveugle" -- la suite (bascule caméra CameraX→ARCore) attend un accès device. Le point 11 (signature + versionnage) est traité (point 12). Le point 8 (minify) reste pour plus tard, une fois les tests device de nouveau possibles. Le point 14 (vérification de mise à jour) est en backlog, pas urgent. Le point 15 (navigation retour) est traité. Le point 16 (dénomination du mode iFacialMocap) est traité. Le point 17 (CI build/tests sur PR) est traité.
+Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device (aucun impact visuel, juste un travail évité). Le point 10 est traité (README réécrit). Le point 3/13 (ARCore phase 2) est maintenant mieux cerné mais reste un investissement lourd et risqué à finir "à l'aveugle" -- la suite (bascule caméra CameraX→ARCore) attend un accès device. Le point 11 (signature + versionnage) est traité (point 12). Le point 8 (minify) reste pour plus tard, une fois les tests device de nouveau possibles. Le point 14 (vérification de mise à jour) est en backlog, pas urgent. Le point 15 (navigation retour) est traité. Le point 16 (dénomination du mode iFacialMocap) est traité. Le point 17 (CI build/tests sur PR) est traité. Le point 27 (projection du mesh overlay) est traité, corrigé sans dépendre d'un nouvel accès device (le bug avait déjà été reproduit par la photo fournie).
 
 **Ordre de priorité actuel (mis à jour) :** 1) revue/merge des PR #5 et #6 et test de l'état actuel de la branche `main` dès qu'un accès device est possible ; 2) point 23 (localisation complète de l'UI), juste derrière -- peut démarrer (passe d'extraction) avant même la fin du point 1, seule la vérification visuelle finale dépend du device.
 
@@ -280,6 +280,31 @@ des blendshapes (ligne cliquable + chevron). Nouveaux écrans : `DiagnosticsScre
 comme avant), `DisplaySettingsScreen`, `ExperimentalFeaturesScreen` (message d'attente, catégorie
 réservée aux points 15/16 de l'index ci-dessus, aucun des deux implémenté). Pure extraction/
 réorganisation, aucune logique nouvelle -- voir `AndroidMoCap_tests_unitaires.md`.
+
+### 27. Correctif de la projection du mesh overlay (ratio image/écran) -- ✅ corrigé
+
+Retour de test device (ASUS ROG Phone II, photo à l'appui) : le mesh de tracking (overlay optionnel,
+478 points) apparaissait écrasé et décalé par rapport au visage -- plus petit que l'écran en
+largeur. Sur tablette (XPPen Magic Drawing Pad) le placement était correct (ratio écran/caméra
+proches, écart invisible). Comportement anticipé dès l'écriture initiale (commit `01c1e34`) : les
+doc comments de `LandmarkProjection.kt` et `FaceMeshOverlay.kt` signalaient déjà l'approximation
+volontaire "à affiner après un premier essai sur device si besoin".
+
+Cause : `LandmarkProjection.toScreenPoint()` étirait les coordonnées normalisées MediaPipe
+directement sur toute la surface du canvas, sans tenir compte (a) du ratio largeur/hauteur réel de
+l'image analysée par `ImageAnalysis` (aucune résolution cible explicite configurée, donc ratio natif
+de la caméra) ni (b) du recadrage centré ("FILL_CENTER") appliqué par défaut par `PreviewView` pour
+remplir l'écran en conservant ce ratio.
+
+Correctif : `toScreenPoint()` reproduit maintenant ce recadrage centré -- `scale =
+max(canvas/image)` sur chaque axe, mise à l'échelle uniforme, puis un décalage centré compensant
+l'axe qui déborde. Repli sur l'ancien étirement simple si les dimensions de l'image sont encore
+inconnues (avant la première frame). Dimensions de l'image obtenues via le paramètre `input: MPImage`
+de `FaceLandmarkerHelper.onLiveStreamResult()`, déjà reçu mais jusqu'ici inutilisé
+(`@Suppress("UNUSED_PARAMETER")`, supprimé) -- propagées jusqu'à l'overlay via
+`FaceTrackingResult.imageWidthPx/imageHeightPx` puis `MainViewModel.TrackingFrame`. Couvert en TDD :
+cas ratio identique (comportement inchangé), cas de rognage sur chaque axe, combinaison avec le
+miroir, repli dimensions inconnues -- voir `LandmarkProjectionTest.kt`.
 
 ### 16. Dénomination du mode de connexion "iFacialMocap" -- ✅ corrigé
 

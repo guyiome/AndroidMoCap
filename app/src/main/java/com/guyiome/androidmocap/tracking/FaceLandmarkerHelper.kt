@@ -135,7 +135,7 @@ class FaceLandmarkerHelper(
         faceLandmarker = null
     }
 
-    private fun onLiveStreamResult(result: FaceLandmarkerResult, @Suppress("UNUSED_PARAMETER") input: MPImage) {
+    private fun onLiveStreamResult(result: FaceLandmarkerResult, input: MPImage) {
         val blendshapesOptional = result.faceBlendshapes()
         val blendshapes = if (blendshapesOptional.isPresent && blendshapesOptional.get().isNotEmpty()) {
             blendshapesOptional.get()[0].map { category ->
@@ -178,6 +178,11 @@ class FaceLandmarkerHelper(
                 leftEyeEulerDegrees = leftEyeEuler,
                 rightEyeEulerDegrees = rightEyeEuler,
                 faceLandmarks = landmarks,
+                // Dimensions de l'image réellement analysée (espace de normalisation de
+                // faceLandmarks) -- permet à LandmarkProjection de reproduire le recadrage centré
+                // de PreviewView plutôt qu'un étirement naïf. Voir point 27 de la revue technique.
+                imageWidthPx = input.width,
+                imageHeightPx = input.height,
             )
         )
         onFrameProcessed(result.timestampMs())
