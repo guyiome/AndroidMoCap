@@ -275,12 +275,16 @@ merge -- consigne explicite de ne pas y toucher sans validation.
 
 ~~⚠️ Point d'attention pour le prochain push...~~ **Résolu** : contrairement à ce que cette section
 affirmait, ce sandbox *a* un accès réseau à GitHub (confirmé par un `git fetch` qui a bien remonté le
-merge serveur de la PR #6). Correction de l'hypothèse ci-dessus pour référence future : ne plus
-supposer une absence d'accès réseau sans l'avoir testé dans la session en cours -- l'environnement
-diffère apparemment de celui où cette note avait été écrite. `git rebase origin/main` a résolu la
-divergence sans conflit (le commit local du bump Kotlin, identique au commit `ec3989d` déjà sur
-`origin/main`, a été automatiquement sauté par git), puis `git push origin main` a réussi
-(`030aae5..222adea`, fast-forward, validation explicite de l'utilisateur obtenue avant le push).
+merge serveur de la PR #6). Cause de l'écart, confirmée par l'utilisateur : cette note avait été
+écrite depuis un environnement **Cowork** (la conversation "réflexion" non-codante mentionnée en
+introduction de ce document), un sandbox isolé sans accès réseau sortant vers `api.github.com` --
+alors qu'une session Claude Code classique (comme celle-ci) y a accès. Retenir pour l'avenir :
+l'accès réseau (fetch/push GitHub) dépend du type d'environnement d'exécution, pas du dépôt lui-même
+-- toujours le tester dans la session en cours plutôt que de se fier à une note écrite depuis un
+environnement différent. `git rebase origin/main` a résolu la divergence sans conflit (le commit
+local du bump Kotlin, identique au commit `ec3989d` déjà sur `origin/main`, a été automatiquement
+sauté par git), puis `git push origin main` a réussi (`030aae5..222adea`, fast-forward, validation
+explicite de l'utilisateur obtenue avant le push).
 
 **Suivi PR #5/#6 (mise à jour, même jour)** : rattrapage local complet des deux PR, chacune en
 commit dédié conformément à la convention "local d'abord" adoptée le même jour, puis poussées.
