@@ -47,7 +47,7 @@
     <string name="connection_vmc_section_title">VMC (VTube Studio / Blender / Unity)</string>
     <string name="connection_vmc_ip_label">PC IP address</string>
     <string name="action_send">Send</string>
-    <string name="connection_vmc_active_status">VMC sending active to %1$s</string>
+    <string name="connection_vmc_active_status">Sending VMC data to %1$s</string>
     <string name="connection_udp_section_title">iFacialMocap — compatible protocol</string>
     <string name="connection_udp_ip_hint">Phone IP to enter in VBridger: %1$s</string>
     <string name="action_listen">Listen</string>
@@ -82,7 +82,7 @@
     <string name="display_mesh_overlay_description">Overlays the points detected by MediaPipe on the camera preview -- handy to check tracking quality without depending on VTube Studio/Blender.</string>
     <string name="display_keep_mesh_overlay_in_power_save_label">Keep mesh overlay visible in power save mode</string>
     <string name="display_power_save_title">Power save mode</string>
-    <string name="display_power_save_description">After the delay below with no screen touch: screen dimmed, camera preview hidden (tracking and sending keep running normally). A single tap on the screen exits it.</string>
+    <string name="display_power_save_description">After the delay below without touching the screen: dimmed screen, hidden camera preview (tracking and sending keep running normally). A single tap exits it.</string>
     <string name="display_power_save_delay">Idle delay: %1$d s</string>
     <string name="display_low_battery_threshold">Low battery alert threshold: %1$d%%</string>
 
