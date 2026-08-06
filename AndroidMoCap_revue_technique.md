@@ -265,7 +265,7 @@ accès device.
 
 Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device (aucun impact visuel, juste un travail évité). Le point 10 est traité (README réécrit). Le point 3/13 (ARCore phase 2) est maintenant mieux cerné mais reste un investissement lourd et risqué à finir "à l'aveugle" -- la suite (bascule caméra CameraX→ARCore) attend un accès device. Le point 11 (signature + versionnage) est traité (point 12). Le point 8 (minify) reste pour plus tard, une fois les tests device de nouveau possibles. Le point 14 (vérification de mise à jour) est en backlog, pas urgent. Le point 15 (navigation retour) est traité. Le point 16 (dénomination du mode iFacialMocap) est traité. Le point 17 (CI build/tests sur PR) est traité. Le point 27 (projection du mesh overlay) est traité, corrigé sans dépendre d'un nouvel accès device (le bug avait déjà été reproduit par la photo fournie).
 
-**Ordre de priorité actuel (mis à jour) :** 1) revue/merge des PR #5 et #6 et test de l'état actuel de la branche `main` dès qu'un accès device est possible ; 2) point 23 (localisation complète de l'UI), juste derrière -- peut démarrer (passe d'extraction) avant même la fin du point 1, seule la vérification visuelle finale dépend du device.
+**Ordre de priorité actuel (mis à jour) :** ~~1) revue/merge des PR #5 et #6 et test de l'état actuel de la branche `main` dès qu'un accès device est possible~~ -- fait, voir suivi PR #5/#6 ci-dessous (les deux validées, compilation/tests JVM et device). Priorité désormais : point 23 (localisation complète de l'UI) -- la passe d'extraction peut démarrer sans device, seule la vérification visuelle finale en dépend (device maintenant disponible si besoin).
 
 **Suivi PR #5/#6 (6 août 2026)** : PR #6 (Kotlin 2.3.20→2.4.10, risque jugé faible -- même clé de
 version pilote le plugin Compose, voir §CI ci-dessus) mergée sur GitHub (commit `030aae5`) suite à
@@ -290,13 +290,13 @@ commit dédié conformément à la convention "local d'abord" adoptée le même 
   résout correctement depuis Maven, `testDebugUnitTest` (49 tests/8 classes, 0 échec, dont
   `FaceLandmarkerHelperTest`) et `assembleDebug` → succès, aucune rupture de compilation dans
   `FaceLandmarkerHelper.kt` (seul point de contact avec l'API MediaPipe). Validation utilisateur
-  obtenue sur cette base ; bump commité (commit `d1d1dfc`). **Limite qui reste ouverte** : ces tests
-  JVM ne couvrent pas le comportement runtime réel (init MediaPipe, delegate GPU, callback
-  live-stream) -- à confirmer sur device dès qu'un accès est possible, avant de considérer le point
-  totalement clos.
+  obtenue sur cette base ; bump commité (commit `d1d1dfc`). **Validée sur device par l'utilisateur le
+  même jour** : comportement runtime réel (init MediaPipe, delegate GPU, callback live-stream) conforme
+  -- plus aucune réserve, point totalement clos.
 
-Les deux PR sont maintenant traitées côté dépôt local (commits prêts) ; il reste à les pousser depuis
-la machine de l'utilisateur (voir avertissement non-fast-forward ci-dessus) puis à les marquer/fermer
+Les deux PR sont maintenant traitées et validées de bout en bout côté dépôt local (commits prêts,
+compilation/tests JVM et comportement device tous deux confirmés) ; il reste à les pousser depuis la
+machine de l'utilisateur (voir avertissement non-fast-forward ci-dessus) puis à les marquer/fermer
 côté GitHub.
 
 ### 24. Indicateur de fiabilité par blendshape -- ✅ corrigé (correspond au "point 17" de l'index ci-dessus)
