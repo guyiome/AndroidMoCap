@@ -65,6 +65,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 28 | Fiabilisation du clignement des yeux avec lunettes | Idée de conception ouverte le 6 août 2026, voir section dédiée plus bas -- aucun code écrit |
 | 29 | Validation des traductions FR/EN par locuteurs natifs | Backlog, voir point 23 -- texte rédigé sans relecture native, ni le français ni l'anglais (repli par défaut) n'ont été validés |
 | 30 | Sélecteur de langue dans l'app pour Android 11/12 | Backlog, voir point 23 -- pas d'équivalent au sélecteur système Android 13+ sur ces versions, demanderait `androidx.appcompat` + `AppCompatDelegate` |
+| 31 | CI cassée depuis le premier run (`gradlew` sans bit exécutable) | **✅ corrigé le 6 août 2026** (commit `df640a4`), voir section dédiée plus bas |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -680,3 +681,41 @@ manquaient jusqu'ici à ce journal, maintenant rapatriés ci-dessus.]*
 Statut : constat factuel remonté en discussion, aucune décision prise sur la suite (adapter réellement
 l'écran de réglages et revoir la logique de rotation caméra, vs. accepter que le comportement sur
 tablette reste dégradé pour l'instant, l'usage principal visé restant le téléphone).
+
+### 31. CI cassée depuis le premier run -- `gradlew` sans bit exécutable
+
+Détecté par la nouvelle routine de vérification nocturne (Claude Code cloud, tous les jours ~21h,
+lecture seule, voir §Automatisation ci-dessous) lors de son tout premier passage manuel le 6 août
+2026 -- ce n'est pas quelque chose qu'une session de travail habituelle aurait remarqué, puisque le
+build local fonctionne sans problème (Git for Windows/NTFS ne fait pas respecter le bit d'exécution
+Unix comme le fait un checkout Linux).
+
+Constat : `git ls-files -s gradlew` montrait le mode `100644` (non exécutable) depuis le tout premier
+commit du dépôt (`7337c6c`) -- jamais corrigé depuis. Conséquence : sur un checkout Linux (donc tout
+runner GitHub Actions), `./gradlew ...` échoue immédiatement en `Permission denied` (exit 126), avant
+même d'atteindre Gradle. Le seul run CI ayant jamais eu lieu sur `main` (workflow `ci.yml`, déclenché
+par le commit `a6e5327`) a échoué pour cette raison précise -- et ça n'avait été remarqué nulle part,
+ni dans ce document ni ailleurs : la CI (point 17 de l'index, "traité") était en réalité rouge depuis
+sa création, silencieusement.
+
+Corrigé : `git update-index --chmod=+x gradlew` (mode `100755`), commit `df640a4`. `gradlew.bat`
+laissé tel quel (`100644`), le bit d'exécution Unix n'a pas de sens pour un script Windows.
+
+**Point non résolu, à vérifier au prochain accès `gh`/API GitHub authentifiée** : la même
+vérification a également remonté qu'aucun run CI n'existe pour les 6 commits poussés après
+`a6e5327` (jusqu'à `41d04dc` au moment du rapport), alors que `ci.yml` est censé se déclencher sur
+chaque push vers `main`. Cause non déterminée depuis ce sandbox (pas d'accès `gh` local ni accès
+réseau `api.github.com` authentifié pour lister les runs) -- hypothèses à vérifier : Actions
+désactivées après l'échec initial, quota de minutes, ou tout simplement pas encore redéclenché. Le
+commit `df640a4` (ce correctif) devrait le confirmer ou l'infirmer au prochain push : si la CI ne se
+redéclenche toujours pas dessus, le problème est réel et mérite sa propre investigation.
+
+## Automatisation
+
+**Vérification nocturne GitHub (Claude Code cloud, routine planifiée)** -- créée le 6 août 2026,
+tous les jours à 19:00 UTC (~21h Paris en été, ~20h en hiver -- le cron reste fixe en UTC). Lecture
+seule : delta de commits `origin/main`, état CI, PR ouvertes (recoupées avec la convention "local
+d'abord" de ce document), issues ouvertes, et un audit léger façon "regard extérieur/repo public"
+(recherche grossière de secrets committés par erreur). Ne committe ni ne pousse jamais rien --
+seulement un rapport. Le point 31 ci-dessus est sa première trouvaille concrète. Gérée depuis
+https://claude.ai/code/routines (id `trig_01AnKSNF9qEMC3hom1eegjow`), pas depuis ce dépôt.
