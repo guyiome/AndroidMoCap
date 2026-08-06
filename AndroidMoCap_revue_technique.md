@@ -21,6 +21,23 @@ technique travaillant sur ce dépôt : les décisions prises ici n'ont d'effet q
 et reportées ici une fois traitées -- pas de synchronisation automatique entre conversations, le
 dépôt de fichiers partagé est le seul canal.
 
+**Convention de commit** : quand une demande touche plusieurs fonctionnalités à la fois, séparer les
+commits pour n'en avoir qu'un par fonctionnalité (sauf dépendance forte entre les deux qui ferait
+planter l'une sans l'autre, ou refactor global -- un seul commit "refactor" suffit alors). Titre
+clair et concis, détails en corps de message.
+
+**Traitement des PR (Dependabot ou autre), depuis le 6 août 2026** : ne pas utiliser le bouton
+"Merge" de GitHub. À la place -- lire la PR (diff, changelog/release notes), reproduire la même
+modification directement en local dans ce dépôt, tester/valider (dans la mesure du possible depuis
+ce sandbox, sinon sur device), commit dédié comme n'importe quelle modif. Une fois poussé vers
+GitHub depuis la machine de l'utilisateur, marquer la PR correspondante comme traitée (fermeture
+manuelle avec commentaire renvoyant vers le commit, ou laisser Dependabot la fermer automatiquement
+à son prochain passage s'il détecte que `main` satisfait déjà la version cible). Raison : un merge
+fait côté serveur GitHub crée un commit que ce sandbox ne peut pas rapatrier (pas d'accès réseau
+`api.github.com`/push ici, voir plus bas) alors que la copie locale accumule ses propres commits non
+poussés -- ça a produit une divergence confuse lors du merge de la PR #6 (voir plus bas). Passer par
+un commit local dès le départ élimine ce problème : la locale reste la source de vérité unique.
+
 ### Index des décisions actées en attente d'implémentation
 
 **Collision de numérotation à connaître :** les points 15-21 ci-dessous reprennent la numérotation
