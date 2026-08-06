@@ -1,6 +1,7 @@
 package com.guyiome.androidmocap.tracking
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.media.Image
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
@@ -20,8 +21,8 @@ import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException
 import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
+import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.MPImage
-import com.google.mediapipe.framework.image.MediaImageBuilder
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -41,13 +42,29 @@ import javax.microedition.khronos.opengles.GL10
  * (sélection de la configuration caméra frontale, liaison de la texture GL, `resume()`) qui suit la
  * séquence documentée dans les échantillons officiels ARCore mais n'a pas été rejouée ici.
  *
- * ⚠️ **Risque connu et non résolu, identifié lors de l'intégration dans `main` (6 août 2026, voir
- * revue technique point 3/13)** : [emitCameraImage] construit le [MPImage] directement depuis
- * `frame.acquireCameraImage()`, sans aucune correction de rotation ni de miroir -- contrairement à
- * `CameraController.processFrame()`, qui applique explicitement `rotationDegrees` selon
- * l'orientation du capteur. Impact possible, à vérifier au premier test device : détection
- * MediaPipe dégradée et/ou overlay du mesh mal projeté quand ce tracker est actif. Ne pas
- * corriger à l'aveugle sans pouvoir observer le comportement réel sur un appareil.
+ * ⚠️ **Crash confirmé sur device (6 août 2026) et corrigé** : `frame.acquireCameraImage()` renvoie
+ * toujours du YUV_420_888 côté ARCore (pas d'option de config, contrairement à CameraX/
+ * `ImageAnalysis` qui peut demander du RGBA directement, voir `CameraController`) -- passer ça tel
+ * quel à `MediaImageBuilder` faisait planter MediaPipe (`AndroidPacketCreator.createImage` :
+ * `UnsupportedOperationException: Android media image must use RGBA_8888 config`) dès la première
+ * frame. [emitCameraImage] convertit maintenant manuellement en `Bitmap` ARGB_8888
+ * ([yuv420ToBitmap], conversion BT.601 standard) avant de construire le [MPImage] via
+ * `BitmapImageBuilder`, même format que celui produit par `CameraController`. Conséquence
+ * secondaire : plus besoin de garder l'`Image` ARCore ouverte au-delà de cette conversion
+ * synchrone, `releaseFrame()` n'a donc plus rien à fermer (voir sa doc) -- simplification par
+ * rapport à la version d'origine, qui suivait les images en vol par timestamp.
+ *
+ * ⚠️ **Risque restant, non résolu** : [yuv420ToBitmap] alloue un nouveau `Bitmap` par frame (pas de
+ * pool de réutilisation comme `CameraController.acquirePooledBitmap`) et copie les pixels un par un
+ * -- correct mais potentiellement coûteux à haut débit (palier `OPTIMAL`, jusqu'à 60 fps). À
+ * optimiser si le coût se confirme réel sur device (mesurer avant d'optimiser à l'aveugle), voir
+ * revue technique point 3/13.
+ *
+ * ⚠️ **Risque restant, non résolu** : aucune correction de rotation ni de miroir de l'image caméra
+ * appliquée avant conversion -- contrairement à `CameraController.processFrame()`, qui applique
+ * explicitement `rotationDegrees` selon l'orientation du capteur. Impact possible, à vérifier sur
+ * device : détection MediaPipe dégradée et/ou overlay du mesh mal projeté. Ne pas corriger à
+ * l'aveugle sans pouvoir observer le comportement réel sur un appareil.
  *
  * Raison d'être : ARCore Augmented Faces gère lui-même la capture caméra frontale en interne (via
  * `Session#setCameraTextureName`, qui nécessite un contexte GL) -- il ne peut donc pas cohabiter
@@ -83,13 +100,6 @@ class ArCoreHeadPoseTracker(
 
     companion object {
         private const val TAG = "ArCoreHeadPoseTracker"
-
-        // Même logique que CameraController.MAX_TRACKED_BITMAPS : nombre d'images caméra "en vol"
-        // (transmises à MediaPipe, résultat pas encore reçu) toléré avant de laisser tomber une
-        // frame plutôt que d'accumuler des `Image` non fermées -- ARCore limite en interne le
-        // nombre d'images CPU acquises simultanément, les garder ouvertes trop longtemps ferait
-        // échouer les acquisitions suivantes.
-        private const val MAX_TRACKED_IMAGES = 2
     }
 
     @Volatile private var session: Session? = null
@@ -98,11 +108,6 @@ class ArCoreHeadPoseTracker(
     @Volatile private var targetFps: Int = initialTargetFps.coerceAtLeast(1)
     @Volatile private var minFrameIntervalMs: Long = 1000L / targetFps
     private var lastAcceptedFrameElapsedMs: Long = 0L
-
-    // Une `Image` ARCore n'est pas réutilisable (contrairement aux bitmaps de CameraController) --
-    // uniquement suivie ici pour être fermée au bon moment, jamais remise dans un pool de libres.
-    private val poolLock = Any()
-    private val inFlightImages = HashMap<Long, Image>()
 
     /**
      * À appeler avec le [GLSurfaceView] hébergé côté Compose (voir `MainScreen`). Requis par ARCore
@@ -141,24 +146,19 @@ class ArCoreHeadPoseTracker(
 
     /** À appeler à la fermeture du ViewModel (voir `MainViewModel.onCleared`). */
     fun close() {
-        synchronized(poolLock) {
-            inFlightImages.values.forEach { it.close() }
-            inFlightImages.clear()
-        }
         session?.close()
         session = null
     }
 
     /**
-     * À appeler une fois que MediaPipe a terminé de traiter l'image portant ce timestamp -- même
-     * mécanique que `CameraController.releaseFrame`, câblée sur le même callback
-     * `FaceLandmarkerHelper.onFrameProcessed`. Contrairement au pool de bitmaps, l'image n'est pas
-     * réutilisée : elle est simplement fermée (`Image#close()`), obligatoire côté ARCore pour
-     * libérer la place et permettre l'acquisition de la suivante.
+     * Ne fait plus rien -- gardée pour la compatibilité de signature avec l'appel sûr (`?.`) déjà
+     * fait dans `MainViewModel.onFrameProcessed` (mutuellement exclusif avec
+     * `CameraController.releaseFrame`, voir ce callback). L'`Image` ARCore source est désormais
+     * fermée de façon synchrone dans [emitCameraImage] juste après la conversion en `Bitmap`, plus
+     * besoin de la garder ouverte jusqu'à ce que MediaPipe ait fini de traiter le frame.
      */
     fun releaseFrame(frameTimeMs: Long) {
-        val image = synchronized(poolLock) { inFlightImages.remove(frameTimeMs) } ?: return
-        image.close()
+        // No-op, voir doc ci-dessus.
     }
 
     private fun tryCreateSession(): Session? {
@@ -269,23 +269,66 @@ class ArCoreHeadPoseTracker(
             return
         }
 
-        val inFlightCount = synchronized(poolLock) { inFlightImages.size }
-        if (inFlightCount >= MAX_TRACKED_IMAGES) {
-            image.close()
-            return
-        }
-
-        val mpImage = try {
-            MediaImageBuilder(image).build()
+        // frame.acquireCameraImage() est toujours en YUV_420_888 côté ARCore (pas d'option RGBA
+        // comme pour CameraX/ImageAnalysis, voir CameraController) -- MediaPipe exige du RGBA_8888
+        // (voir le crash documenté dans le kdoc de cette classe), d'où la conversion manuelle.
+        // L'Image source n'est plus nécessaire une fois ses pixels copiés dans le Bitmap : fermée
+        // ici, synchrone, pas besoin de la garder ouverte jusqu'à ce que MediaPipe ait fini avec le
+        // frame (contrairement à l'ancienne version, voir releaseFrame()).
+        val bitmap = try {
+            yuv420ToBitmap(image)
         } catch (e: Exception) {
-            Log.e(TAG, "Échec de conversion Image ARCore -> MPImage", e)
-            image.close()
+            Log.e(TAG, "Échec de conversion YUV -> Bitmap de l'image caméra ARCore", e)
             return
+        } finally {
+            image.close()
         }
 
+        val mpImage = BitmapImageBuilder(bitmap).build()
         val frameTimeMs = SystemClock.uptimeMillis()
-        synchronized(poolLock) { inFlightImages[frameTimeMs] = image }
         onFrame(mpImage, frameTimeMs)
+    }
+
+    /**
+     * Convertit une `Image` caméra YUV_420_888 (format renvoyé par ARCore, voir [emitCameraImage])
+     * en `Bitmap` ARGB_8888 -- coefficients BT.601 standard, identiques à ceux utilisés par la
+     * plupart des conversions YUV->RGB caméra Android. Alloue un nouveau `Bitmap` à chaque appel
+     * (pas de pool de réutilisation pour l'instant, voir le risque de performance documenté dans le
+     * kdoc de cette classe). Gère le cas où U et V sont entrelacés (`pixelStride == 2`, format
+     * NV21/NV12 courant) comme le cas où ils sont sur des plans séparés (`pixelStride == 1`).
+     */
+    private fun yuv420ToBitmap(image: Image): Bitmap {
+        val width = image.width
+        val height = image.height
+
+        val yPlane = image.planes[0]
+        val uPlane = image.planes[1]
+        val vPlane = image.planes[2]
+        val yBuffer = yPlane.buffer
+        val uBuffer = uPlane.buffer
+        val vBuffer = vPlane.buffer
+
+        val pixels = IntArray(width * height)
+        for (row in 0 until height) {
+            val yRowOffset = row * yPlane.rowStride
+            val uvRow = row / 2
+            val uRowOffset = uvRow * uPlane.rowStride
+            val vRowOffset = uvRow * vPlane.rowStride
+            for (col in 0 until width) {
+                val y = yBuffer.get(yRowOffset + col).toInt() and 0xFF
+                val uvCol = col / 2
+                val u = (uBuffer.get(uRowOffset + uvCol * uPlane.pixelStride).toInt() and 0xFF) - 128
+                val v = (vBuffer.get(vRowOffset + uvCol * vPlane.pixelStride).toInt() and 0xFF) - 128
+
+                val r = (y + 1.370705f * v).toInt().coerceIn(0, 255)
+                val g = (y - 0.337633f * u - 0.698001f * v).toInt().coerceIn(0, 255)
+                val b = (y + 1.732446f * u).toInt().coerceIn(0, 255)
+
+                pixels[row * width + col] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+            }
+        }
+
+        return Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
     }
 
     private fun emitHeadPose(session: Session) {
