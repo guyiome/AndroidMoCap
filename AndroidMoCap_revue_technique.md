@@ -52,7 +52,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 
 | Point | Sujet | Statut |
 | --- | --- | --- |
-| 3 / 13 | Fusion ARCore (palier `OPTIMAL`) | Codée sur `feature/arcore-fusion`, pas mergée, pas testée sur device |
+| 3 / 13 | Fusion ARCore (palier `OPTIMAL`) | **Intégrée sur `main` le 6 août 2026** (réimplémentée à neuf, pas mergée depuis `feature/arcore-fusion`), voir sa section dédiée -- compile et teste en JVM, **pas encore testée sur device** |
 | 8 | Minify/R8 en release | Désactivé volontairement, en attente de tests device |
 | 14 | Vérification de mise à jour semi-automatique | Backlog, aucun code écrit |
 | 15 | Détection langue (cascade) | Conception actée, aucun code écrit -- prérequiert le throttling thermique continu (point 3/13). **Confirmé par observation device le 6 août 2026** : le mesh montre que `tongueOut` n'est pas du tout restitué par MediaPipe (pas juste peu fiable), cohérent avec sa présence dans `BlendshapeCatalog.unreliable`. |
@@ -87,7 +87,7 @@ L'app est structurée proprement en couches : `camera` (CameraX), `tracking` (Me
 
 ## 3. Fonctionnalités documentées mais jamais branchées
 
-`DeviceCapabilityDetector.isThermalThrottling()` existe, avec un commentaire explicite ("à appeler périodiquement pendant la capture... pour déclencher une rétrogradation dynamique de palier") mais n'est appelé nulle part dans le code : aucune surveillance thermique ni rétrogradation de palier en cours de session. Dans le même esprit, `TierConfig.useArCorePose` est bien calculé pour le palier `OPTIMAL` mais la pose ARCore elle-même n'est branchée nulle part (le commentaire l'indique : "phase 2, pas encore actif") — la résolution de capture n'est pas non plus adaptée au palier (`ImageAnalysis.Builder()` ne fixe aucune résolution cible, CameraX choisit son défaut quel que soit `COMPATIBLE` ou `OPTIMAL`). Rien d'urgent ici, mais ce sont des leviers d'optimisation "gratuits" déjà prévus dans l'architecture et non exploités.
+`DeviceCapabilityDetector.isThermalThrottling()` existe, avec un commentaire explicite ("à appeler périodiquement pendant la capture... pour déclencher une rétrogradation dynamique de palier") mais n'est appelé nulle part dans le code : aucune surveillance thermique ni rétrogradation de palier en cours de session. `TierConfig.useArCorePose` est désormais branché (voir point 13, intégré le 6 août 2026) -- la résolution de capture, elle, n'est toujours pas adaptée au palier (`ImageAnalysis.Builder()` ne fixe aucune résolution cible, CameraX choisit son défaut quel que soit `COMPATIBLE` ou `OPTIMAL`). Rien d'urgent ici, mais ce sont des leviers d'optimisation "gratuits" déjà prévus dans l'architecture et pas encore tous exploités -- le throttling thermique en particulier reste d'autant plus utile maintenant que le palier `OPTIMAL` combine ARCore et MediaPipe simultanément (voir les risques listés au point 13).
 
 ## 4. Envoi réseau VMC : un paquet UDP par blendshape
 
@@ -140,7 +140,7 @@ attaché. Procédure complète (génération de la clé, secrets à créer) dans
 "Distribution". `versionCode`/`versionName` passés à `2`/`0.2.0`. Le point 8 (minify/R8) reste
 volontairement désactivé -- voir sa note mise à jour ci-dessus.
 
-### 13. Fusion ARCore (palier `OPTIMAL`, phase 2) -- conflit d'architecture identifié, design en cours
+### 13. Fusion ARCore (palier `OPTIMAL`, phase 2) -- ✅ intégrée sur `main`, vérification device en attente
 
 En creusant ce que "brancher ARCore" impliquerait concrètement, un point bloquant est apparu, qui
 explique en partie pourquoi ce n'était encore qu'un commentaire dans le code : **ARCore Augmented
@@ -166,6 +166,63 @@ maths pure et sans risque a été préparée en TDD : `RotationMath.rotation3x3F
 convertit le quaternion `Pose#getRotationQuaternion()` d'ARCore vers le même format de matrice 3x3
 row-major que `rotation3x3FromColumnMajor4x4`, pour pouvoir rejoindre `composeCalibratedEuler` sans le
 dupliquer une fois le reste branché. Voir `AndroidMoCap_tests_unitaires.md`.
+
+**Mise à jour (6 août 2026) : intégration à neuf sur `main`.** Le travail existait déjà sur la
+branche `feature/arcore-fusion` (jamais fusionnée, jamais testée sur device), mais un test de merge
+à blanc (fait puis annulé sans rien committer) a montré 13 fichiers en conflit -- l'UI/le ViewModel
+ont trop divergé depuis (menu à 4 sous-écrans, état enrichi, localisation, correctif du mesh
+overlay point 27) pour que fusionner soit raisonnable. Décision : récupérer uniquement les deux
+fichiers purs et isolés de la branche (`ArCoreHeadPoseTracker.kt`, `ArCoreFaceSelector.kt` + test --
+commit `28941c0`, compilent et testent sans aucun ajustement, dépendance ARCore déjà câblée,
+`MediaImageBuilder` confirmé identique en MediaPipe 1.0.0 par décompilation `javap`), puis
+réimplémenter l'intégration caméra/UI entièrement à neuf contre l'architecture actuelle.
+
+Conception (décisions actées avec l'utilisateur) :
+- Pas d'aperçu caméra live pour ce palier dans cette passe -- l'overlay du mesh de tracking (478
+  points) est le seul retour visuel, **forcé visible** quand ARCore est la source caméra active
+  (indépendamment du réglage "Overlay du mesh", qui reste un diagnostic optionnel pour les autres
+  paliers). Conçu pour ne pas fermer la porte à un futur mode "rendu live" (toggle dédié, avec
+  avertissement utilisateur si coûteux en ressources) -- pas construit maintenant.
+- Le mode économie d'énergie garde la priorité par défaut (l'overlay, forcé ou non, y disparaît
+  comme avant) ; nouveau réglage `keepMeshOverlayInPowerSave` (Affichage & confort, tous paliers
+  confondus, défaut désactivé) pour le garder visible même en éco.
+- Logique de visibilité extraite en fonction pure testée (`ui/MeshOverlayVisibility.kt` +
+  `MeshOverlayVisibilityTest.kt`, 8 cas), même principe que `LandmarkProjection.kt`.
+
+Câblage (`ui/MainViewModel.kt`) : `initializeTracking()` branche sur `TierConfig.useArCorePose` --
+construit `ArCoreHeadPoseTracker` (jamais en même temps que `CameraController`, les deux sont
+mutuellement exclusifs) avec repli automatique et silencieux sur `CameraController`/CameraX si
+`onUnavailable` se déclenche (ARCore non installé, appareil incompatible, config caméra frontale
+refusée...) -- testé synchrone dès `initializeTracking()` (pas seulement sur `ON_START`) pour que le
+repli soit déjà effectif avant que `MainScreen` n'appelle `startCamera()`. La pose de tête reçue via
+`onHeadPoseRotationMatrix` (thread GL, `@Volatile`) remplace celle de MediaPipe
+(`facialTransformationMatrixes()`, toujours calculée mais ignorée dans ce cas) dans
+`handleTrackingResult()`, avec repli sur la matrice MediaPipe tant qu'ARCore n'a pas encore émis de
+pose. `ui/MainScreen.kt` héberge un `GLSurfaceView` (via `AndroidView`, même patron que le
+`PreviewView` CameraX) à la place de l'aperçu caméra quand ARCore est actif. `DiagnosticsScreen`
+affiche la source caméra effective (ARCore/CameraX) au palier `OPTIMAL`, utile pour repérer un repli
+silencieux sur l'appareil de test.
+
+Vérifié (sans device, comme le reste de cette session) : `testDebugUnitTest` (61 tests, 0 échec,
+dont les 8 nouveaux `MeshOverlayVisibilityTest`) + `assembleDebug` → succès, compilation propre du
+premier coup sans aucun ajustement.
+
+**Risques connus, non résolus, à vérifier au premier accès device (pas deviner/corriger à
+l'aveugle) :**
+1. `ArCoreHeadPoseTracker.emitCameraImage()` ne corrige ni la rotation ni le miroir de l'image
+   caméra (contrairement à `CameraController.processFrame()`) -- détection MediaPipe et/ou overlay
+   potentiellement dégradés en mode ARCore tant que non vérifié. Documenté directement dans le
+   kdoc du fichier.
+2. `DeviceCapabilityDetector.detect()` lit `ArCoreApk.checkAvailability().isSupported` de façon
+   synchrone, un seul appel au démarrage -- un état transitoire `UNKNOWN_CHECKING` (tout premier
+   appel ARCore jamais mis en cache sur l'appareil) serait interprété comme "non supporté" pour
+   toute la session. Pré-existant, pas introduit par cette intégration.
+3. Pas de bloc `<queries>` pour `com.google.ar.core` dans le manifeste -- sans impact tant que le
+   repli reste silencieux (pas de flux `ArCoreApk.requestInstall()` prévu), à confirmer si un jour
+   un flux d'installation est ajouté.
+4. Coût thermique/batterie du duo GL (`RENDERMODE_CONTINUOUSLY`) + inférence MediaPipe simultanés,
+   sur un palier qui ne bénéficie toujours pas du throttling thermique dynamique (jamais branché,
+   voir plus haut dans ce même point).
 
 ### 14. Vérification de mise à jour semi-automatique -- à faire (backlog)
 

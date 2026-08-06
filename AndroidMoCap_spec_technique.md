@@ -69,22 +69,28 @@ c'est le point où le filtrage coûte le moins cher.
 mais n'est pas encore appelé en continu pendant une session pour déclencher une rétrogradation
 dynamique de palier -- voir revue technique, point 3/13.
 
-## 4. Fusion ARCore (palier `OPTIMAL`) -- branche séparée, non fusionnée
+## 4. Fusion ARCore (palier `OPTIMAL`) -- intégrée sur `main`, non testée sur device
 
-Implémentée sur la branche `feature/arcore-fusion`, **non mergée sur `main`, non testée sur
-device**. Contrainte technique identifiée : ARCore Augmented Faces gère lui-même l'accès caméra en
-interne et ne peut pas coexister avec `ImageAnalysis` de CameraX sur la même caméra frontale (un
-seul client Camera2 actif à la fois). Solution retenue : pour ce palier uniquement, `Session`
-(ARCore) pilote la caméra, les frames sont récupérées via `Frame.acquireCameraImage()` et converties
+Intégrée directement sur `main` le 6 août 2026 (réimplémentée à neuf plutôt que fusionnée depuis
+`feature/arcore-fusion`, devenue trop divergente -- voir revue technique, point 13, pour le
+raisonnement complet), **compile et teste en JVM, non testée sur device**. Contrainte technique
+identifiée : ARCore Augmented Faces gère lui-même l'accès caméra en interne et ne peut pas coexister
+avec `ImageAnalysis` de CameraX sur la même caméra frontale (un seul client Camera2 actif à la
+fois). Solution retenue : pour ce palier uniquement, `Session` (ARCore) pilote la caméra via
+`ArCoreHeadPoseTracker`, les frames sont récupérées via `Frame.acquireCameraImage()` et converties
 en `MPImage` (`MediaImageBuilder`) pour continuer à nourrir MediaPipe côté blendshapes ; la pose de
-tête utilise `AugmentedFace.centerPose` à la place de `facialTransformationMatrixes()`. Repli
-automatique et silencieux vers CameraX+MediaPipe (comme le palier `STANDARD`) si Augmented Faces
-s'avère indisponible à l'usage. Pas d'aperçu caméra live pour ce palier dans cette première passe
-(l'overlay du mesh sert de retour visuel à la place) -- choix assumé, pas une limitation
-définitive.
+tête utilise `AugmentedFace.centerPose` (récupérée via un callback dédié dans `MainViewModel`, thread
+GL) à la place de `facialTransformationMatrixes()`. Repli automatique et silencieux vers
+CameraX+`CameraController` (comme le palier `STANDARD`) si Augmented Faces s'avère indisponible à
+l'usage, décidé synchrone dès `MainViewModel.initializeTracking()`. Pas d'aperçu caméra live pour ce
+palier dans cette passe (l'overlay du mesh sert de retour visuel à la place, forcé visible dans ce
+cas -- voir `ui/MeshOverlayVisibility.kt`) -- choix assumé, conçu pour ne pas empêcher un futur mode
+"rendu live" (backlog, revue technique point 13).
 
-Nouvelles classes sur cette branche : `ArCoreHeadPoseTracker`, `ArCoreFaceSelector` (sélection du
-visage principal si plusieurs détectés, fonction pure testée en JVM : `pickPrimary`).
+Classes dédiées : `ArCoreHeadPoseTracker`, `ArCoreFaceSelector` (sélection du visage principal si
+plusieurs détectés, fonction pure testée en JVM : `pickPrimary`). Risques connus non résolus sans
+device (rotation/miroir de l'image caméra ARCore non gérée, vérification `ArCoreApk` synchrone au
+démarrage) : détaillés dans le kdoc d'`ArCoreHeadPoseTracker.kt` et la revue technique, point 13.
 
 ## 5. Protocoles réseau
 
@@ -189,9 +195,9 @@ Licence : PolyForm Shield 1.0.0 (voir `LICENSE`), CLA en place pour les contribu
 
 Liste vivante tenue dans `AndroidMoCap_revue_technique.md`, pas dupliquée ici. Points ouverts
 principaux au moment de la rédaction : throttling thermique dynamique non branché (point 3/13),
-fusion ARCore non mergée (point 13), minify désactivé (point 8), vérification de mise à jour non
-implémentée (point 14), comportement non défini sur grand écran/tablette (point 20). La localisation
-de l'UI (point 23) est traitée -- voir §12.
+minify désactivé (point 8), vérification de mise à jour non implémentée (point 14), comportement
+non défini sur grand écran/tablette (point 20). La localisation de l'UI (point 23) est traitée --
+voir §12. La fusion ARCore (point 13) est intégrée sur `main` mais non testée sur device -- voir §4.
 
 ## 12. Localisation
 

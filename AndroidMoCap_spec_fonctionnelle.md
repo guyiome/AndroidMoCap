@@ -141,9 +141,9 @@ d'attention) reste dans la revue technique :
   actuellement non adaptatif ; un constat platateforme (Android 16/17 ignore déjà le verrouillage
   d'orientation sur grand écran, indépendamment de ce choix) est documenté sans décision de mise en
   œuvre. Point 20 de la revue technique.
-- **Fusion ARCore** (pose de tête, palier `OPTIMAL`) -- implémentée sur une branche séparée, pas
-  fusionnée ni testée sur device, donc non active dans les versions distribuées à ce jour. Point 13
-  (spec technique §4 pour le détail architectural).
+- **Fusion ARCore** (pose de tête, palier `OPTIMAL`) -- intégrée sur `main`, mais pas encore testée
+  sur device, donc pas encore considérée fiable pour les versions distribuées. Point 13 (spec
+  technique §4 pour le détail architectural).
 - **Ajustement de poids/gain par blendshape** (+ lissage réglable) -- fonctionnalité équivalente à
   ce que proposait MeowFace et propose iFacialMocap aujourd'hui. Idée retenue comme prioritaire
   lors du comparatif concurrentiel, pas encore formalisée en point de conception détaillé.

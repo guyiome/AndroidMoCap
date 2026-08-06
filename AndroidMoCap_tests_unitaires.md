@@ -83,17 +83,30 @@ Point d'attention pour la vérification manuelle sur device : la projection supp
 
 Contrairement aux points 1, 2 et 4, les points 5 (capteurs/batterie pas alignés sur le cycle de vie) et 6 (`initializeTracking()` pas protégé contre un double appel) ne contenaient aucune logique pure à extraire -- uniquement du glue code Android (observation de `Lifecycle`, garde sur un booléen d'instance). Implémentés directement, sans étape rouge/verte JUnit au préalable, avec la raison documentée ci-dessus plutôt qu'un silence. Vérification manuelle recommandée après relance de l'app : mettre l'app en arrière-plan quelques secondes puis revenir dessus, et confirmer que le tracking reprend normalement (capteurs bien redémarrés) sans redémarrage complet.
 
-## Fusion ARCore (rapport technique, point 13) -- préparation en TDD, implémentation en attente
+## Fusion ARCore (rapport technique, point 13) -- intégrée, vérification device en attente
 
-Un point d'architecture bloquant a été identifié (accès caméra disputé entre ARCore Augmented Faces
-et CameraX, voir le rapport technique) : le branchement complet attend un accès device pour être
-validé sans risque de casser le tracking existant. Seule la brique de maths pure et indépendante de
-ce point d'architecture a été préparée dès maintenant, suivant le même principe que le reste de l'app
-(extraire la logique à risque en fonction pure, la couvrir en JUnit, avant de toucher au code Android
-qui l'entoure) : `RotationMath.rotation3x3FromQuaternion()`, testée par deux cas (quaternion identité,
-et rotation de 90° autour de Z comparée à la matrice de rotation Z déjà utilisée ailleurs dans les
-tests). Rien d'autre n'a été branché : pas de session ARCore créée, pas de changement sur
-`CameraController`/`FaceLandmarkerHelper`/`MainViewModel`.
+La brique de maths pure a été préparée en premier, comme le reste de l'app (extraire la logique à
+risque en fonction pure, la couvrir en JUnit, avant de toucher au code Android qui l'entoure) :
+`RotationMath.rotation3x3FromQuaternion()`, testée par deux cas (quaternion identité, et rotation de
+90° autour de Z comparée à la matrice de rotation Z déjà utilisée ailleurs dans les tests).
+
+Intégration complète faite le 6 août 2026 (réimplémentée à neuf sur `main`, voir revue technique
+point 13 pour le pourquoi). Ce qui est couvert en JUnit :
+- `ArCoreFaceSelector.pickPrimary()` -- sélection du visage principal parmi les candidats suivis,
+  4 cas (`ArCoreFaceSelectorTest.kt`).
+- `computeMeshOverlayVisible()` (`ui/MeshOverlayVisibility.kt`) -- table de vérité complète des 4
+  entrées booléennes (ARCore actif, réglage overlay, mode éco, garder-en-éco), 8 cas
+  (`MeshOverlayVisibilityTest.kt`).
+
+Ce qui n'est **pas** couvert, volontairement, même raison que le reste du glue code Android de cette
+app (`DeviceCapabilityDetector`, `CameraController`...) : `ArCoreHeadPoseTracker` dépend directement
+du SDK ARCore (`Session`, `GLSurfaceView.Renderer`, `Frame.acquireCameraImage()`) et du branchement
+caméra/cycle de vie dans `MainViewModel` -- nécessiterait Robolectric ou un test instrumenté pour un
+gain limité vu la nature du code (orchestration, pas de décision non triviale isolable). Vérifié
+seulement par compilation + build complet (`assembleDebug` réussi) dans ce sandbox, **jamais exécuté
+sur un appareil réel** -- voir la revue technique, point 13, pour la liste des risques connus non
+résolus (rotation/miroir de l'image caméra ARCore en particulier) à vérifier en priorité au premier
+test device, avant tout autre ajustement.
 
 ## Règle pour la suite (TDD)
 
