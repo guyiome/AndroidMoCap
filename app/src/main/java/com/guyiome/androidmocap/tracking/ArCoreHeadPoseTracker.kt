@@ -30,6 +30,9 @@ import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationExceptio
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.MPImage
 import com.guyiome.androidmocap.camera.CameraController
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -61,27 +64,25 @@ import javax.microedition.khronos.opengles.GL10
  * synchrone, `releaseFrame()` n'a donc plus rien à fermer (voir sa doc) -- simplification par
  * rapport à la version d'origine, qui suivait les images en vol par timestamp.
  *
- * ⚠️ **Risque restant, non résolu** : [yuv420ToBitmap] alloue un nouveau `Bitmap` par frame (pas de
- * pool de réutilisation comme `CameraController.acquirePooledBitmap`) et copie les pixels un par un
- * -- correct mais potentiellement coûteux à haut débit (palier `OPTIMAL`, jusqu'à 60 fps). À
- * optimiser si le coût se confirme réel sur device (mesurer avant d'optimiser à l'aveugle), voir
- * revue technique point 3/13.
+ * ⚠️ **Perf, corrigé (6 août 2026)** : la conversion YUV->RGB + rotation ([yuv420ToBitmap],
+ * [rotateBitmap]) est déportée sur [imageProcessingExecutor] (thread dédié) plutôt que de tourner
+ * en synchrone sur le thread GL ([onDrawFrame]) -- confirmé sur device (retour utilisateur) que ça
+ * ralentissait à la fois le rendu et la cadence de `session.update()`. Contre-pression explicite
+ * ([pendingConversions]/[MAX_PENDING_CONVERSIONS]) : une frame est abandonnée plutôt que mise en
+ * file si le thread dédié a du retard -- priorité explicite de l'utilisateur aux données envoyées
+ * au récepteur (fluides, à jour) plutôt qu'au traitement exhaustif de chaque frame caméra.
+ * [yuv420ToBitmap] alloue toujours un nouveau `Bitmap` par frame (pas de pool de réutilisation
+ * comme `CameraController.acquirePooledBitmap`) -- optimisation restante si nécessaire, non
+ * prioritaire vu le gain déjà obtenu par le déport de thread.
  *
- * ⚠️ **Risque restant, non résolu** : aucune correction de rotation ni de miroir de l'image caméra
- * appliquée avant conversion -- contrairement à `CameraController.processFrame()`, qui applique
- * explicitement `rotationDegrees` selon l'orientation du capteur. Impact possible, à vérifier sur
- * device : détection MediaPipe dégradée et/ou overlay du mesh mal projeté. Ne pas corriger à
- * l'aveugle sans pouvoir observer le comportement réel sur un appareil.
- *
- * ⚠️ **Warning natif confirmé sur device (6 août 2026), partiellement corrigé** : logcat
- * utilisateur après le correctif YUV ci-dessus montrait en continu, à chaque frame, deux messages
- * natifs -- `view_manager_utils.cc: Display geometry has an invalid width: 0` (corrigé : `Session`
- * n'avait jamais reçu [Session.setDisplayGeometry], voir [maybeSetDisplayGeometry]) et
- * `aimatter_landmarks_3Dmesh.cc: Not able to find preprocess rotation with expected timestamp`
- * (cause distincte, **toujours pas résolue** -- probablement liée au même risque de
- * rotation/miroir non géré ci-dessus, mais pas confirmé ; ne pas corriger à l'aveugle en ajoutant
- * un `ImageProcessingOptions.rotationDegrees` deviné sans savoir la valeur correcte pour ce
- * capteur). À revérifier au prochain retour device.
+ * ⚠️ **Rotation, corrigée (6 août 2026)** : [cameraRotationDegrees] (lu via Camera2
+ * `CameraCharacteristics.SENSOR_ORIENTATION`, voir [readCameraSensorOrientation]) est appliqué à
+ * l'image avant conversion -- confirmé nécessaire et fonctionnel sur device (retour utilisateur :
+ * tracking correctement orienté après ce correctif, latence perçue également améliorée). Le
+ * warning natif `aimatter_landmarks_3Dmesh.cc: Not able to find preprocess rotation with expected
+ * timestamp`, observé en continu avant ce correctif, était vraisemblablement causé par la même
+ * absence de rotation -- probablement résolu du même coup, à confirmer explicitement au prochain
+ * accès au logcat (pas encore vérifié directement).
  *
  * Raison d'être : ARCore Augmented Faces gère lui-même la capture caméra frontale en interne (via
  * `Session#setCameraTextureName`, qui nécessite un contexte GL) -- il ne peut donc pas cohabiter
@@ -117,7 +118,25 @@ class ArCoreHeadPoseTracker(
 
     companion object {
         private const val TAG = "ArCoreHeadPoseTracker"
+
+        // Nombre de conversions YUV->Bitmap tolérées "en vol" (soumises à imageProcessingExecutor,
+        // pas encore terminées) avant de laisser tomber une frame plutôt que d'empiler du travail
+        // en retard -- même philosophie que CameraController.MAX_TRACKED_BITMAPS. Fixé à 1 (pas 2
+        // comme côté CameraX) : demande explicite de l'utilisateur (6 août 2026) de garder les
+        // données envoyées au récepteur (blendshapes/pose) prioritaires et à jour plutôt que de
+        // traiter coûte que coûte chaque frame caméra -- un retard qui s'accumule sur un thread
+        // dédié est pire pour la latence perçue qu'une frame simplement sautée.
+        private const val MAX_PENDING_CONVERSIONS = 1
     }
+
+    // Conversion YUV->RGB + rotation déplacées hors du thread GL (onDrawFrame) : faites pixel par
+    // pixel, elles ralentissaient à la fois le rendu et la cadence de session.update() -- observé
+    // concrètement sur device (retour utilisateur, 6 août 2026, latence perçue nettement réduite
+    // après correction de la rotation, mais le principe reste : ce travail n'a aucune raison de
+    // bloquer le thread qui pilote ARCore). Un seul thread dédié (pas de parallélisme inutile, une
+    // seule caméra) plutôt qu'un pool.
+    private val imageProcessingExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    private val pendingConversions = AtomicInteger(0)
 
     @Volatile private var session: Session? = null
     @Volatile private var cameraTextureId: Int = 0
@@ -184,6 +203,10 @@ class ArCoreHeadPoseTracker(
 
     /** À appeler à la fermeture du ViewModel (voir `MainViewModel.onCleared`). */
     fun close() {
+        // shutdown() (pas shutdownNow()) : laisse une conversion déjà en cours se terminer
+        // proprement plutôt que de l'interrompre en plein milieu -- même convention que
+        // CameraController.stop()/cameraExecutor.
+        imageProcessingExecutor.shutdown()
         session?.close()
         session = null
     }
@@ -344,25 +367,41 @@ class ArCoreHeadPoseTracker(
             return
         }
 
-        // frame.acquireCameraImage() est toujours en YUV_420_888 côté ARCore (pas d'option RGBA
-        // comme pour CameraX/ImageAnalysis, voir CameraController) -- MediaPipe exige du RGBA_8888
-        // (voir le crash documenté dans le kdoc de cette classe), d'où la conversion manuelle.
-        // L'Image source n'est plus nécessaire une fois ses pixels copiés dans le Bitmap : fermée
-        // ici, synchrone, pas besoin de la garder ouverte jusqu'à ce que MediaPipe ait fini avec le
-        // frame (contrairement à l'ancienne version, voir releaseFrame()).
-        val bitmap = try {
-            val raw = yuv420ToBitmap(image)
-            if (cameraRotationDegrees == 0) raw else rotateBitmap(raw, cameraRotationDegrees)
-        } catch (e: Exception) {
-            Log.e(TAG, "Échec de conversion YUV -> Bitmap de l'image caméra ARCore", e)
-            return
-        } finally {
+        // Contre-pression explicite : si imageProcessingExecutor a déjà MAX_PENDING_CONVERSIONS
+        // conversions en cours, cette frame est abandonnée immédiatement plutôt que mise en file --
+        // acquireCameraImage() doit rester sur le thread GL (lié à session.update()), mais la suite
+        // (conversion YUV->RGB + rotation, coûteuse) est déportée ci-dessous.
+        if (pendingConversions.get() >= MAX_PENDING_CONVERSIONS) {
             image.close()
+            return
         }
+        pendingConversions.incrementAndGet()
 
-        val mpImage = BitmapImageBuilder(bitmap).build()
-        val frameTimeMs = SystemClock.uptimeMillis()
-        onFrame(mpImage, frameTimeMs)
+        imageProcessingExecutor.execute {
+            try {
+                // frame.acquireCameraImage() est toujours en YUV_420_888 côté ARCore (pas d'option
+                // RGBA comme pour CameraX/ImageAnalysis, voir CameraController) -- MediaPipe exige
+                // du RGBA_8888 (voir le crash documenté dans le kdoc de cette classe), d'où la
+                // conversion manuelle. L'Image source n'est plus nécessaire une fois ses pixels
+                // copiés dans le Bitmap : fermée ici, pas besoin de la garder ouverte jusqu'à ce
+                // que MediaPipe ait fini avec le frame (contrairement à l'ancienne version, voir
+                // releaseFrame()).
+                val bitmap = try {
+                    val raw = yuv420ToBitmap(image)
+                    if (cameraRotationDegrees == 0) raw else rotateBitmap(raw, cameraRotationDegrees)
+                } finally {
+                    image.close()
+                }
+
+                val mpImage = BitmapImageBuilder(bitmap).build()
+                val frameTimeMs = SystemClock.uptimeMillis()
+                onFrame(mpImage, frameTimeMs)
+            } catch (e: Exception) {
+                Log.e(TAG, "Échec de conversion YUV -> Bitmap de l'image caméra ARCore", e)
+            } finally {
+                pendingConversions.decrementAndGet()
+            }
+        }
     }
 
     /**
