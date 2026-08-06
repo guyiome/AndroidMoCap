@@ -51,7 +51,7 @@ Deux grandes catégories reviennent tout du long. Le code **logique pur** (maths
 
 | Fichier | Élément couvert | Test(s) | Statut |
 |---|---|---|---|
-| `AppSettingsStore.kt`, `ConnectionSettingsStore.kt` | Getters/setters DataStore (dont `faceMeshOverlayEnabled`) | -- | ❌ Dépendent de `Context`/DataStore Preferences -- nécessitent Robolectric (avec un `PreferenceDataStore` en mémoire) ou un test instrumenté. Bon candidat pour une prochaine itération : la logique (lire une clé, valeur par défaut si absente, écrire) est simple mais entièrement non couverte aujourd'hui. |
+| `AppSettingsStore.kt`, `ConnectionSettingsStore.kt` | Getters/setters DataStore (dont `faceMeshOverlayEnabled`, `persistBlendshapeSelectionEnabled`, `persistedBlendshapeSelectionNames`) | -- | ❌ Dépendent de `Context`/DataStore Preferences -- nécessitent Robolectric (avec un `PreferenceDataStore` en mémoire) ou un test instrumenté. Bon candidat pour une prochaine itération : la logique (lire une clé, valeur par défaut si absente, écrire) est simple mais entièrement non couverte aujourd'hui. |
 
 ## ui/ (Compose)
 

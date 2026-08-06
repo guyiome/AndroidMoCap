@@ -61,6 +61,7 @@ fun SettingsScreen(
     onSetPowerSaveMode: (Boolean) -> Unit,
     onSetPowerSaveDelay: (Int) -> Unit,
     onSetFaceMeshOverlay: (Boolean) -> Unit,
+    onSetPersistBlendshapeSelection: (Boolean) -> Unit,
 ) {
     var vmcHostInput by remember { mutableStateOf(uiState.savedVmcHost.ifBlank { "192.168.1.100" }) }
 
@@ -109,12 +110,23 @@ fun SettingsScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Blendshapes affichées", color = Color.White, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "${uiState.selectedBlendshapeNames.size} sélectionnée(s) -- non conservé au redémarrage",
+                        "${uiState.selectedBlendshapeNames.size} sélectionnée(s)" +
+                            if (uiState.persistBlendshapeSelectionEnabled) " -- mémorisée" else " -- non conservé au redémarrage",
                         color = Color.White.copy(alpha = 0.7f),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
                 Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = null, tint = Color.White)
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "Mémoriser cette sélection au prochain lancement",
+                    color = Color.White.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(checked = uiState.persistBlendshapeSelectionEnabled, onCheckedChange = onSetPersistBlendshapeSelection)
             }
 
             Spacer(Modifier.height(24.dp))

@@ -202,6 +202,7 @@ fun MainScreen(
                     onSetPowerSaveMode = { enabled -> viewModel.setPowerSaveModeEnabled(enabled) },
                     onSetPowerSaveDelay = { seconds -> viewModel.setPowerSaveDelaySeconds(seconds) },
                     onSetFaceMeshOverlay = { enabled -> viewModel.setFaceMeshOverlayEnabled(enabled) },
+                    onSetPersistBlendshapeSelection = { enabled -> viewModel.setPersistBlendshapeSelectionEnabled(enabled) },
                 )
             }
 

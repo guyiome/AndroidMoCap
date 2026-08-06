@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -17,8 +18,10 @@ const val DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT = 20
 const val DEFAULT_POWER_SAVE_DELAY_SECONDS = 30
 
 /**
- * Réglages généraux de l'app, persistés entre les lancements (contrairement à la sélection de
- * blendshapes affichées, volontairement non persistée -- voir [MainUiState.selectedBlendshapeNames]).
+ * Réglages généraux de l'app, persistés entre les lancements. La sélection de blendshapes
+ * affichées reste non persistée par défaut (remise à zéro à chaque lancement, comme demandé
+ * initialement) -- [persistBlendshapeSelectionEnabled] permet de changer ce comportement au cas
+ * par cas, voir sa doc.
  */
 class AppSettingsStore(private val context: Context) {
 
@@ -27,6 +30,8 @@ class AppSettingsStore(private val context: Context) {
         val POWER_SAVE_MODE = booleanPreferencesKey("power_save_mode_enabled")
         val POWER_SAVE_DELAY = intPreferencesKey("power_save_delay_seconds")
         val FACE_MESH_OVERLAY = booleanPreferencesKey("face_mesh_overlay_enabled")
+        val PERSIST_BLENDSHAPE_SELECTION = booleanPreferencesKey("persist_blendshape_selection_enabled")
+        val PERSISTED_BLENDSHAPE_SELECTION = stringSetPreferencesKey("persisted_blendshape_selection")
     }
 
     val lowBatteryThresholdPercent: Flow<Int> = context.appSettingsDataStore.data.map { prefs ->
@@ -67,5 +72,27 @@ class AppSettingsStore(private val context: Context) {
 
     suspend fun setFaceMeshOverlayEnabled(enabled: Boolean) {
         context.appSettingsDataStore.edit { prefs -> prefs[Keys.FACE_MESH_OVERLAY] = enabled }
+    }
+
+    /**
+     * Désactivé par défaut (voir rapport technique, point 18) : la sélection de blendshapes
+     * affichés ([persistedBlendshapeSelectionNames]) n'est mémorisée que si ce réglage est activé
+     * -- ne change rien au comportement historique tant que l'utilisateur ne l'active pas lui-même.
+     */
+    val persistBlendshapeSelectionEnabled: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[Keys.PERSIST_BLENDSHAPE_SELECTION] ?: false
+    }
+
+    suspend fun setPersistBlendshapeSelectionEnabled(enabled: Boolean) {
+        context.appSettingsDataStore.edit { prefs -> prefs[Keys.PERSIST_BLENDSHAPE_SELECTION] = enabled }
+    }
+
+    /** Dernière sélection de blendshapes sauvegardée, utilisée uniquement si [persistBlendshapeSelectionEnabled]. */
+    val persistedBlendshapeSelectionNames: Flow<Set<String>> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[Keys.PERSISTED_BLENDSHAPE_SELECTION] ?: emptySet()
+    }
+
+    suspend fun setPersistedBlendshapeSelectionNames(names: Set<String>) {
+        context.appSettingsDataStore.edit { prefs -> prefs[Keys.PERSISTED_BLENDSHAPE_SELECTION] = names }
     }
 }

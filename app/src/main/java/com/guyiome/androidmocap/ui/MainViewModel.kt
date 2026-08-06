@@ -32,6 +32,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.net.InetAddress
@@ -87,6 +88,10 @@ data class MainUiState(
     // réglages. Option activable indépendamment du futur aperçu 3D d'avatar (piste séparée, pas
     // encore implémentée).
     val faceMeshOverlayEnabled: Boolean = false,
+    // Mémorise (ou non) la sélection de blendshapes affichés d'une session à l'autre -- désactivé
+    // par défaut, comportement historique inchangé tant que l'utilisateur ne l'active pas
+    // lui-même. Voir rapport technique, point 18.
+    val persistBlendshapeSelectionEnabled: Boolean = false,
     val errorMessage: String? = null,
 )
 
@@ -189,6 +194,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // pas encore accordée) -- initializeTracking() réapplique l'état courant une fois
                 // prêt, même logique que pour setPreviewEnabled côté caméra.
                 faceLandmarkerHelper?.setLandmarksNeeded(enabled)
+            }
+        }
+        viewModelScope.launch {
+            appSettingsStore.persistBlendshapeSelectionEnabled.collect { enabled ->
+                _uiState.update { it.copy(persistBlendshapeSelectionEnabled = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            // Chargée une seule fois au lancement (first(), pas collect en continu comme les
+            // collecteurs ci-dessus) : contrairement à un simple réglage on/off, réappliquer cette
+            // valeur à chaque émission du Flow écraserait la sélection en cours dès que
+            // l'utilisateur la modifie lui-même (toggleBlendshapeSelection écrit dans ce même Flow
+            // quand la persistance est active, ce qui redéclencherait ce Flow en boucle).
+            if (appSettingsStore.persistBlendshapeSelectionEnabled.first()) {
+                val savedNames = appSettingsStore.persistedBlendshapeSelectionNames.first()
+                _uiState.update { it.copy(selectedBlendshapeNames = savedNames) }
             }
         }
     }
@@ -337,12 +358,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(errorMessage = message) }
     }
 
-    // --- Sélection des blendshapes affichées sur l'écran principal (non persistée) ---
+    // --- Sélection des blendshapes affichées sur l'écran principal (persistée seulement si
+    // l'utilisateur l'a activé, voir persistBlendshapeSelectionEnabled) ---
 
     fun toggleBlendshapeSelection(name: String) {
         _uiState.update { state ->
             val selection = state.selectedBlendshapeNames
             state.copy(selectedBlendshapeNames = if (name in selection) selection - name else selection + name)
+        }
+        if (_uiState.value.persistBlendshapeSelectionEnabled) {
+            viewModelScope.launch(Dispatchers.IO) {
+                appSettingsStore.setPersistedBlendshapeSelectionNames(_uiState.value.selectedBlendshapeNames)
+            }
+        }
+    }
+
+    /**
+     * Réglage : mémorise (ou non) la sélection de blendshapes affichés d'une session à l'autre --
+     * désactivé par défaut. Activer le réglage sauvegarde immédiatement la sélection courante
+     * (plutôt que d'attendre la prochaine modification), cohérent avec l'attente "j'active, ça
+     * mémorise dès maintenant l'état actuel".
+     */
+    fun setPersistBlendshapeSelectionEnabled(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            appSettingsStore.setPersistBlendshapeSelectionEnabled(enabled)
+            if (enabled) {
+                appSettingsStore.setPersistedBlendshapeSelectionNames(_uiState.value.selectedBlendshapeNames)
+            }
         }
     }
 
