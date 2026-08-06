@@ -259,10 +259,19 @@ corrigé, perf déportée sur thread dédié -- tracking fonctionnel confirmé p
   celle utilisée en interne par CameraX, pas une valeur devinée -- puis appliquée via
   `rotateBitmap()` qui réutilise `CameraController.rotatedDimensions()` (fonction pure déjà
   testée). **Confirmé fonctionnel par l'utilisateur** : tracking correctement orienté, et la
-  latence perçue s'est nettement améliorée du même coup -- le warning `aimatter_landmarks_3Dmesh.cc:
-  Not able to find preprocess rotation with expected timestamp` était vraisemblablement causé par
-  la même absence de rotation (probablement résolu, pas encore reconfirmé explicitement dans un
-  nouveau logcat).
+  latence perçue s'est nettement améliorée du même coup.
+- **Warning `aimatter_landmarks_3Dmesh.cc: Not able to find preprocess rotation with expected
+  timestamp`, hypothèse initiale infirmée** (commit `ac0ed9f`) : contrairement à ce qui était
+  supposé ci-dessus, ce warning **persiste identique** après le correctif de rotation (reconfirmé
+  sur device, même logcat que la rotation validée) -- pas causé par l'absence de rotation. Nouvelle
+  piste non vérifiée : le timestamp du message (ex. `792660266321`) est trop grand pour
+  `SystemClock.uptimeMillis()`, cohérent avec un timestamp en nanosecondes façon
+  `Frame.getTimestamp()` d'ARCore -- suggérerait une fonctionnalité interne (compensation de
+  rotation continue via IMU ?) jamais câblée, pas confirmé. Tracking reste fonctionnel malgré ce
+  warning, donc vraisemblablement bénin. **Prochaine étape pour trancher sans deviner un troisième
+  correctif à l'aveugle** : vérifier si le même warning apparaît aussi au palier `STANDARD`
+  (CameraX) sur le même appareil -- si oui, comportement préexistant de la lib sans rapport avec
+  cette intégration ; si non, spécifique à `ArCoreHeadPoseTracker` et à creuser plus loin.
 - **Conversion déportée sur thread dédié** (commit `a247b95`), sur demande explicite de
   l'utilisateur : la conversion YUV→RGB + rotation (coûteuse, pixel par pixel) tournait en
   synchrone sur le thread GL (`onDrawFrame`), ralentissant à la fois le rendu et la cadence de
