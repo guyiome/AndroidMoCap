@@ -133,3 +133,7 @@ réglages au moment de l'installation.
    existe déjà, pas encore appelé en continu pendant la capture).
 5. Activer R8/minify sur le build release une fois la vérification sur device de nouveau possible
    (règles ProGuard MediaPipe/OSC à valider une par une).
+6. Vérification de mise à jour semi-automatique : interroger l'API GitHub Releases (`/releases/latest`),
+   comparer au `versionCode` courant, et afficher une bannière non intrusive avec un lien vers l'APK
+   si une nouvelle version est disponible. Pas d'installation silencieuse possible hors store (limite
+   Android, pas technique) -- voir la discussion sur la distribution.

@@ -94,6 +94,17 @@ convertit le quaternion `Pose#getRotationQuaternion()` d'ARCore vers le même fo
 row-major que `rotation3x3FromColumnMajor4x4`, pour pouvoir rejoindre `composeCalibratedEuler` sans le
 dupliquer une fois le reste branché. Voir `AndroidMoCap_tests_unitaires.md`.
 
+### 14. Vérification de mise à jour semi-automatique -- à faire (backlog)
+
+Discuté suite au point 12 (distribution GitHub Releases) : pas de mise à jour automatique possible
+hors store (Android exige une confirmation manuelle d'installation pour tout APK sideloadé, protection
+système, pas une limite contournable côté code). Piste retenue : l'app interroge périodiquement
+l'API GitHub (`GET /repos/guyiome/AndroidMoCap/releases/latest`), compare le `versionCode` reçu au
+sien, et affiche une bannière non intrusive ("Mise à jour disponible") avec un lien direct vers l'APK
+si une version plus récente existe -- l'utilisateur garde la main, un ou deux taps suffisent ensuite.
+Logique de comparaison de version + parsing de la réponse JSON sont de bons candidats à extraire en
+fonction pure et à couvrir en TDD le moment venu, avant de toucher à l'appel réseau/UI qui les entoure.
+
 ## Priorités suggérées (mise à jour)
 
-Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device (aucun impact visuel, juste un travail évité). Le point 10 est une simple mise à jour de documentation. Le point 3/13 (ARCore phase 2) est maintenant mieux cerné mais reste un investissement lourd et risqué à finir "à l'aveugle" -- la suite (bascule caméra CameraX→ARCore) attend un accès device. Le point 11 (signature + versionnage) est traité (point 12). Le point 8 (minify) reste pour plus tard, une fois les tests device de nouveau possibles.
+Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device (aucun impact visuel, juste un travail évité). Le point 10 est une simple mise à jour de documentation. Le point 3/13 (ARCore phase 2) est maintenant mieux cerné mais reste un investissement lourd et risqué à finir "à l'aveugle" -- la suite (bascule caméra CameraX→ARCore) attend un accès device. Le point 11 (signature + versionnage) est traité (point 12). Le point 8 (minify) reste pour plus tard, une fois les tests device de nouveau possibles. Le point 14 (vérification de mise à jour) est en backlog, pas urgent.
