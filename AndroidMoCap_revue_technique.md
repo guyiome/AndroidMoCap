@@ -297,6 +297,22 @@ Risques restants après cette série de correctifs (mise à jour de la liste ci-
   réutilisation) -- non prioritaire vu le gain déjà obtenu par le déport de thread, à reconsidérer
   seulement si un nouveau signal de coût apparaît.
 
+**Suivi device (6 août 2026, même jour, suite) : palier forçable manuellement, pour diagnostiquer
+sans second appareil.** L'utilisateur n'a pas d'appareil qui qualifie naturellement pour `STANDARD`
+(le sien qualifie pour `OPTIMAL`), donc pas de moyen direct de comparer le warning `aimatter`
+(toujours ouvert, voir ci-dessus) entre les deux paliers. Ajouté (commit `e1c75df`) :
+`TrackingTierSelector.select()` accepte un `override: TrackingTier? = null` qui court-circuite la
+sélection automatique (fonction reste pure, testée), persisté via
+`AppSettingsStore.tierOverride`, réglable depuis un nouveau sélecteur dans `DiagnosticsScreen`
+(FilterChips Automatique/OPTIMAL/STANDARD/COMPATIBLE). S'applique seulement au prochain lancement
+de l'app (`MainViewModel.initializeTracking()` lit l'override une seule fois via `first()`) --
+pas de reconstruction à chaud du pipeline caméra/MediaPipe, choix assumé pour rester simple et sûr
+plutôt que de gérer un teardown/rebuild en cours de session. Forcer `OPTIMAL` sur un appareil sans
+ARCore réel ne pose pas de problème : le repli silencieux déjà en place
+(`ArCoreHeadPoseTracker.onUnavailable`) s'applique identiquement, override ou sélection
+automatique. Outil de diagnostic explicitement, pas une fonctionnalité utilisateur normale -- `DiagnosticsScreen`
+n'est donc plus tout à fait "en lecture seule" (doc du composant mise à jour).
+
 ### 14. Vérification de mise à jour semi-automatique -- à faire (backlog)
 
 Discuté suite au point 12 (distribution GitHub Releases) : pas de mise à jour automatique possible

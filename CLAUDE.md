@@ -66,12 +66,17 @@ push, reconstituting the keystore from a base64 GitHub secret.
 
 **Adaptive tracking tiers.** `capabilities/DeviceCapabilities.kt` (`DeviceCapabilityDetector.detect()`)
 inspects ARCore support, Android performance class, CPU cores and RAM once at startup, with no manual
-configuration. `tracking/TrackingTier.kt` (`TrackingTierSelector.select()`, pure function) maps that
-to one of `COMPATIBLE` / `STANDARD` / `OPTIMAL`, each fixing a `TierConfig` (GPU delegate preference,
-target FPS, whether ARCore head pose fusion is used). `OPTIMAL`'s ARCore fusion is designed but not
-merged into `main` (see `feature/arcore-fusion` branch and revue technique point 3/13) — the camera
-source switch it requires hasn't been validated on device. `isThermalThrottling()` exists but isn't
-wired into any continuous loop yet.
+configuration by default. `tracking/TrackingTier.kt` (`TrackingTierSelector.select()`, pure function)
+maps that to one of `COMPATIBLE` / `STANDARD` / `OPTIMAL`, each fixing a `TierConfig` (GPU delegate
+preference, target FPS, whether ARCore head pose fusion is used) — takes an optional `override`
+parameter that bypasses the automatic decision entirely, wired to a diagnostics-only manual tier
+picker (`DiagnosticsScreen`, persisted via `AppSettingsStore.tierOverride`, applied on next app
+launch, not a live pipeline rebuild) added so devices that never naturally qualify for a given tier
+can still be used to test it. `OPTIMAL`'s ARCore fusion is merged into `main` and confirmed working
+on device (revue technique point 3/13) — camera source switching (CameraX ↔ ARCore), rotation
+correction and the image-processing thread split are all implemented; a few minor items (a native
+MediaPipe warning of unconfirmed cause, no Bitmap pooling for the ARCore path) remain open, see the
+revue technique. `isThermalThrottling()` exists but isn't wired into any continuous loop yet.
 
 **Capture pipeline.** `camera/CameraController.kt` drives CameraX (front camera → `MPImage`), with a
 bitmap pool (`acquirePooledBitmap`) to avoid a per-frame allocation, frame-rate throttling against
