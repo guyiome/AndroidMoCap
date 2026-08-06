@@ -65,9 +65,10 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 28 | Fiabilisation du clignement des yeux avec lunettes | Idée de conception ouverte le 6 août 2026, voir section dédiée plus bas -- aucun code écrit |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
-(point 23), rien à corriger côté statut. Note : ce fichier ne contient pas (encore) les sections
-détaillées des points 15/16/19/20 -- leur rédaction complète existe uniquement sur la copie du
-document présente sur `feature/arcore-fusion`, jamais fusionnée dans celle-ci.
+(point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
+n'existaient jusqu'ici que sur la copie du document présente sur `feature/arcore-fusion` (jamais
+fusionnée), ont été rapatriées dans `main` le 6 août 2026 -- voir la section dédiée en fin de
+document.
 
 ## Vue d'ensemble
 
@@ -421,3 +422,202 @@ elles-mêmes affichées à l'écran) -- possible que MediaPipe compense déjà c
 évaluer, dans le même esprit de sobriété batterie que le reste du pipeline (voir spec technique
 §budget batterie). Pas de priorité assignée pour l'instant -- observation à garder en tête pour une
 future session de conception détaillée, éventuellement avec les points 15/16.
+
+## Rapatriement des points 15, 16, 19, 20 (6 août 2026)
+
+Sections détaillées écrites à l'origine sur `feature/arcore-fusion` (conversation "réflexion", même
+jour) et jusqu'ici jamais fusionnées dans `main` -- voir le point soulevé dans l'index en tête de
+document. Contenu repris tel quel (c'est la trace du raisonnement d'origine, pas à réécrire) ; seules
+des notes entre crochets `[main, 6 août]` ont été ajoutées où l'état de `main` a bougé depuis
+l'écriture initiale sur la branche.
+
+**Note sur la numérotation** : ces points reprennent la numérotation de la branche
+`feature/arcore-fusion`, qui entre en collision avec des points sans rapport déjà utilisés sous les
+mêmes numéros ailleurs dans ce document (voir l'avertissement dans l'index) -- se fier au sujet des
+titres ci-dessous, pas au seul numéro. Les points 17, 18 et 21 de la branche ne sont **pas** repris
+ici : ils correspondent respectivement aux points 24, 25 et 26 déjà rédigés plus haut dans ce
+document, sous ces numéros-là, une fois implémentés sur `main`.
+
+### 15. Détection de la langue tirée (`tongueOut`) -- piste retenue : cascade + calibration par embedding, en fonctionnalité expérimentale
+
+Point de départ : ce qu'indique déjà le commentaire dans `BlendshapeCatalog` (« `tongueOut` excepté
+en pratique -- limitation connue ») n'est pas un défaut d'implémentation côté app mais une limite
+structurelle du modèle MediaPipe -- le mesh facial (478 points) ne modélise que la surface visible du
+visage, jamais l'intérieur de la bouche, donc aucun mapping landmarks→blendshapes, aussi bien
+entraîné soit-il, ne peut "voir" la langue à partir de ce seul signal. Confirmé en creusant un mapping
+alternatif (`haibalabs/face-mesh-to-blendshapes`, pour mémoire) qui force lui aussi `tongueOut` à
+zéro, pour la même raison. Un signal fiable doit donc venir d'ailleurs que des landmarks seuls --
+typiquement de l'image caméra elle-même, déjà disponible via le bitmap RGBA construit par
+`CameraController.processFrame()` pour nourrir MediaPipe (pas de capture supplémentaire à prévoir).
+*[main, 6 août : confirmé par observation device le même jour -- `tongueOut` n'est pas du tout
+restitué (pas juste peu fiable), voir index en tête de document.]*
+
+Architecture retenue -- cascade à trois étages, du moins cher au plus cher, chaque étage ne se
+déclenchant que si le précédent donne un indice positif :
+
+1. **Porte géométrique** (quasi gratuite) : le score `jawOpen` déjà produit par MediaPipe à chaque
+   frame (aucun coût supplémentaire) sert de pré-filtre -- en dessous d'un seuil d'ouverture de
+   bouche, on ne va pas plus loin.
+2. **Analyse couleur** (déclenchée seulement si l'étage 1 s'active) : recadrage de la région
+   intérieure de la bouche dans le bitmap déjà produit par `CameraController`, à partir des landmarks
+   de lèvres -- implique de forcer `FaceLandmarkerHelper.setLandmarksNeeded(true)` en continu tant
+   que la fonctionnalité est activée (ce flag ne sert aujourd'hui qu'à l'overlay de debug, désactivé
+   par défaut ; à faire dépendre d'un OU logique entre "overlay activé" et "détection langue
+   activée"). Recherche d'une teinte rose/rouge saturée dépassant la ligne des lèvres inférieures --
+   toujours aucun réseau de neurones à ce stade.
+3. **Classification par comparaison à une calibration personnelle** (le seul étage réellement
+   coûteux, et seulement sur les frames candidates) : plutôt qu'un dataset et un ré-entraînement par
+   utilisateur (écarté pendant la discussion -- généraliserait mal d'une personne à l'autre et
+   demande une collecte lourde), un extracteur de features générique pré-entraîné (backbone léger
+   type MobileNet, TFLite, embarqué une fois pour toutes dans l'app) transforme le recadrage buccal
+   en vecteur, comparé par plus proche voisin à deux références enregistrées lors d'une calibration
+   dédiée ("langue dehors" / "langue rentrée", quelques secondes chacune) -- même logique que la
+   calibration de pose neutre déjà présente dans l'app (`uiState.isCalibrated`), à reprendre comme
+   modèle d'UX.
+
+Rangement prévu : catégorie "Fonctionnalités expérimentales" dans `SettingsScreen` *[main, 6 août :
+déjà créée, vide -- voir point 26]*, désactivée par défaut, avec un interrupteur qui révèle un accès
+à un écran de calibration dédié (même principe de navigation que `BlendshapeSelectionScreen`) -- tant
+que la calibration n'a pas été faite au moins une fois, le `tongueOut` calculé par cette cascade n'est
+simplement pas injecté (comportement identique à aujourd'hui : il reste à 0). Stockage des deux
+vecteurs de référence : pas dans `AppSettingsStore`/DataStore (pensé pour des préférences scalaires,
+pas des tableaux de floats) -- un petit fichier dans le stockage interne de l'app (`filesDir`) suffit,
+protégé par le bac à sable Android comme le reste des données de l'app.
+
+Avertissement "téléphone qui souffre" : combiner `DeviceCapabilityDetector.isThermalThrottling()`
+(existe, mais toujours pas appelé en continu pendant la capture -- point 3/13 ; cette fonctionnalité
+en fait un prérequis direct plutôt qu'un simple levier non exploité) avec la latence d'inférence déjà
+tracée dans `FaceTrackingResult.inferenceTimeMs` -- une moyenne glissante qui dépasse le budget frame
+du palier courant est un signal de charge complémentaire au thermique (l'app peut saturer le CPU sans
+déclencher de throttling thermique mesurable). Si l'un des deux signaux se déclenche pendant que la
+détection de langue est active, afficher un avertissement non bloquant, sur le même principe visuel
+que `LowBatteryAlert` (icône en contour, pulsante, jamais plein écran) -- pas de désactivation
+automatique de la fonctionnalité (cohérent avec le reste de l'app : c'est toujours l'utilisateur qui
+choisit), juste un accès direct au réglage pour la couper si besoin.
+
+Coût attendu : les étages 1 et 2 sont négligeables (pas de réseau de neurones, quelques opérations sur
+une petite zone de pixels). L'étage 3 est le seul qui ajoute une inférence, mais seulement sur les
+frames où les deux premiers étages ont déjà donné un indice positif -- contribution marginale au
+budget déjà mesuré par `inferenceTimeMs`, à vérifier concrètement une fois implémenté plutôt qu'estimé
+ici.
+
+Statut : idée de conception actée suite à discussion, aucun code écrit. Prochaine étape naturelle :
+brancher réellement la surveillance thermique en continu (point 3/13) avant de commencer l'étage 3,
+puisque l'avertissement en dépend directement.
+
+### 16. Détection expérimentale de `cheekPuff` (joues gonflées) -- même famille que le point 15, cascade allégée
+
+Même statut que `tongueOut` chez MediaPipe (signal peu fiable, cf. issue GitHub #4436 et le mapping
+haibalabs qui le force aussi à zéro) mais une cause différente : contrairement à la langue, le
+gonflement des joues déforme la silhouette du visage et *est* donc visible dans le mesh de landmarks
+-- probablement un manque de données d'entraînement côté modèle officiel plutôt qu'un point aveugle
+structurel. Conséquence sur la conception : un simple signal géométrique (écartement des landmarks du
+contour des joues par rapport à un point stable, normalisé par la distance inter-oculaire) a de
+bonnes chances de suffire seul, sans les étages couleur ni calibration par embedding visuel
+nécessaires au point 15 -- cascade à 2 niveaux au lieu de 3, réutilisable en pratique :
+`headRotationMatrix`/`headEulerDegrees` (déjà calculés à chaque frame dans `FaceTrackingResult`,
+aucun coût ajouté) pour gater ou corriger la mesure. Rattaché à la même catégorie "Fonctionnalités
+expérimentales" que le point 15 (même justification : fiabilité pas encore éprouvée, à ne pas imposer
+par défaut). *[main, 6 août : confirmé par observation device le même jour -- le mesh bouge très peu
+au gonflement des joues, le signal géométrique disponible risque d'être faible/bruité, point
+d'attention à garder pour la conception détaillée -- voir index en tête de document.]*
+
+Individuel (par joue) vs. en paire : mesurer chaque joue séparément ne pose pas de difficulté
+technique particulière (clusters de landmarks déjà distincts par côté, même logique que
+`computeEyeGazeDegrees` pour le regard), mais le blendshape `cheekPuff` du catalogue ARKit/VMC utilisé
+ici est unique et partagé -- pas de `cheekPuffLeft`/`Right` dans `BlendshapeCatalog` (contrairement à
+`cheekSquintLeft`/`Right`, séparés dès l'origine). Mesurer les deux côtés reste utile en interne (ex.
+retenir le minimum des deux pour limiter un faux positif lié à la rotation de tête) mais la sortie
+doit converger vers ce scalaire unique existant, sauf à envisager une extension non standard -- non
+retenu pour l'instant.
+
+**Point d'attention explicite : faux positifs.** C'est le risque principal de cette fonctionnalité, à
+traiter comme un objectif de conception à part entière et pas comme un détail d'implémentation :
+- Rotation de tête : un visage de 3/4 fait paraître une joue plus "gonflée" que l'autre par pur effet
+  de perspective -- gater la mesure à une plage de rotation quasi frontale (yaw/pitch faibles) plutôt
+  que tenter une correction complexe, cohérent avec la philosophie déjà retenue au point 15 (cascade
+  qui s'abstient plutôt que de deviner dans le doute).
+- Confusion avec d'autres expressions qui élargissent le visage (grand sourire, `mouthStretch`) -- à
+  vérifier explicitement contre ces cas pendant la calibration/les tests, pas seulement contre le cas
+  neutre.
+- Morphologie individuelle (joues naturellement pleines) -- absorbée par la calibration par
+  utilisateur (vecteur de mesures géométriques normalisées, pas besoin d'un extracteur d'image comme
+  pour la langue), mais une calibration mal faite (mauvaise position de tête au moment de
+  l'enregistrement) biaise durablement le résultat -- prévoir une recalibration facilement
+  accessible, pas enfouie dans un sous-menu.
+
+Statut : idée de conception actée suite à discussion, aucun code écrit.
+
+### 19. Détection d'anomalie de calibrage -- alerte discrète, jamais d'action automatique
+
+Suite à la discussion sur une éventuelle relance automatique de calibrage : écarté sous cette forme,
+risque réel de se déclencher en pleine expression tenue volontairement (effet comique, surprise jouée
+longtemps) et de confondre ça avec une dérive physique du téléphone. Retenu à la place : détection
+seule, jamais d'action déclenchée toute seule -- cohérent avec le reste de l'app (l'alerte batterie
+n'éteint rien, l'avertissement thermique du point 15 ne coupe pas la fonctionnalité, toujours
+l'utilisateur qui agit).
+
+Le critère de détection ne doit pas être "les valeurs sont extrêmes depuis longtemps" (indiscernable
+d'une expression tenue volontairement) mais "quand le visage semble au repos (faible variation
+frame-à-frame des blendshapes), les valeurs ne reviennent pas près de zéro comme elles le devraient
+juste après un calibrage" -- signature bien plus spécifique d'une dérive réelle, qui ne se déclenche
+jamais pendant une performance active puisque celle-ci n'est par définition pas un état de repos.
+Signal complémentaire, plus simple et déjà disponible sans rien ajouter : une perte de détection du
+visage (`faceDetected` qui repasse à faux puis revrai, déjà suivi à chaque frame dans
+`FaceTrackingResult`) est un indice plus spécifique qu'un changement physique a eu lieu (téléphone
+bougé/repositionné).
+
+Restitution : purement visuelle, sur le bouton de calibrage existant du `MainHud`
+(`Icons.Filled.CenterFocusStrong`, aujourd'hui toujours blanc) teinté en rouge tant que l'anomalie est
+détectée -- réutilise la couleur "problème" déjà employée ailleurs (`LowBatteryAlert`, messages
+d'erreur de `SettingsScreen`) plutôt que d'introduire un nouveau langage visuel. Pas de bandeau, pas
+de popup ; se résout de lui-même dès que l'utilisateur appuie pour recalibrer. Point d'attention
+explicite : le seuil/la durée d'observation doivent être réglés pour éviter un clignotement
+rouge/blanc si la mesure oscille près de la limite -- sans quoi le signal cesse d'être discret.
+
+Statut : idée de conception actée suite à discussion, aucun code écrit.
+
+### 20. Écrans de réglages non adaptatifs -- et un verrouillage portrait déjà ignoré par le système sur grand écran
+
+Point de départ d'une discussion sur le tri de l'écran de réglages *[main, 6 août : le tri lui-même
+est traité, voir point 26]* : l'idée de faire tourner l'écran de réglages avec l'orientation du
+téléphone/de la tablette, sur le même principe que la rotation individuelle des icônes du `MainHud`.
+Écarté sous cette forme -- une rotation visuelle bricolée sur du contenu interactif (champs de texte,
+sliders) est fragile (zones tactiles désalignées, comportement du clavier système imprévisible),
+contrairement à de simples icônes décoratives. La bonne réponse est de laisser les écrans de réglages
+suivre l'orientation système normalement (contrairement à l'écran de capture, qui a de bonnes raisons
+de rester verrouillé portrait) plutôt que de la simuler visuellement.
+
+Nuance apportée en discussion : sur téléphone, garder les réglages verrouillés en portrait reste
+cohérent (le ratio d'écran rend un réglages en paysage peu pratique -- peu de hauteur, beaucoup de
+largeur inutilisée pour une liste de sliders/switches). La pertinence d'un vrai support de
+l'orientation système concerne donc surtout les grands écrans (tablettes), où le ratio se prête mieux
+au paysage et où l'utilisateur choisit vraiment cette orientation plutôt que de la subir.
+
+**Ce qui change la donne, découvert en creusant plutôt qu'anticipé** : ce n'est plus vraiment une
+question de choix. Depuis Android 16 (API 36), l'adaptation complète à toutes les orientations/tailles
+est devenue le comportement par défaut sur tout écran de largeur minimale ≥ 600dp (tablettes, grands
+pliables) -- avec une désactivation manifeste encore possible côté appli. Android 17 (API 37) supprime
+entièrement cette désactivation : sur un tel écran, les restrictions d'orientation/redimensionnement
+déclarées par l'appli sont purement et simplement ignorées par le système, sans aucun levier pour les
+réaffirmer. Or `app/build.gradle.kts` fixe déjà `targetSdk = 37` (poussé par les dépendances AndroidX
+récentes qui exigent `compileSdk = 37`) -- ce n'est donc pas une perspective lointaine, c'est déjà la
+configuration actuelle du projet : sur toute tablette tournant déjà Android 16 ou 17, le verrouillage
+portrait de l'appli est d'ores et déjà ignoré par l'OS, aujourd'hui. Répartition du parc à titre de
+repère (créée en cours de discussion, août 2026) : Android 16 est passé de 7,5 % (déc. 2025, chiffres
+officiels Google) à environ 24 % (relevé communautaire AppBrain, août 2026) -- en progression rapide,
+mais encore loin de couvrir tout le parc tablette, donc l'exposition réelle reste partielle pour
+l'instant et continuera de croître.
+
+Portée du problème : ça dépasse l'écran de réglages. La spec technique note explicitement que la
+matrice de rotation caméra n'est recalculée que si l'angle change, en s'appuyant sur le fait que
+"l'app est verrouillée portrait" pour toute la session -- une hypothèse qui ne tient plus sur une
+tablette où le système ignore ce verrouillage. Un risque potentiellement plus grave que la mise en
+page des réglages : aperçu mal orienté/mal mirroré, voire image transmise à MediaPipe dans le mauvais
+sens. *[main, 6 août : ce risque et son lien avec le point 1/verrouillage portrait sont déjà reflétés
+dans `AndroidMoCap_spec_technique.md` §7 -- seul le raisonnement complet et les chiffres d'adoption
+manquaient jusqu'ici à ce journal, maintenant rapatriés ci-dessus.]*
+
+Statut : constat factuel remonté en discussion, aucune décision prise sur la suite (adapter réellement
+l'écran de réglages et revoir la logique de rotation caméra, vs. accepter que le comportement sur
+tablette reste dégradé pour l'instant, l'usage principal visé restant le téléphone).
