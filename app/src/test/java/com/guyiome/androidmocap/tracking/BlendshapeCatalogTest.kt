@@ -36,4 +36,23 @@ class BlendshapeCatalogTest {
             assertTrue("Catégorie $category absente de byCategory", category in categoriesPresentes)
         }
     }
+
+    @Test
+    fun `tous les blendshapes marques peu fiables existent bien dans le catalogue`() {
+        // Filet contre une faute de frappe dans BlendshapeCatalog.unreliable (voir rapport
+        // technique, point 17) -- un nom mal orthographié n'afficherait simplement jamais
+        // l'avertissement dans BlendshapeSelectionScreen, silencieusement.
+        val allNames = BlendshapeCatalog.all.map { it.second }.toSet()
+        for (name in BlendshapeCatalog.unreliable) {
+            assertTrue("'$name' est marqué peu fiable mais absent du catalogue", name in allNames)
+        }
+    }
+
+    @Test
+    fun `au moins un blendshape est marque peu fiable`() {
+        // Garde-fou trivial : un ensemble vide ne serait pas forcément une erreur de code, mais
+        // rendrait ce test (et la fonctionnalité) sans objet -- vérifie qu'on ne l'a pas vidé par
+        // erreur en modifiant le catalogue.
+        assertTrue(BlendshapeCatalog.unreliable.isNotEmpty())
+    }
 }

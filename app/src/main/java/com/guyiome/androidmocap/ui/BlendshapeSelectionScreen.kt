@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -151,5 +153,17 @@ private fun BlendshapeSelectionRow(name: String, checked: Boolean, onToggle: () 
         Checkbox(checked = checked, onCheckedChange = { onToggle() })
         Spacer(Modifier.width(4.dp))
         Text(name, color = Color.White)
+        // Avertissement discret, compact (petite icône, pas de texte) pour les blendshapes connus
+        // pour être peu fiables chez MediaPipe -- voir BlendshapeCatalog.unreliable et le rapport
+        // technique, point 17. Purement informatif : n'empêche pas la sélection.
+        if (name in BlendshapeCatalog.unreliable) {
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                imageVector = Icons.Filled.WarningAmber,
+                contentDescription = "Fiabilité limitée chez MediaPipe",
+                tint = Color(0xFFFFB74D),
+                modifier = Modifier.size(14.dp),
+            )
+        }
     }
 }
