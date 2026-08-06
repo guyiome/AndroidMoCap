@@ -83,6 +83,10 @@ data class MainUiState(
     // toucher (voir [MainViewModel.onUserInteraction]) -- volontairement NON persisté, on redémarre
     // toujours en mode normal.
     val isPowerSaveActive: Boolean = false,
+    // Superpose les points du mesh facial (478) sur l'aperçu caméra -- persisté, réglable dans les
+    // réglages. Option activable indépendamment du futur aperçu 3D d'avatar (piste séparée, pas
+    // encore implémentée).
+    val faceMeshOverlayEnabled: Boolean = false,
     val errorMessage: String? = null,
 )
 
@@ -98,6 +102,9 @@ data class TrackingFrame(
     // l'affichage sur l'écran principal.
     val allBlendshapes: List<BlendshapeScore> = emptyList(),
     val inferenceTimeMs: Long = 0,
+    // Points du mesh facial (478, coordonnées normalisées) -- toujours peuplé (coût négligeable),
+    // affiché uniquement si [MainUiState.faceMeshOverlayEnabled] est actif (voir MainScreen).
+    val faceLandmarks: List<Pair<Float, Float>> = emptyList(),
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -173,6 +180,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // Reprogramme avec le nouveau délai -- sans effet si le mode n'est pas autorisé
                 // ou déjà actif (voir schedulePowerSaveTimer).
                 schedulePowerSaveTimer()
+            }
+        }
+        viewModelScope.launch {
+            appSettingsStore.faceMeshOverlayEnabled.collect { enabled ->
+                _uiState.update { it.copy(faceMeshOverlayEnabled = enabled) }
             }
         }
     }
@@ -278,6 +290,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 faceDetected = calibrated.faceDetected,
                 allBlendshapes = calibrated.blendshapes,
                 inferenceTimeMs = calibrated.inferenceTimeMs,
+                faceLandmarks = calibrated.faceLandmarks,
             )
         }
         vmcSender?.send(calibrated)
@@ -330,6 +343,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setLowBatteryThresholdPercent(percent: Int) {
         viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setLowBatteryThresholdPercent(percent) }
+    }
+
+    /** Superposition du mesh de tracking sur l'aperçu caméra -- persisté, réglable dans les réglages. */
+    fun setFaceMeshOverlayEnabled(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setFaceMeshOverlayEnabled(enabled) }
     }
 
     /**

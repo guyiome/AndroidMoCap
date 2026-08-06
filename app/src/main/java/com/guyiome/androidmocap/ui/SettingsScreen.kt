@@ -60,6 +60,7 @@ fun SettingsScreen(
     onOpenBlendshapeSelection: () -> Unit,
     onSetPowerSaveMode: (Boolean) -> Unit,
     onSetPowerSaveDelay: (Int) -> Unit,
+    onSetFaceMeshOverlay: (Boolean) -> Unit,
 ) {
     var vmcHostInput by remember { mutableStateOf(uiState.savedVmcHost.ifBlank { "192.168.1.100" }) }
 
@@ -156,6 +157,20 @@ fun SettingsScreen(
                     valueRange = 5f..120f,
                     modifier = Modifier.fillMaxWidth(),
                 )
+            }
+
+            Spacer(Modifier.height(24.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Overlay du mesh de tracking", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Superpose les points détectés par MediaPipe sur l'aperçu caméra -- pratique " +
+                            "pour vérifier la qualité du tracking sans dépendre de VTube Studio/Blender.",
+                        color = Color.White.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Switch(checked = uiState.faceMeshOverlayEnabled, onCheckedChange = onSetFaceMeshOverlay)
             }
 
             Spacer(Modifier.height(24.dp))

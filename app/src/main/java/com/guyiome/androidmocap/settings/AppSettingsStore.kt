@@ -26,6 +26,7 @@ class AppSettingsStore(private val context: Context) {
         val LOW_BATTERY_THRESHOLD = intPreferencesKey("low_battery_threshold_percent")
         val POWER_SAVE_MODE = booleanPreferencesKey("power_save_mode_enabled")
         val POWER_SAVE_DELAY = intPreferencesKey("power_save_delay_seconds")
+        val FACE_MESH_OVERLAY = booleanPreferencesKey("face_mesh_overlay_enabled")
     }
 
     val lowBatteryThresholdPercent: Flow<Int> = context.appSettingsDataStore.data.map { prefs ->
@@ -57,5 +58,14 @@ class AppSettingsStore(private val context: Context) {
 
     suspend fun setPowerSaveDelaySeconds(seconds: Int) {
         context.appSettingsDataStore.edit { prefs -> prefs[Keys.POWER_SAVE_DELAY] = seconds }
+    }
+
+    /** Superpose les points du mesh facial MediaPipe sur l'aperçu caméra -- désactivé par défaut. */
+    val faceMeshOverlayEnabled: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[Keys.FACE_MESH_OVERLAY] ?: false
+    }
+
+    suspend fun setFaceMeshOverlayEnabled(enabled: Boolean) {
+        context.appSettingsDataStore.edit { prefs -> prefs[Keys.FACE_MESH_OVERLAY] = enabled }
     }
 }

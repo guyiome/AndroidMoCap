@@ -22,4 +22,11 @@ data class FaceTrackingResult(
     /** Direction du regard [pitch, yaw, 0] par œil, dérivée des blendshapes eyeLookUp/Down/In/Out. */
     val leftEyeEulerDegrees: FloatArray = floatArrayOf(0f, 0f, 0f),
     val rightEyeEulerDegrees: FloatArray = floatArrayOf(0f, 0f, 0f),
+    /**
+     * Points du mesh facial (478 points -- 468 de surface + 10 d'iris), coordonnées normalisées
+     * [0,1] dans l'espace de l'image droite envoyée au modèle -- sert uniquement à l'overlay visuel
+     * optionnel (voir [com.guyiome.androidmocap.ui.FaceMeshOverlay]), pas envoyé aux récepteurs
+     * VMC/iFacialMocap (qui utilisent les blendshapes + la pose de tête, pas le mesh brut).
+     */
+    val faceLandmarks: List<Pair<Float, Float>> = emptyList(),
 )

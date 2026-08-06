@@ -148,6 +148,16 @@ fun MainScreen(
                 factory = { previewView },
             )
 
+            // Overlay optionnel du mesh de tracking -- masqué en mode éco comme le reste de
+            // l'aperçu (PowerSaveOverlay le recouvrira de toute façon, mais autant ne pas dessiner
+            // 478 points par frame pour rien pendant que l'écran est délibérément assombri).
+            if (uiState.faceMeshOverlayEnabled && !uiState.isPowerSaveActive) {
+                FaceMeshOverlay(
+                    landmarks = trackingFrame.faceLandmarks,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+
             // Mode économie d'énergie : masque l'aperçu (déjà coupé côté CameraX, voir
             // setPreviewEnabled) et le panneau blendshapes derrière un fond noir -- les 4
             // contrôles du HUD restent accessibles (dont l'icône "Visage détecté").
@@ -191,6 +201,7 @@ fun MainScreen(
                     onOpenBlendshapeSelection = { showBlendshapeSelection = true },
                     onSetPowerSaveMode = { enabled -> viewModel.setPowerSaveModeEnabled(enabled) },
                     onSetPowerSaveDelay = { seconds -> viewModel.setPowerSaveDelaySeconds(seconds) },
+                    onSetFaceMeshOverlay = { enabled -> viewModel.setFaceMeshOverlayEnabled(enabled) },
                 )
             }
 

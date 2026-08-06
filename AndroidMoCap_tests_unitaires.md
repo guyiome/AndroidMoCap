@@ -12,7 +12,7 @@ Deux grandes catégories reviennent tout du long. Le code **logique pur** (maths
 | `TrackingTier.kt` | `TrackingTierSelector.select()` | `TrackingTierSelectorTest.kt` | ✅ Couvert (fonction pure `DeviceCapabilities -> TierConfig`). |
 | `BlendshapeCatalog.kt` | `all`, `byCategory` | `BlendshapeCatalogTest.kt` | ✅ Couvert (cohérence structurelle : 52 entrées, pas de doublon, recouvrement catégorie/liste complète). |
 | `FaceLandmarkerHelper.kt` | `computeEyeGazeDegrees()` (extraite en `internal`, pure) | `FaceLandmarkerHelperTest.kt` | ✅ Couvert. |
-| `FaceLandmarkerHelper.kt` | `setup()`, `tryCreateLandmarker()`, `detectAsync()`, `onLiveStreamResult()` | -- | ❌ Non testable en JUnit pur : enrobe le moteur natif MediaPipe (`FaceLandmarker.createFromOptions`, délégué GPU/CPU réel) -- nécessite un appareil/émulateur. Test instrumenté à envisager si un bug survient ici. |
+| `FaceLandmarkerHelper.kt` | `setup()`, `tryCreateLandmarker()`, `detectAsync()`, `onLiveStreamResult()` (dont l'extraction de `faceLandmarks()`) | -- | ❌ Non testable en JUnit pur : enrobe le moteur natif MediaPipe (`FaceLandmarker.createFromOptions`, délégué GPU/CPU réel) -- nécessite un appareil/émulateur. `FaceLandmarkerResult` ne peut pas non plus être construit à la main en test (fabrique `create()` package-private côté MediaPipe). Test instrumenté à envisager si un bug survient ici. |
 | `FaceTrackingResult.kt` | Data class (`FaceTrackingResult`, `BlendshapeScore`) | -- | ➖ Pas de logique propre, sert de fixture aux autres tests (voir `IFacialMocapSenderTest`, `FaceLandmarkerHelperTest`). |
 
 ## network/
@@ -51,7 +51,7 @@ Deux grandes catégories reviennent tout du long. Le code **logique pur** (maths
 
 | Fichier | Élément couvert | Test(s) | Statut |
 |---|---|---|---|
-| `AppSettingsStore.kt`, `ConnectionSettingsStore.kt` | Getters/setters DataStore | -- | ❌ Dépendent de `Context`/DataStore Preferences -- nécessitent Robolectric (avec un `PreferenceDataStore` en mémoire) ou un test instrumenté. Bon candidat pour une prochaine itération : la logique (lire une clé, valeur par défaut si absente, écrire) est simple mais entièrement non couverte aujourd'hui. |
+| `AppSettingsStore.kt`, `ConnectionSettingsStore.kt` | Getters/setters DataStore (dont `faceMeshOverlayEnabled`) | -- | ❌ Dépendent de `Context`/DataStore Preferences -- nécessitent Robolectric (avec un `PreferenceDataStore` en mémoire) ou un test instrumenté. Bon candidat pour une prochaine itération : la logique (lire une clé, valeur par défaut si absente, écrire) est simple mais entièrement non couverte aujourd'hui. |
 
 ## ui/ (Compose)
 
@@ -60,7 +60,8 @@ Deux grandes catégories reviennent tout du long. Le code **logique pur** (maths
 | `MainViewModel.kt` | Orchestration (caméra, capteurs, réseau, DataStore, minuteur éco...) | -- | ❌ Dépend d'`AndroidViewModel`/`Application` et de tous les composants ci-dessus. Volontairement laissé "fin" : sa seule logique non triviale (composition de la calibration) a été extraite dans `RotationMath.composeCalibratedEuler`, testée séparément -- stratégie à reconduire pour toute nouvelle logique ajoutée au ViewModel. |
 | `MainViewModel.kt` | `initializeTracking()` idempotent (`trackingInitialized`, point 6 du rapport technique) | -- | ❌ Un test pertinent demanderait d'instancier un `MainViewModel` réel (Application, ArCoreApk, ActivityManager...) et d'appeler `initializeTracking()` deux fois -- nécessite Robolectric. Garde à une ligne, risque de régression faible ; à couvrir si Robolectric est introduit pour d'autres besoins (ex. `AppSettingsStore`). |
 | `MainScreen.kt` | Rattachement d'`IconOrientationTracker`/`BatteryMonitor` au cycle de vie (`ON_START`/`ON_STOP`, point 5 du rapport technique) | -- | ❌ Composable Compose observant un vrai `Lifecycle` -- nécessite un test d'UI Compose ou Robolectric pour simuler des transitions de cycle de vie. Vérifié manuellement (voir note ci-dessous). |
-| `MainScreen.kt`, `MainHud.kt`, `SettingsScreen.kt`, `BlendshapeSelectionScreen.kt`, `BlendshapePanel.kt`, `PowerSaveOverlay.kt`, `LowBatteryAlert.kt`, `Theme.kt` | Composables | -- | ❌ Hors périmètre des tests unitaires JVM : nécessitent soit des tests d'UI Compose (`androidx.compose.ui.test`, instrumentés ou Robolectric), soit une vérification manuelle. Sujet séparé des "TUs" si souhaité plus tard. |
+| `MainScreen.kt`, `MainHud.kt`, `SettingsScreen.kt`, `BlendshapeSelectionScreen.kt`, `BlendshapePanel.kt`, `PowerSaveOverlay.kt`, `LowBatteryAlert.kt`, `FaceMeshOverlay.kt`, `Theme.kt` | Composables | -- | ❌ Hors périmètre des tests unitaires JVM : nécessitent soit des tests d'UI Compose (`androidx.compose.ui.test`, instrumentés ou Robolectric), soit une vérification manuelle. Sujet séparé des "TUs" si souhaité plus tard. |
+| `LandmarkProjection.kt` | `toScreenPoint()` (projection normalisé -> écran, avec/sans miroir) | `LandmarkProjectionTest.kt` | ✅ Couvert -- seule partie mathématique de l'overlay du mesh (voir `FaceMeshOverlay.kt` ci-dessus, qui l'utilise mais reste lui-même hors périmètre JUnit). |
 
 ## Racine
 
@@ -70,7 +71,13 @@ Deux grandes catégories reviennent tout du long. Le code **logique pur** (maths
 
 ## Bilan actuel
 
-7 fichiers de test, tous en JVM pur (aucun appareil/émulateur requis) : `RotationMathTest`, `TrackingTierSelectorTest`, `BlendshapeCatalogTest`, `FaceLandmarkerHelperTest`, `IFacialMocapSenderTest`, `CameraControllerTest`, `VmcOscSenderTest`. Ils couvrent l'intégralité de la logique mathématique et de formatage identifiée comme la plus fragile (rotation/calibration, mapping de noms de blendshapes, regard des yeux, sélection de palier, dimensions de rotation caméra, regroupement des messages OSC), en s'appuyant sur quelques extractions de fonctions pures (visibilité `internal`) qui ne changent aucun comportement.
+8 fichiers de test, tous en JVM pur (aucun appareil/émulateur requis) : `RotationMathTest`, `TrackingTierSelectorTest`, `BlendshapeCatalogTest`, `FaceLandmarkerHelperTest`, `IFacialMocapSenderTest`, `CameraControllerTest`, `VmcOscSenderTest`, `LandmarkProjectionTest`. Ils couvrent l'intégralité de la logique mathématique et de formatage identifiée comme la plus fragile (rotation/calibration, mapping de noms de blendshapes, regard des yeux, sélection de palier, dimensions de rotation caméra, regroupement des messages OSC, projection écran du mesh), en s'appuyant sur quelques extractions de fonctions pures (visibilité `internal`) qui ne changent aucun comportement.
+
+## Overlay du mesh de tracking (option activable)
+
+Nouvelle fonctionnalité : superposition optionnelle des 478 points du mesh facial MediaPipe sur l'aperçu caméra, activable/désactivable depuis les réglages (persisté). Suit exactement le même principe que le reste de l'app : la seule partie mathématique -- la projection d'un point normalisé vers l'espace écran, avec effet miroir pour correspondre à l'aperçu -- a été écrite en TDD (`LandmarkProjectionTest.kt` avant `LandmarkProjection.kt`) et isolée du Composable qui l'utilise (`FaceMeshOverlay.kt`, non testable en JUnit pur). L'aperçu 3D d'un avatar générique reste une piste séparée, non implémentée, à traiter plus tard.
+
+Point d'attention pour la vérification manuelle sur device : la projection suppose que le calque occupe tout l'écran au même rapport largeur/hauteur que l'image analysée par MediaPipe, sans compenser un éventuel recadrage de `PreviewView` -- si les points ne se superposent pas exactement au visage à l'écran (léger décalage ou mise à l'échelle), c'est le premier endroit à regarder.
 
 ## Points 5 et 6 (rapport technique) -- pas de test dédié, raison assumée
 

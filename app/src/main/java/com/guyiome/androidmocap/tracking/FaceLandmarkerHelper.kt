@@ -145,6 +145,17 @@ class FaceLandmarkerHelper(
 
         val (leftEyeEuler, rightEyeEuler) = computeEyeGazeDegrees(blendshapes)
 
+        // Mesh complet (478 points -- surface + iris), coordonnées déjà normalisées [0,1] par
+        // MediaPipe -- gardé disponible en continu pour l'overlay optionnel (voir
+        // com.guyiome.androidmocap.ui.FaceMeshOverlay), qu'il soit affiché ou non à cet instant
+        // (le coût d'extraction est négligeable comparé au reste du pipeline).
+        val landmarksOptional = result.faceLandmarks()
+        val landmarks = if (landmarksOptional.isNotEmpty()) {
+            landmarksOptional[0].map { landmark -> landmark.x() to landmark.y() }
+        } else {
+            emptyList()
+        }
+
         onResult(
             FaceTrackingResult(
                 faceDetected = blendshapes.isNotEmpty(),
@@ -155,6 +166,7 @@ class FaceLandmarkerHelper(
                 headRotationMatrix = headRotationMatrix,
                 leftEyeEulerDegrees = leftEyeEuler,
                 rightEyeEulerDegrees = rightEyeEuler,
+                faceLandmarks = landmarks,
             )
         )
         onFrameProcessed(result.timestampMs())
