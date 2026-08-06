@@ -2,6 +2,7 @@ package com.guyiome.androidmocap.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,8 +11,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -26,9 +30,11 @@ import com.guyiome.androidmocap.R
 import com.guyiome.androidmocap.tracking.TrackingTier
 
 /**
- * Diagnostics en lecture seule (palier de tracking, délégué, détection, latence, calibration) --
- * une des quatre catégories de [SettingsScreen] (voir rapport technique, point 21). Reçoit l'état
- * chaud ([faceDetected]/[inferenceTimeMs], issus de [MainViewModel.trackingFrame]) séparément de
+ * Diagnostics -- une des quatre catégories de [SettingsScreen] (voir rapport technique, point 21).
+ * Très majoritairement en lecture seule (palier de tracking, délégué, détection, latence,
+ * calibration), à l'exception du forçage de palier ([onSetTierOverride]) -- outil de diagnostic,
+ * pas une fonctionnalité utilisateur normale (voir sa doc). Reçoit l'état chaud
+ * ([faceDetected]/[inferenceTimeMs], issus de [MainViewModel.trackingFrame]) séparément de
  * [uiState], même séparation froid/chaud que partout ailleurs dans l'app.
  */
 @Composable
@@ -37,6 +43,7 @@ fun DiagnosticsScreen(
     faceDetected: Boolean,
     inferenceTimeMs: Long,
     onClose: () -> Unit,
+    onSetTierOverride: (TrackingTier?) -> Unit,
 ) {
     BackHandler(onBack = onClose)
     Box(
@@ -69,6 +76,40 @@ fun DiagnosticsScreen(
                 color = Color.White,
                 style = MaterialTheme.typography.titleMedium,
             )
+
+            Spacer(Modifier.height(12.dp))
+            Text(
+                stringResource(R.string.diagnostics_tier_override_label),
+                color = Color.White.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .horizontalScroll(rememberScrollState()),
+            ) {
+                FilterChip(
+                    selected = uiState.tierOverride == null,
+                    onClick = { onSetTierOverride(null) },
+                    label = { Text(stringResource(R.string.diagnostics_tier_override_auto)) },
+                )
+                TrackingTier.entries.forEach { tier ->
+                    Spacer(Modifier.width(8.dp))
+                    FilterChip(
+                        selected = uiState.tierOverride == tier,
+                        onClick = { onSetTierOverride(tier) },
+                        label = { Text(tier.name) },
+                    )
+                }
+            }
+            Text(
+                stringResource(R.string.diagnostics_tier_override_hint),
+                color = Color.White.copy(alpha = 0.5f),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+
+            Spacer(Modifier.height(16.dp))
             Text(
                 stringResource(R.string.diagnostics_delegate, if (uiState.activeDelegateIsGpu) "GPU" else "CPU"),
                 color = Color.White,

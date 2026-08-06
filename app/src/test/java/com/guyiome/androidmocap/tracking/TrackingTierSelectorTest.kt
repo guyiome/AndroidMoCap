@@ -79,4 +79,36 @@ class TrackingTierSelectorTest {
         )
         assertEquals(TrackingTier.COMPATIBLE, TrackingTierSelector.select(capabilities).tier)
     }
+
+    @Test
+    fun `override non nul court-circuite completement la selection automatique`() {
+        // Appareil qui qualifierait normalement pour OPTIMAL (ARCore + haut de gamme) --
+        // l'override force STANDARD quand meme, meme TierConfig que la selection automatique
+        // aurait produit pour STANDARD sur un autre appareil.
+        val highEndArCoreCapabilities = DeviceCapabilities(
+            arCoreSupported = true,
+            mediaPerformanceClass = 31,
+            cpuCoreCount = 8,
+            totalRamMb = 8000,
+        )
+        val config = TrackingTierSelector.select(highEndArCoreCapabilities, override = TrackingTier.STANDARD)
+        assertEquals(TrackingTier.STANDARD, config.tier)
+        assertTrue(config.preferGpuDelegate)
+        assertFalse(config.useArCorePose)
+        assertEquals(30, config.targetFps)
+    }
+
+    @Test
+    fun `override null se comporte comme l'absence de parametre (selection automatique)`() {
+        val capabilities = DeviceCapabilities(
+            arCoreSupported = false,
+            mediaPerformanceClass = 0,
+            cpuCoreCount = 4,
+            totalRamMb = 3000,
+        )
+        assertEquals(
+            TrackingTierSelector.select(capabilities),
+            TrackingTierSelector.select(capabilities, override = null),
+        )
+    }
 }

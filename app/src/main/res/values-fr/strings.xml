@@ -57,6 +57,9 @@
     <!-- Écran Diagnostics -->
     <string name="diagnostics_title">Diagnostics</string>
     <string name="diagnostics_tier">Palier : %1$s</string>
+    <string name="diagnostics_tier_override_label">Forcer le palier (diagnostic)</string>
+    <string name="diagnostics_tier_override_auto">Automatique</string>
+    <string name="diagnostics_tier_override_hint">S\'applique au prochain lancement de l\'app</string>
     <string name="diagnostics_delegate">Délégué : %1$s</string>
     <string name="diagnostics_face_detected">Visage détecté : %1$s</string>
     <string name="diagnostics_inference_latency">Latence inférence : %1$d ms</string>

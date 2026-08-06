@@ -259,6 +259,7 @@ fun MainScreen(
                     faceDetected = trackingFrame.faceDetected,
                     inferenceTimeMs = trackingFrame.inferenceTimeMs,
                     onClose = { showDiagnostics = false },
+                    onSetTierOverride = { tier -> viewModel.setTierOverride(tier) },
                 )
             }
 

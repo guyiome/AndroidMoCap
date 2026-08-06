@@ -4,8 +4,10 @@ import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.guyiome.androidmocap.tracking.TrackingTier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -33,6 +35,7 @@ class AppSettingsStore(private val context: Context) {
         val KEEP_MESH_OVERLAY_IN_POWER_SAVE = booleanPreferencesKey("keep_mesh_overlay_in_power_save")
         val PERSIST_BLENDSHAPE_SELECTION = booleanPreferencesKey("persist_blendshape_selection_enabled")
         val PERSISTED_BLENDSHAPE_SELECTION = stringSetPreferencesKey("persisted_blendshape_selection")
+        val TIER_OVERRIDE = stringPreferencesKey("tier_override")
     }
 
     val lowBatteryThresholdPercent: Flow<Int> = context.appSettingsDataStore.data.map { prefs ->
@@ -108,5 +111,25 @@ class AppSettingsStore(private val context: Context) {
 
     suspend fun setPersistedBlendshapeSelectionNames(names: Set<String>) {
         context.appSettingsDataStore.edit { prefs -> prefs[Keys.PERSISTED_BLENDSHAPE_SELECTION] = names }
+    }
+
+    /**
+     * Force un palier de tracking spécifique au lieu de la sélection automatique -- `null` =
+     * automatique (comportement par défaut, voir `TrackingTierSelector.select`). Pensé comme
+     * outil de diagnostic (ex. forcer `STANDARD` sur un appareil qui qualifierait pour `OPTIMAL`,
+     * pour tester le chemin CameraX sans dépendre d'un second appareil), pas une fonctionnalité
+     * utilisateur normale -- voir `DiagnosticsScreen`. Lu une seule fois au lancement
+     * (`initializeTracking`, comme `persistBlendshapeSelectionEnabled`) : un changement en cours
+     * de session ne s'applique qu'au prochain redémarrage de l'app, le pipeline caméra/MediaPipe
+     * n'étant pas reconstruit à chaud.
+     */
+    val tierOverride: Flow<TrackingTier?> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[Keys.TIER_OVERRIDE]?.let { name -> runCatching { TrackingTier.valueOf(name) }.getOrNull() }
+    }
+
+    suspend fun setTierOverride(tier: TrackingTier?) {
+        context.appSettingsDataStore.edit { prefs ->
+            if (tier == null) prefs.remove(Keys.TIER_OVERRIDE) else prefs[Keys.TIER_OVERRIDE] = tier.name
+        }
     }
 }

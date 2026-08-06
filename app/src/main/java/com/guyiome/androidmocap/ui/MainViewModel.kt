@@ -55,6 +55,11 @@ import java.net.InetAddress
 @Immutable
 data class MainUiState(
     val tier: TrackingTier? = null,
+    // Force un palier au lieu de la sélection automatique -- null = automatique (comportement par
+    // défaut). Outil de diagnostic (voir DiagnosticsScreen), persisté mais appliqué seulement au
+    // prochain lancement de l'app (voir initializeTracking) : changer ce réglage ne reconstruit
+    // pas le pipeline caméra/MediaPipe à chaud.
+    val tierOverride: TrackingTier? = null,
     val capabilities: DeviceCapabilities? = null,
     val activeDelegateIsGpu: Boolean = false,
     // Choix fait dans l'écran de sélection dédié -- volontairement NON persisté (remis à zéro à
@@ -246,6 +251,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         viewModelScope.launch {
+            // Collecté en continu pour que l'écran Diagnostics reflète la valeur persistée --
+            // n'affecte le pipeline caméra/MediaPipe qu'au prochain lancement (voir
+            // initializeTracking, qui lit ce même Flow une seule fois via first()).
+            appSettingsStore.tierOverride.collect { override ->
+                _uiState.update { it.copy(tierOverride = override) }
+            }
+        }
+        viewModelScope.launch {
             // Chargée une seule fois au lancement (first(), pas collect en continu comme les
             // collecteurs ci-dessus) : contrairement à un simple réglage on/off, réappliquer cette
             // valeur à chaque émission du Flow écraserait la sélection en cours dès que
@@ -261,15 +274,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * À appeler une fois la permission caméra accordée. Idempotent (voir [trackingInitialized]) :
      * un second appel ne fait rien plutôt que de recréer caméra/MediaPipe par-dessus les instances
-     * existantes.
+     * existantes. `suspend` uniquement pour lire [AppSettingsStore.tierOverride] une seule fois
+     * via `first()` avant de choisir le palier (même patron que la lecture ponctuelle de
+     * `persistBlendshapeSelectionEnabled` dans [init]) -- appelée depuis un `LaunchedEffect` côté
+     * `MainScreen`, déjà une coroutine.
      */
-    fun initializeTracking(lifecycleOwner: LifecycleOwner) {
+    suspend fun initializeTracking(lifecycleOwner: LifecycleOwner) {
         if (trackingInitialized) return
         trackingInitialized = true
 
         val context = getApplication<Application>()
         val capabilities = DeviceCapabilityDetector.detect(context)
-        val tierConfig = TrackingTierSelector.select(capabilities)
+        val tierOverride = appSettingsStore.tierOverride.first()
+        val tierConfig = TrackingTierSelector.select(capabilities, tierOverride)
 
         _uiState.update {
             it.copy(
@@ -530,6 +547,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun setKeepMeshOverlayInPowerSave(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setKeepMeshOverlayInPowerSave(enabled) }
+    }
+
+    /**
+     * Force un palier de tracking (ou `null` pour revenir à la sélection automatique) -- persisté,
+     * réglable depuis Diagnostics. Ne s'applique qu'au prochain lancement de l'app, voir
+     * [MainUiState.tierOverride] et [initializeTracking].
+     */
+    fun setTierOverride(tier: TrackingTier?) {
+        viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setTierOverride(tier) }
     }
 
     /**
