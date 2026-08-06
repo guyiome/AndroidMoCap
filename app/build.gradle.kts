@@ -5,6 +5,22 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Signature release : lue depuis des variables d'environnement, jamais depuis un fichier commité.
+// Fonctionne aussi bien en local (export avant ./gradlew assembleRelease) qu'en CI (voir
+// .github/workflows/release.yml, qui les fournit depuis les secrets du dépôt GitHub). Si ces
+// variables sont absentes -- cas normal en dev quotidien (assembleDebug/installDebug) -- le bloc
+// signingConfigs.release n'est simplement pas créé et release.signingConfig reste non défini :
+// un assembleRelease sans les variables produit un APK non signé (comportement Gradle standard),
+// pas un crash de configuration.
+val releaseKeystorePath: String? = System.getenv("RELEASE_KEYSTORE_PATH")
+val releaseKeystorePassword: String? = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+val releaseKeyAlias: String? = System.getenv("RELEASE_KEY_ALIAS")
+val releaseKeyPassword: String? = System.getenv("RELEASE_KEY_PASSWORD")
+val hasReleaseSigningEnv = !releaseKeystorePath.isNullOrBlank() &&
+    !releaseKeystorePassword.isNullOrBlank() &&
+    !releaseKeyAlias.isNullOrBlank() &&
+    !releaseKeyPassword.isNullOrBlank()
+
 android {
     namespace = "com.guyiome.androidmocap"
     // 37 requis par les dernières versions d'androidx.core / lifecycle (AAR metadata check).
@@ -16,19 +32,37 @@ android {
         // et ARCore/CameraX/MediaPipe filtrent de toute façon les appareils trop anciens.
         minSdk = 30
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0-poc"
+        versionCode = 2
+        versionName = "0.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (hasReleaseSigningEnv) {
+            create("release") {
+                storeFile = file(releaseKeystorePath!!)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
+            // Toujours désactivé pour l'instant (voir AndroidMoCap_revue_technique.md, point 8) :
+            // activer R8 sans pouvoir vérifier sur device que MediaPipe/OSC (réflexion) survivent
+            // à l'obfuscation serait risqué tant que le testeur habituel n'a pas d'appareil sous la
+            // main -- à revisiter une fois les tests device possibles à nouveau.
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (hasReleaseSigningEnv) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 

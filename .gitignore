@@ -18,3 +18,9 @@ app/debug/
 
 # Modèle MediaPipe téléchargé manuellement (voir README) : trop volumineux pour être versionné tel quel.
 app/src/main/assets/*.task
+
+# Clé de signature release -- ne doit JAMAIS être commitée (voir README section Distribution).
+# Le workflow CI la reconstruit à la volée depuis un secret GitHub, ce fichier n'existe qu'en local.
+*.keystore
+*.jks
+release.keystore

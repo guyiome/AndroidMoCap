@@ -58,6 +58,15 @@ Le README (section "Builder sur un appareil physique") mentionne un "aperçu dia
 
 `app/build.gradle.kts` n'a pas de bloc `signingConfigs` : un `assembleRelease` produirait un APK non signé, impossible à installer tel quel. `versionCode`/`versionName` sont toujours à `1`/`0.1.0-poc`, alors que l'app a beaucoup changé depuis. Sans conséquence tant que le build reste local (`installDebug`), mais bloquant dès qu'il s'agit de partager un APK -- voir la discussion sur le déploiement.
 
+### 12. Distribution (open source / GitHub Releases) -- ✅ mis en place
+
+Ajout d'un `signingConfigs.release` lu depuis des variables d'environnement (jamais commité) et d'un
+workflow `.github/workflows/release.yml` : un tag `vX.Y.Z` poussé déclenche un build, télécharge le
+modèle MediaPipe, signe l'APK avec la clé stockée en secret GitHub et publie une Release avec l'APK
+attaché. Procédure complète (génération de la clé, secrets à créer) dans le README, section
+"Distribution". `versionCode`/`versionName` passés à `2`/`0.2.0`. Le point 8 (minify/R8) reste
+volontairement désactivé -- voir sa note mise à jour ci-dessus.
+
 ## Priorités suggérées (mise à jour)
 
-Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device (aucun impact visuel, juste un travail évité). Le point 10 est une simple mise à jour de documentation. Le point 3 reste un investissement plus lourd (ARCore phase 2 surtout) à ne déclencher que si le besoin se confirme. Le point 11 (signature + versionnage) ne devient prioritaire qu'au moment de distribuer l'app au-delà d'un usage local -- voir la section déploiement.
+Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device (aucun impact visuel, juste un travail évité). Le point 10 est une simple mise à jour de documentation. Le point 3 reste un investissement plus lourd (ARCore phase 2 surtout) à ne déclencher que si le besoin se confirme. Le point 11 (signature + versionnage) est traité (point 12). Le point 8 (minify) reste pour plus tard, une fois les tests device de nouveau possibles.

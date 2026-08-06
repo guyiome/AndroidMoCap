@@ -2,11 +2,11 @@
 
 Capture de mouvement facial sur Android, avec sélection automatique du meilleur pipeline
 disponible selon l'appareil, et diffusion des blendshapes vers VTube Studio / Blender / Unity
-via le protocole VMC (OSC/UDP).
+(protocole VMC/OSC) ou vers VBridger (iFacialMocap/UDP).
 
-Ce dépôt est le **squelette de la phase 1** (voir `AndroidMoCap_etude_options.md`) : CameraX +
-MediaPipe Face Landmarker, détection de palier, overlay de diagnostic, envoi VMC basique.
-L'intégration ARCore (fusion de pose de tête, phase 2) est préparée dans le code (`TrackingTier`,
+Ce dépôt couvre la **phase 1** (voir `AndroidMoCap_etude_options.md`) : CameraX + MediaPipe Face
+Landmarker, détection de palier, mode économie d'énergie, envoi VMC/iFacialMocap. L'intégration
+ARCore (fusion de pose de tête, phase 2) est préparée dans le code (`TrackingTier`,
 `DeviceCapabilities`) mais pas encore branchée.
 
 ## Avant d'ouvrir le projet
@@ -40,13 +40,12 @@ les versions du projet datent d'avril 2026, il est normal qu'elles bougent.
 tracking facial réel. Il faut un téléphone physique connecté en USB (débogage USB activé) avec
 Android 11 (API 30) ou plus.
 
-Au premier lancement, l'app demande la permission caméra puis affiche :
-
-- un aperçu caméra plein écran ;
-- en haut à gauche : le palier de tracking choisi automatiquement (`OPTIMAL` / `STANDARD` /
-  `COMPATIBLE`), le délégué actif (GPU/CPU), et les valeurs des blendshapes les plus actifs ;
-- en bas : un champ pour entrer l'IP du PC qui fait tourner VTube Studio / Blender / Unity, et
-  un bouton pour démarrer l'envoi VMC.
+Au premier lancement, l'app demande la permission caméra puis affiche l'aperçu caméra plein écran
+avec, par-dessus, un bandeau d'icônes minimal (visage détecté, calibrage, connexion, mode éco,
+réglages -- ce dernier toujours en dernière position) et, sur simple appui, un écran de réglages
+dédié regroupant : type de connexion (VMC / iFacialMocap) et cible réseau, sélection des
+blendshapes affichés, seuil de batterie faible, mode économie d'énergie (délai d'activation,
+sortie au toucher), et overlay optionnel du mesh de tracking (478 points, désactivé par défaut).
 
 ## Recevoir le flux côté PC
 
@@ -55,6 +54,9 @@ Au premier lancement, l'app demande la permission caméra puis affiche :
 
 **Blender / Unity** : utiliser un addon/package compatible VMC (voir `AndroidMoCap_etude_options.md`
 section 2) configuré pour écouter sur le même port.
+
+**VBridger** : sélectionner le protocole iFacialMocap dans les réglages de l'app et suivre les
+instructions VBridger pour pointer vers l'IP/port du téléphone.
 
 Téléphone et PC doivent être sur le **même réseau Wi-Fi local**.
 
@@ -65,18 +67,66 @@ app/src/main/java/com/guyiome/androidmocap/
   MainActivity.kt              Permission caméra + point d'entrée Compose
   MoCapApplication.kt
   capabilities/                Détection des capacités de l'appareil (ARCore, GPU, RAM, thermal)
-  tracking/                    Sélection de palier + wrapper MediaPipe Face Landmarker
-  camera/                      Pilotage CameraX (caméra frontale -> MPImage)
-  network/                     Envoi OSC/UDP au format VMC
-  ui/                          ViewModel + écran Compose (overlay diagnostic, contrôles VMC)
+  tracking/                    Sélection de palier + wrapper MediaPipe Face Landmarker + maths de rotation
+  camera/                      Pilotage CameraX (caméra frontale -> MPImage, pool de bitmaps)
+  sensors/                     Orientation du téléphone, icônes HUD, batterie
+  network/                     Envoi OSC/UDP (VMC) et UDP (iFacialMocap)
+  settings/                    Persistance des réglages (DataStore)
+  ui/                          ViewModel + écrans Compose (HUD, réglages, overlay mesh)
 ```
 
-## Prochaines étapes (voir l'étude pour le détail)
+## Tests
+
+Suite de tests unitaires JVM pur (aucune dépendance Android/Robolectric) sous `app/src/test/`.
+Voir `AndroidMoCap_tests_unitaires.md` pour le détail fonction par fonction, avec les raisons
+explicites de ce qui n'est volontairement pas couvert. Lancer avec :
+
+```
+./gradlew testDebugUnitTest
+```
+
+## Distribution
+
+Le projet est distribué en open source via les **Releases GitHub** (pas de Play Store pour
+l'instant) : `.github/workflows/release.yml` build, signe et publie automatiquement un APK dès
+qu'un tag `vX.Y.Z` est poussé.
+
+### Mettre en place la signature (une seule fois)
+
+1. Générer une clé de signature en local (à garder précieusement, jamais commitée) :
+   ```
+   keytool -genkeypair -v -keystore release.keystore -alias androidmocap \
+     -keyalg RSA -keysize 2048 -validity 10000
+   ```
+2. Dans les réglages GitHub du dépôt (`Settings > Secrets and variables > Actions`), créer 4 secrets :
+   - `RELEASE_KEYSTORE_BASE64` : `base64 -w0 release.keystore` (le contenu du fichier encodé)
+   - `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS` (`androidmocap` si tu as suivi la commande
+     ci-dessus), `RELEASE_KEY_PASSWORD`
+3. Conserver `release.keystore` en lieu sûr en dehors du dépôt : le perdre empêche de publier une
+   mise à jour signée avec la même clé (les utilisateurs devraient alors désinstaller/réinstaller).
+
+### Publier une version
+
+```
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+Le workflow construit l'APK (téléchargement du modèle MediaPipe inclus), le signe avec la clé du
+secret, et crée une Release GitHub avec l'APK en pièce jointe.
+
+### Installer l'APK (côté utilisateur)
+
+Comme l'app n'est pas sur le Play Store, Android affiche un avertissement "source inconnue" à
+l'installation -- normal pour un APK distribué hors store, à activer ponctuellement dans les
+réglages au moment de l'installation.
+
+## Prochaines étapes (voir l'étude et `AndroidMoCap_revue_technique.md` pour le détail)
 
 1. Valider fréquence/latence réelle sur quelques appareils de test.
 2. Brancher ARCore (pose de tête) en fusion avec MediaPipe pour le palier `OPTIMAL`.
 3. Ajouter le lissage temporel (One Euro Filter) sur les blendshapes.
-4. Écran de calibrage (offset caméra, sensibilité, persistance des réglages via DataStore --
-   la dépendance est déjà dans `build.gradle.kts`, pas encore utilisée).
-5. Rétrogradation dynamique de palier en cas de throttling thermique (`DeviceCapabilityDetector.isThermalThrottling`
+4. Rétrogradation dynamique de palier en cas de throttling thermique (`DeviceCapabilityDetector.isThermalThrottling`
    existe déjà, pas encore appelé en continu pendant la capture).
+5. Activer R8/minify sur le build release une fois la vérification sur device de nouveau possible
+   (règles ProGuard MediaPipe/OSC à valider une par une).
