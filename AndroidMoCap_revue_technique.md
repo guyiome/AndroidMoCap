@@ -273,31 +273,35 @@ validation explicite de l'utilisateur. PR #5 (MediaPipe tasks-vision 0.10.35→1
 stable, risque non vérifié) volontairement laissée ouverte, en attente de test device avant tout
 merge -- consigne explicite de ne pas y toucher sans validation.
 
-⚠️ Point d'attention pour le prochain push depuis la machine locale de l'utilisateur : ce merge a été
-fait directement sur GitHub, côté serveur, sans passer par ce dépôt local (aucun accès réseau
-`api.github.com`/push depuis ce sandbox). `origin/main` a donc avancé d'un commit que ni ce
-sandbox ni la machine locale de l'utilisateur ne possèdent encore, alors que la locale est par
-ailleurs très en avance (plusieurs commits non poussés, voir historique de ce document). Le prochain
-`git push` depuis la machine de l'utilisateur sera très probablement rejeté (non-fast-forward) et
-demandera un `git pull --rebase` (ou merge) avant de pouvoir pousser.
+~~⚠️ Point d'attention pour le prochain push...~~ **Résolu** : contrairement à ce que cette section
+affirmait, ce sandbox *a* un accès réseau à GitHub (confirmé par un `git fetch` qui a bien remonté le
+merge serveur de la PR #6). Correction de l'hypothèse ci-dessus pour référence future : ne plus
+supposer une absence d'accès réseau sans l'avoir testé dans la session en cours -- l'environnement
+diffère apparemment de celui où cette note avait été écrite. `git rebase origin/main` a résolu la
+divergence sans conflit (le commit local du bump Kotlin, identique au commit `ec3989d` déjà sur
+`origin/main`, a été automatiquement sauté par git), puis `git push origin main` a réussi
+(`030aae5..222adea`, fast-forward, validation explicite de l'utilisateur obtenue avant le push).
 
 **Suivi PR #5/#6 (mise à jour, même jour)** : rattrapage local complet des deux PR, chacune en
-commit dédié conformément à la convention "local d'abord" adoptée le même jour.
-- PR #6 (Kotlin 2.4.10) : bump reproduit localement (commit `b2755ee`) -- `testDebugUnitTest` +
-  `assembleDebug` → succès, seul warning est une dépréciation `LocalLifecycleOwner` préexistante et
-  sans rapport.
+commit dédié conformément à la convention "local d'abord" adoptée le même jour, puis poussées.
+- PR #6 (Kotlin 2.4.10) : bump reproduit localement, identique au commit Dependabot déjà mergé côté
+  serveur (`ec3989d`/`030aae5`) -- absorbé par le rebase, pas de commit local distinct au final.
+  `testDebugUnitTest` + `assembleDebug` → succès, seul warning est une dépréciation
+  `LocalLifecycleOwner` préexistante et sans rapport.
 - PR #5 (MediaPipe tasks-vision 1.0.0) : testée avant merge comme prévu -- l'artefact `1.0.0` se
   résout correctement depuis Maven, `testDebugUnitTest` (49 tests/8 classes, 0 échec, dont
   `FaceLandmarkerHelperTest`) et `assembleDebug` → succès, aucune rupture de compilation dans
   `FaceLandmarkerHelper.kt` (seul point de contact avec l'API MediaPipe). Validation utilisateur
-  obtenue sur cette base ; bump commité (commit `d1d1dfc`). **Validée sur device par l'utilisateur le
-  même jour** : comportement runtime réel (init MediaPipe, delegate GPU, callback live-stream) conforme
-  -- plus aucune réserve, point totalement clos.
+  obtenue sur cette base ; bump commité (commit `1305cbc` après rebase). **Validée sur device par
+  l'utilisateur le même jour** : comportement runtime réel (init MediaPipe, delegate GPU, callback
+  live-stream) conforme -- plus aucune réserve, point totalement clos.
 
-Les deux PR sont maintenant traitées et validées de bout en bout côté dépôt local (commits prêts,
-compilation/tests JVM et comportement device tous deux confirmés) ; il reste à les pousser depuis la
-machine de l'utilisateur (voir avertissement non-fast-forward ci-dessus) puis à les marquer/fermer
-côté GitHub.
+Les deux PR sont maintenant traitées, validées de bout en bout (compilation, tests JVM, comportement
+device) **et poussées sur `origin/main`**. Reste : fermer manuellement la PR #5 sur GitHub (branche
+Dependabot `dependabot/gradle/com.google.mediapipe-tasks-vision-1.0.0` toujours présente côté serveur)
+-- pas d'accès `gh`/API GitHub authentifiée depuis ce sandbox pour le faire par outil, à faire par
+l'utilisateur ou Dependabot la fermera de lui-même en detectant que `main` satisfait déjà la version
+cible.
 
 ### 24. Indicateur de fiabilité par blendshape -- ✅ corrigé (correspond au "point 17" de l'index ci-dessus)
 
