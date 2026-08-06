@@ -1,5 +1,6 @@
 package com.guyiome.androidmocap.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -15,7 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.WarningAmber
@@ -51,6 +52,7 @@ fun BlendshapeSelectionScreen(
     var query by remember { mutableStateOf("") }
     var expandedCategories by remember { mutableStateOf(setOf<BlendshapeCategory>()) }
 
+    BackHandler(onBack = onClose)
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -65,7 +67,12 @@ fun BlendshapeSelectionScreen(
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(onClick = onClose) {
-                    Icon(imageVector = Icons.Filled.Close, contentDescription = "Fermer", tint = Color.White)
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Retour",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp),
+                    )
                 }
             }
 

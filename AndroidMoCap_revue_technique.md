@@ -105,6 +105,19 @@ si une version plus récente existe -- l'utilisateur garde la main, un ou deux t
 Logique de comparaison de version + parsing de la réponse JSON sont de bons candidats à extraire en
 fonction pure et à couvrir en TDD le moment venu, avant de toucher à l'appel réseau/UI qui les entoure.
 
+### 15. Navigation retour des écrans superposés -- ✅ corrigé
+
+Retour de test sur émulateur : la croix de fermeture (`Icons.Filled.Close`) était difficilement
+cliquable sur les six écrans superposés (`SettingsScreen` et ses quatre sous-écrans, plus
+`BlendshapeSelectionScreen`). Remplacée par une flèche de retour standard
+(`Icons.AutoMirrored.Filled.ArrowBack`, 28dp au lieu de la taille par défaut ~24dp) sur les six
+écrans, et ajout de `androidx.activity.compose.BackHandler(onBack = onClose)` sur chacun : le
+bouton retour matériel et le geste de balayage système (predictive back, Android 13+) déclenchent
+maintenant la même fermeture que l'icône, sans détection de geste custom (`BackHandler` est
+justement le point d'accroche du geste système). `androidx-activity-compose` était déjà une
+dépendance du projet, aucun ajout nécessaire. Aucune logique pure à extraire ici -- pur remaniement
+UI, pas de nouveau test unitaire.
+
 ## Priorités suggérées (mise à jour)
 
-Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device (aucun impact visuel, juste un travail évité). Le point 10 est une simple mise à jour de documentation. Le point 3/13 (ARCore phase 2) est maintenant mieux cerné mais reste un investissement lourd et risqué à finir "à l'aveugle" -- la suite (bascule caméra CameraX→ARCore) attend un accès device. Le point 11 (signature + versionnage) est traité (point 12). Le point 8 (minify) reste pour plus tard, une fois les tests device de nouveau possibles. Le point 14 (vérification de mise à jour) est en backlog, pas urgent.
+Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device (aucun impact visuel, juste un travail évité). Le point 10 est une simple mise à jour de documentation. Le point 3/13 (ARCore phase 2) est maintenant mieux cerné mais reste un investissement lourd et risqué à finir "à l'aveugle" -- la suite (bascule caméra CameraX→ARCore) attend un accès device. Le point 11 (signature + versionnage) est traité (point 12). Le point 8 (minify) reste pour plus tard, une fois les tests device de nouveau possibles. Le point 14 (vérification de mise à jour) est en backlog, pas urgent. Le point 15 (navigation retour) est traité.
