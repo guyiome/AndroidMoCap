@@ -37,7 +37,9 @@ import com.guyiome.androidmocap.sensors.IconOrientationTracker
 
 /**
  * Écran unique de l'app : preview caméra pleine page + bandeau d'icônes minimal ([MainHud]) +
- * panneau de réglages/diagnostics ([SettingsScreen]) affiché par-dessus à la demande.
+ * menu de réglages ([SettingsScreen]) affiché par-dessus à la demande, qui ouvre à son tour l'une
+ * de ses quatre catégories ([DiagnosticsScreen], [ConnectionSettingsScreen],
+ * [DisplaySettingsScreen], [ExperimentalFeaturesScreen] -- voir rapport technique, point 21).
  */
 @Composable
 fun MainScreen(
@@ -54,7 +56,14 @@ fun MainScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
     val previewView = remember { PreviewView(context) }
+    // Menu des réglages + ses quatre sous-écrans (voir rapport technique, point 21) -- même
+    // principe "un booléen par écran conditionnel" que showBlendshapeSelection ci-dessous,
+    // désormais ouvert depuis DisplaySettingsScreen plutôt que directement depuis ce menu.
     var showSettings by remember { mutableStateOf(false) }
+    var showDiagnostics by remember { mutableStateOf(false) }
+    var showConnectionSettings by remember { mutableStateOf(false) }
+    var showDisplaySettings by remember { mutableStateOf(false) }
+    var showExperimentalFeatures by remember { mutableStateOf(false) }
     var showBlendshapeSelection by remember { mutableStateOf(false) }
     var iconRotationDegrees by remember { mutableStateOf(0f) }
     var batteryPercent by remember { mutableStateOf(100) }
@@ -190,20 +199,50 @@ fun MainScreen(
                 SettingsScreen(
                     uiState = uiState,
                     faceDetected = trackingFrame.faceDetected,
-                    inferenceTimeMs = trackingFrame.inferenceTimeMs,
                     onClose = { showSettings = false },
+                    onOpenDiagnostics = { showDiagnostics = true },
+                    onOpenConnection = { showConnectionSettings = true },
+                    onOpenDisplay = { showDisplaySettings = true },
+                    onOpenExperimental = { showExperimentalFeatures = true },
+                )
+            }
+
+            if (showDiagnostics) {
+                DiagnosticsScreen(
+                    uiState = uiState,
+                    faceDetected = trackingFrame.faceDetected,
+                    inferenceTimeMs = trackingFrame.inferenceTimeMs,
+                    onClose = { showDiagnostics = false },
+                )
+            }
+
+            if (showConnectionSettings) {
+                ConnectionSettingsScreen(
+                    uiState = uiState,
+                    onClose = { showConnectionSettings = false },
                     onSelectConnectionType = { type -> viewModel.setConnectionType(type) },
                     onConnectVmc = { host -> viewModel.connectVmcTarget(host) },
                     onDisconnectVmc = { viewModel.disconnectVmcTarget() },
                     onStartIFacialMocap = { viewModel.startIFacialMocapListening() },
                     onStopIFacialMocap = { viewModel.stopIFacialMocapListening() },
-                    onSetLowBatteryThreshold = { percent -> viewModel.setLowBatteryThresholdPercent(percent) },
+                )
+            }
+
+            if (showDisplaySettings) {
+                DisplaySettingsScreen(
+                    uiState = uiState,
+                    onClose = { showDisplaySettings = false },
                     onOpenBlendshapeSelection = { showBlendshapeSelection = true },
+                    onSetPersistBlendshapeSelection = { enabled -> viewModel.setPersistBlendshapeSelectionEnabled(enabled) },
+                    onSetLowBatteryThreshold = { percent -> viewModel.setLowBatteryThresholdPercent(percent) },
                     onSetPowerSaveMode = { enabled -> viewModel.setPowerSaveModeEnabled(enabled) },
                     onSetPowerSaveDelay = { seconds -> viewModel.setPowerSaveDelaySeconds(seconds) },
                     onSetFaceMeshOverlay = { enabled -> viewModel.setFaceMeshOverlayEnabled(enabled) },
-                    onSetPersistBlendshapeSelection = { enabled -> viewModel.setPersistBlendshapeSelectionEnabled(enabled) },
                 )
+            }
+
+            if (showExperimentalFeatures) {
+                ExperimentalFeaturesScreen(onClose = { showExperimentalFeatures = false })
             }
 
             if (showBlendshapeSelection) {
