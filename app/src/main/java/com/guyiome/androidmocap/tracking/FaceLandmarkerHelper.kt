@@ -9,6 +9,7 @@ import com.google.mediapipe.tasks.core.Delegate
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
+import com.guyiome.androidmocap.R
 
 /**
  * Enrobe MediaPipe Face Landmarker en mode LIVE_STREAM.
@@ -92,7 +93,7 @@ class FaceLandmarkerHelper(
         val cpuOk = tryCreateLandmarker(Delegate.CPU)
         activeDelegateIsGpu = false
         if (!cpuOk) {
-            onError("Impossible d'initialiser MediaPipe Face Landmarker (CPU et GPU en échec).")
+            onError(context.getString(R.string.error_mediapipe_init_failed))
         }
     }
 
@@ -113,7 +114,7 @@ class FaceLandmarkerHelper(
                 .setOutputFaceBlendshapes(true)
                 .setOutputFacialTransformationMatrixes(true)
                 .setResultListener(::onLiveStreamResult)
-                .setErrorListener { e -> onError(e.message ?: "Erreur MediaPipe inconnue") }
+                .setErrorListener { e -> onError(e.message ?: context.getString(R.string.error_mediapipe_unknown)) }
                 .build()
 
             faceLandmarker?.close()

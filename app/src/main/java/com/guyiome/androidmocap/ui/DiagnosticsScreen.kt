@@ -20,7 +20,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.guyiome.androidmocap.R
 
 /**
  * Diagnostics en lecture seule (palier de tracking, délégué, détection, latence, calibration) --
@@ -44,7 +46,7 @@ fun DiagnosticsScreen(
         Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Diagnostics",
+                    stringResource(R.string.diagnostics_title),
                     color = Color.White,
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.weight(1f),
@@ -52,7 +54,7 @@ fun DiagnosticsScreen(
                 IconButton(onClick = onClose) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Retour",
+                        contentDescription = stringResource(R.string.cd_back),
                         tint = Color.White,
                         modifier = Modifier.size(28.dp),
                     )
@@ -61,12 +63,29 @@ fun DiagnosticsScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            Text("Palier : ${uiState.tier?.name ?: "…"}", color = Color.White, style = MaterialTheme.typography.titleMedium)
-            Text("Délégué : ${if (uiState.activeDelegateIsGpu) "GPU" else "CPU"}", color = Color.White)
-            Text("Visage détecté : ${if (faceDetected) "oui" else "non"}", color = Color.White)
-            Text("Latence inférence : $inferenceTimeMs ms", color = Color.White)
             Text(
-                if (uiState.isCalibrated) "Pose neutre : calibrée" else "Pose neutre : non calibrée",
+                stringResource(R.string.diagnostics_tier, uiState.tier?.name ?: stringResource(R.string.placeholder_unknown)),
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                stringResource(R.string.diagnostics_delegate, if (uiState.activeDelegateIsGpu) "GPU" else "CPU"),
+                color = Color.White,
+            )
+            Text(
+                stringResource(
+                    R.string.diagnostics_face_detected,
+                    if (faceDetected) stringResource(R.string.bool_yes) else stringResource(R.string.bool_no),
+                ),
+                color = Color.White,
+            )
+            Text(stringResource(R.string.diagnostics_inference_latency, inferenceTimeMs), color = Color.White)
+            Text(
+                if (uiState.isCalibrated) {
+                    stringResource(R.string.diagnostics_calibrated)
+                } else {
+                    stringResource(R.string.diagnostics_not_calibrated)
+                },
                 color = if (uiState.isCalibrated) Color(0xFF9FE7B0) else Color.White,
             )
         }

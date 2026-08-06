@@ -27,11 +27,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.guyiome.androidmocap.R
 import com.guyiome.androidmocap.sensors.BatteryMonitor
 import com.guyiome.androidmocap.sensors.IconOrientationTracker
 
@@ -265,9 +267,9 @@ fun MainScreen(
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("La caméra frontale est nécessaire pour la capture faciale.", color = Color.White)
+                Text(stringResource(R.string.camera_permission_rationale), color = Color.White)
                 Spacer(Modifier.height(12.dp))
-                Button(onClick = onRequestPermission) { Text("Autoriser la caméra") }
+                Button(onClick = onRequestPermission) { Text(stringResource(R.string.action_grant_camera_permission)) }
             }
         }
     }

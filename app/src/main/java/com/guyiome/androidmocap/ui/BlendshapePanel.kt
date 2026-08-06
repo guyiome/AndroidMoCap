@@ -10,7 +10,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.guyiome.androidmocap.R
 
 /**
  * Valeurs en direct des blendshapes cochées dans [BlendshapeSelectionScreen]. Pivote par pas de
@@ -35,7 +37,7 @@ fun BlendshapePanel(
     ) {
         values.forEach { (name, score) ->
             Text(
-                "$name : ${"%.2f".format(score)}",
+                stringResource(R.string.blendshape_value_format, name, "%.2f".format(score)),
                 color = Color.White,
                 style = MaterialTheme.typography.bodySmall,
             )

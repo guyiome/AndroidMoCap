@@ -18,6 +18,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.MPImage
+import com.guyiome.androidmocap.R
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -149,7 +150,7 @@ class CameraController(
             imageAnalysis = analysis
         } catch (e: Exception) {
             Log.e(TAG, "Échec de bind CameraX (analyse)", e)
-            onError("Impossible de démarrer la caméra frontale : ${e.message}")
+            onError(context.getString(R.string.error_camera_analysis_bind_failed, e.message ?: ""))
         }
     }
 
@@ -163,7 +164,7 @@ class CameraController(
             previewUseCase = useCase
         } catch (e: Exception) {
             Log.e(TAG, "Échec de bind CameraX (aperçu)", e)
-            onError("Impossible d'afficher l'aperçu caméra : ${e.message}")
+            onError(context.getString(R.string.error_camera_preview_bind_failed, e.message ?: ""))
         }
     }
 

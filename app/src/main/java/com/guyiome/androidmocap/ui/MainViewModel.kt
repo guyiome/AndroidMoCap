@@ -8,6 +8,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
+import com.guyiome.androidmocap.R
 import com.guyiome.androidmocap.camera.CameraController
 import com.guyiome.androidmocap.capabilities.DeviceCapabilities
 import com.guyiome.androidmocap.capabilities.DeviceCapabilityDetector
@@ -236,7 +237,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(
                 tier = tierConfig.tier,
                 capabilities = capabilities,
-                localIpAddress = getLocalIpAddress() ?: "indisponible",
+                localIpAddress = getLocalIpAddress() ?: context.getString(R.string.local_ip_unavailable),
             )
         }
 
@@ -475,7 +476,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     val host = _uiState.value.savedVmcHost
                     if (host.isBlank()) {
-                        _uiState.update { it.copy(errorMessage = "Renseigne d'abord une IP VMC dans les réglages.") }
+                        val message = getApplication<Application>().getString(R.string.error_vmc_ip_missing)
+                        _uiState.update { it.copy(errorMessage = message) }
                     } else {
                         connectVmcTarget(host)
                     }
@@ -485,7 +487,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (_uiState.value.iFacialMocapListening) stopIFacialMocapListening() else startIFacialMocapListening()
             }
             null -> {
-                _uiState.update { it.copy(errorMessage = "Choisis un type de connexion dans les réglages.") }
+                val message = getApplication<Application>().getString(R.string.error_no_connection_type)
+                _uiState.update { it.copy(errorMessage = message) }
             }
         }
     }
@@ -504,7 +507,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // reconnecter directement, sans ressaisir l'IP.
                 connectionSettingsStore.setVmcHost(hostText)
             } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = "Adresse IP invalide ou injoignable : $hostText") }
+                val message = getApplication<Application>().getString(R.string.error_vmc_invalid_address, hostText)
+                _uiState.update { it.copy(errorMessage = message) }
             }
         }
     }

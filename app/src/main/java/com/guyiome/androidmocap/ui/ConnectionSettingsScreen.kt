@@ -28,7 +28,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.guyiome.androidmocap.R
 import com.guyiome.androidmocap.settings.ConnectionType
 
 /**
@@ -59,7 +61,7 @@ fun ConnectionSettingsScreen(
         Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Connexion",
+                    stringResource(R.string.connection_title),
                     color = Color.White,
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.weight(1f),
@@ -67,7 +69,7 @@ fun ConnectionSettingsScreen(
                 IconButton(onClick = onClose) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Retour",
+                        contentDescription = stringResource(R.string.cd_back),
                         tint = Color.White,
                         modifier = Modifier.size(28.dp),
                     )
@@ -76,7 +78,7 @@ fun ConnectionSettingsScreen(
 
             Spacer(Modifier.height(16.dp))
             Text(
-                "Type de connexion (bouton de l'écran principal)",
+                stringResource(R.string.connection_type_label),
                 color = Color.White,
                 style = MaterialTheme.typography.titleMedium,
             )
@@ -84,13 +86,13 @@ fun ConnectionSettingsScreen(
                 FilterChip(
                     selected = uiState.connectionType == ConnectionType.VMC,
                     onClick = { onSelectConnectionType(ConnectionType.VMC) },
-                    label = { Text("VMC") },
+                    label = { Text(stringResource(R.string.connection_type_vmc)) },
                 )
                 Spacer(Modifier.width(8.dp))
                 FilterChip(
                     selected = uiState.connectionType == ConnectionType.IFACIALMOCAP,
                     onClick = { onSelectConnectionType(ConnectionType.IFACIALMOCAP) },
-                    label = { Text("UDP / VBridger") },
+                    label = { Text(stringResource(R.string.connection_type_udp_vbridger)) },
                 )
             }
 
@@ -98,7 +100,7 @@ fun ConnectionSettingsScreen(
                 ConnectionType.VMC -> {
                     Spacer(Modifier.height(24.dp))
                     Text(
-                        "VMC (VTube Studio / Blender / Unity)",
+                        stringResource(R.string.connection_vmc_section_title),
                         color = Color.White,
                         style = MaterialTheme.typography.titleMedium,
                     )
@@ -106,49 +108,60 @@ fun ConnectionSettingsScreen(
                         OutlinedTextField(
                             value = vmcHostInput,
                             onValueChange = { vmcHostInput = it },
-                            label = { Text("IP du PC") },
+                            label = { Text(stringResource(R.string.connection_vmc_ip_label)) },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                         )
                         Spacer(Modifier.width(8.dp))
                         if (uiState.vmcEnabled) {
-                            Button(onClick = onDisconnectVmc) { Text("Stop") }
+                            Button(onClick = onDisconnectVmc) { Text(stringResource(R.string.action_stop)) }
                         } else {
-                            Button(onClick = { onConnectVmc(vmcHostInput) }) { Text("Envoyer") }
+                            Button(onClick = { onConnectVmc(vmcHostInput) }) { Text(stringResource(R.string.action_send)) }
                         }
                     }
                     if (uiState.vmcEnabled) {
-                        Text("Envoi VMC actif vers ${uiState.vmcTargetLabel}", color = Color(0xFF9FE7B0))
+                        Text(
+                            stringResource(R.string.connection_vmc_active_status, uiState.vmcTargetLabel),
+                            color = Color(0xFF9FE7B0),
+                        )
                     }
                 }
 
                 ConnectionType.IFACIALMOCAP -> {
                     Spacer(Modifier.height(24.dp))
-                    Text("iFacialMocap — protocole compatible", color = Color.White, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "IP du téléphone à saisir côté VBridger : ${uiState.localIpAddress}",
+                        stringResource(R.string.connection_udp_section_title),
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        stringResource(R.string.connection_udp_ip_hint, uiState.localIpAddress),
                         color = Color.White,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                     Spacer(Modifier.height(8.dp))
                     if (uiState.iFacialMocapListening) {
-                        Button(onClick = onStopIFacialMocap) { Text("Stop") }
+                        Button(onClick = onStopIFacialMocap) { Text(stringResource(R.string.action_stop)) }
                     } else {
-                        Button(onClick = onStartIFacialMocap) { Text("Écouter") }
+                        Button(onClick = onStartIFacialMocap) { Text(stringResource(R.string.action_listen)) }
                     }
                     if (uiState.iFacialMocapListening) {
                         val status = uiState.iFacialMocapConnectedTo
-                            ?.let { "connecté à $it" }
-                            ?: "en attente du handshake VBridger…"
-                        Text("Connexion UDP : $status", color = Color(0xFF9FE7B0), modifier = Modifier.padding(top = 4.dp))
+                            ?.let { stringResource(R.string.connection_udp_connected_to, it) }
+                            ?: stringResource(R.string.connection_udp_waiting_handshake)
+                        Text(
+                            stringResource(R.string.connection_udp_status, status),
+                            color = Color(0xFF9FE7B0),
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
                     }
                 }
 
                 null -> {
                     Spacer(Modifier.height(24.dp))
                     Text(
-                        "Choisis un type de connexion ci-dessus pour voir ses réglages.",
+                        stringResource(R.string.connection_choose_type_hint),
                         color = Color.White.copy(alpha = 0.7f),
                         style = MaterialTheme.typography.bodySmall,
                     )

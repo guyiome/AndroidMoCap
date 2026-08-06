@@ -20,7 +20,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.guyiome.androidmocap.R
 
 /**
  * Catégorie dédiée aux fonctionnalités expérimentales -- une des quatre catégories de
@@ -40,7 +42,7 @@ fun ExperimentalFeaturesScreen(onClose: () -> Unit) {
         Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Fonctionnalités expérimentales",
+                    stringResource(R.string.experimental_features_title),
                     color = Color.White,
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.weight(1f),
@@ -48,7 +50,7 @@ fun ExperimentalFeaturesScreen(onClose: () -> Unit) {
                 IconButton(onClick = onClose) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Retour",
+                        contentDescription = stringResource(R.string.cd_back),
                         tint = Color.White,
                         modifier = Modifier.size(28.dp),
                     )
@@ -57,8 +59,7 @@ fun ExperimentalFeaturesScreen(onClose: () -> Unit) {
 
             Spacer(Modifier.height(16.dp))
             Text(
-                "Aucune fonctionnalité expérimentale disponible pour l'instant -- réservé pour la " +
-                    "détection de la langue tirée et des joues gonflées (voir la revue technique).",
+                stringResource(R.string.experimental_features_placeholder),
                 color = Color.White.copy(alpha = 0.7f),
                 style = MaterialTheme.typography.bodySmall,
             )

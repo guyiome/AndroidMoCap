@@ -16,7 +16,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.guyiome.androidmocap.R
 
 /**
  * Grand contour de batterie rouge superposé à l'aperçu caméra quand la batterie est basse et que
@@ -39,7 +41,7 @@ fun LowBatteryAlert() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Icon(
             imageVector = Icons.Outlined.BatteryAlert,
-            contentDescription = "Batterie faible",
+            contentDescription = stringResource(R.string.cd_low_battery),
             tint = Color.Red.copy(alpha = alpha),
             modifier = Modifier.size(220.dp),
         )

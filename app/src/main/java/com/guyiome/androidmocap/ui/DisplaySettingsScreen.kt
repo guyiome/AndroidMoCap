@@ -25,7 +25,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.guyiome.androidmocap.R
 
 /**
  * Réglages d'affichage et de confort d'usage -- une des quatre catégories de [SettingsScreen]
@@ -52,7 +54,7 @@ fun DisplaySettingsScreen(
         Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Affichage & confort",
+                    stringResource(R.string.display_settings_title),
                     color = Color.White,
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.weight(1f),
@@ -60,7 +62,7 @@ fun DisplaySettingsScreen(
                 IconButton(onClick = onClose) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Retour",
+                        contentDescription = stringResource(R.string.cd_back),
                         tint = Color.White,
                         modifier = Modifier.size(28.dp),
                     )
@@ -76,10 +78,14 @@ fun DisplaySettingsScreen(
                     .padding(vertical = 8.dp),
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Blendshapes affichées", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.blendshape_selection_title), color = Color.White, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "${uiState.selectedBlendshapeNames.size} sélectionnée(s)" +
-                            if (uiState.persistBlendshapeSelectionEnabled) " -- mémorisée" else " -- non conservé au redémarrage",
+                        stringResource(R.string.blendshape_selected_count, uiState.selectedBlendshapeNames.size) +
+                            if (uiState.persistBlendshapeSelectionEnabled) {
+                                stringResource(R.string.blendshape_selection_persisted_suffix)
+                            } else {
+                                stringResource(R.string.blendshape_selection_not_persisted_suffix)
+                            },
                         color = Color.White.copy(alpha = 0.7f),
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -89,7 +95,7 @@ fun DisplaySettingsScreen(
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    "Mémoriser cette sélection au prochain lancement",
+                    stringResource(R.string.display_persist_selection_label),
                     color = Color.White.copy(alpha = 0.7f),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.weight(1f),
@@ -100,10 +106,9 @@ fun DisplaySettingsScreen(
             Spacer(Modifier.height(24.dp))
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Overlay du mesh de tracking", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.display_mesh_overlay_title), color = Color.White, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Superpose les points détectés par MediaPipe sur l'aperçu caméra -- pratique " +
-                            "pour vérifier la qualité du tracking sans dépendre de VTube Studio/Blender.",
+                        stringResource(R.string.display_mesh_overlay_description),
                         color = Color.White.copy(alpha = 0.7f),
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -114,11 +119,9 @@ fun DisplaySettingsScreen(
             Spacer(Modifier.height(24.dp))
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Mode économie d'énergie", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.display_power_save_title), color = Color.White, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Après le délai ci-dessous sans toucher l'écran : écran assombri, aperçu caméra " +
-                            "masqué (le tracking et l'envoi continuent normalement). Un simple toucher " +
-                            "de l'écran en ressort.",
+                        stringResource(R.string.display_power_save_description),
                         color = Color.White.copy(alpha = 0.7f),
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -128,7 +131,7 @@ fun DisplaySettingsScreen(
             if (uiState.powerSaveModeEnabled) {
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "Délai d'inactivité : ${uiState.powerSaveDelaySeconds} s",
+                    stringResource(R.string.display_power_save_delay, uiState.powerSaveDelaySeconds),
                     color = Color.White,
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -142,7 +145,7 @@ fun DisplaySettingsScreen(
 
             Spacer(Modifier.height(24.dp))
             Text(
-                "Seuil d'alerte batterie faible : ${uiState.lowBatteryThresholdPercent}%",
+                stringResource(R.string.display_low_battery_threshold, uiState.lowBatteryThresholdPercent),
                 color = Color.White,
                 style = MaterialTheme.typography.titleMedium,
             )

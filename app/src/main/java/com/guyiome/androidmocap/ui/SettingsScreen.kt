@@ -25,7 +25,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.guyiome.androidmocap.R
 import com.guyiome.androidmocap.settings.ConnectionType
 
 /**
@@ -65,7 +67,7 @@ fun SettingsScreen(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Réglages",
+                    stringResource(R.string.settings_title),
                     color = Color.White,
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.weight(1f),
@@ -73,7 +75,7 @@ fun SettingsScreen(
                 IconButton(onClick = onClose) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Retour",
+                        contentDescription = stringResource(R.string.cd_back),
                         tint = Color.White,
                         modifier = Modifier.size(28.dp),
                     )
@@ -83,23 +85,27 @@ fun SettingsScreen(
             Spacer(Modifier.height(16.dp))
 
             SettingsMenuRow(
-                title = "Diagnostics",
-                subtitle = "Palier ${uiState.tier?.name ?: "…"} · visage ${if (faceDetected) "détecté" else "non détecté"}",
+                title = stringResource(R.string.diagnostics_title),
+                subtitle = stringResource(
+                    R.string.settings_diagnostics_subtitle,
+                    uiState.tier?.name ?: stringResource(R.string.placeholder_unknown),
+                    if (faceDetected) stringResource(R.string.state_face_detected) else stringResource(R.string.state_face_not_detected),
+                ),
                 onClick = onOpenDiagnostics,
             )
             SettingsMenuRow(
-                title = "Connexion",
+                title = stringResource(R.string.connection_title),
                 subtitle = connectionSubtitle(uiState),
                 onClick = onOpenConnection,
             )
             SettingsMenuRow(
-                title = "Affichage & confort",
-                subtitle = "Blendshapes affichés, overlay du mesh, mode éco, seuil batterie",
+                title = stringResource(R.string.display_settings_title),
+                subtitle = stringResource(R.string.settings_display_subtitle),
                 onClick = onOpenDisplay,
             )
             SettingsMenuRow(
-                title = "Fonctionnalités expérimentales",
-                subtitle = "Aucune pour l'instant",
+                title = stringResource(R.string.experimental_features_title),
+                subtitle = stringResource(R.string.settings_experimental_subtitle),
                 onClick = onOpenExperimental,
             )
 
@@ -111,10 +117,19 @@ fun SettingsScreen(
     }
 }
 
+@Composable
 private fun connectionSubtitle(uiState: MainUiState): String = when (uiState.connectionType) {
-    ConnectionType.VMC -> if (uiState.vmcEnabled) "VMC connecté à ${uiState.vmcTargetLabel}" else "VMC choisi, pas encore connecté"
-    ConnectionType.IFACIALMOCAP -> if (uiState.iFacialMocapListening) "UDP / VBridger en écoute" else "UDP / VBridger choisi, pas encore en écoute"
-    null -> "Aucun type choisi"
+    ConnectionType.VMC -> if (uiState.vmcEnabled) {
+        stringResource(R.string.settings_vmc_connected_subtitle, uiState.vmcTargetLabel)
+    } else {
+        stringResource(R.string.settings_vmc_not_connected_subtitle)
+    }
+    ConnectionType.IFACIALMOCAP -> if (uiState.iFacialMocapListening) {
+        stringResource(R.string.settings_udp_listening_subtitle)
+    } else {
+        stringResource(R.string.settings_udp_not_listening_subtitle)
+    }
+    null -> stringResource(R.string.settings_no_connection_type_subtitle)
 }
 
 @Composable

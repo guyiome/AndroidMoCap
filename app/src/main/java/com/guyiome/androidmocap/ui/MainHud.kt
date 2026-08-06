@@ -23,7 +23,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.guyiome.androidmocap.R
 
 /**
  * Bandeau d'icônes minimal affiché en permanence sur l'écran caméra -- les 4 indicateurs/boutons
@@ -61,7 +63,7 @@ fun MainHud(
             // Visage détecté -- purement informatif.
             Icon(
                 imageVector = Icons.Filled.Face,
-                contentDescription = "Visage détecté",
+                contentDescription = stringResource(R.string.cd_face_detected),
                 tint = if (faceDetected) Color(0xFF9FE7B0) else Color.White.copy(alpha = 0.4f),
                 modifier = Modifier.rotate(-iconRotationDegrees),
             )
@@ -71,7 +73,11 @@ fun MainHud(
             IconButton(onClick = onToggleConnection, modifier = Modifier.size(28.dp)) {
                 Icon(
                     imageVector = if (isConnected) Icons.Filled.Link else Icons.Filled.LinkOff,
-                    contentDescription = if (isConnected) "Connecté -- appuyer pour déconnecter" else "Non connecté -- appuyer pour connecter",
+                    contentDescription = if (isConnected) {
+                        stringResource(R.string.cd_connected_tap_disconnect)
+                    } else {
+                        stringResource(R.string.cd_disconnected_tap_connect)
+                    },
                     tint = if (isConnected) Color(0xFF9FE7B0) else Color.White,
                     modifier = Modifier.rotate(-iconRotationDegrees),
                 )
@@ -94,7 +100,7 @@ fun MainHud(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.CenterFocusStrong,
-                        contentDescription = "Mise à zéro",
+                        contentDescription = stringResource(R.string.cd_calibrate),
                         tint = Color.White,
                         modifier = Modifier.rotate(-iconRotationDegrees),
                     )
@@ -106,7 +112,7 @@ fun MainHud(
             IconButton(onClick = onOpenSettings, modifier = Modifier.size(28.dp)) {
                 Icon(
                     imageVector = Icons.Filled.Settings,
-                    contentDescription = "Réglages",
+                    contentDescription = stringResource(R.string.settings_title),
                     tint = Color.White,
                     modifier = Modifier.rotate(-iconRotationDegrees),
                 )

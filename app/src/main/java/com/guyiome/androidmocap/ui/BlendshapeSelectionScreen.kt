@@ -34,9 +34,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.guyiome.androidmocap.R
 import com.guyiome.androidmocap.tracking.BlendshapeCatalog
 import com.guyiome.androidmocap.tracking.BlendshapeCategory
+
+/**
+ * Libellé affiché pour une catégorie -- [BlendshapeCategory.label] reste la valeur technique/de
+ * secours (fonction pure, pas d'accès à `stringResource` en dehors d'un `@Composable`) ; c'est ce
+ * mapping-ci qui fournit le texte localisé réellement affiché à l'écran.
+ */
+@Composable
+private fun BlendshapeCategory.displayLabel(): String = when (this) {
+    BlendshapeCategory.BROW -> stringResource(R.string.category_brow)
+    BlendshapeCategory.EYE -> stringResource(R.string.category_eye)
+    BlendshapeCategory.CHEEK -> stringResource(R.string.category_cheek)
+    BlendshapeCategory.NOSE -> stringResource(R.string.category_nose)
+    BlendshapeCategory.JAW -> stringResource(R.string.category_jaw)
+    BlendshapeCategory.MOUTH -> stringResource(R.string.category_mouth)
+    BlendshapeCategory.TONGUE -> stringResource(R.string.category_tongue)
+}
 
 /**
  * Écran de sélection des blendshapes à afficher sur la page principale -- catalogue complet des
@@ -61,7 +79,7 @@ fun BlendshapeSelectionScreen(
         Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Blendshapes affichées",
+                    stringResource(R.string.blendshape_selection_title),
                     color = Color.White,
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.weight(1f),
@@ -69,7 +87,7 @@ fun BlendshapeSelectionScreen(
                 IconButton(onClick = onClose) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Retour",
+                        contentDescription = stringResource(R.string.cd_back),
                         tint = Color.White,
                         modifier = Modifier.size(28.dp),
                     )
@@ -81,7 +99,7 @@ fun BlendshapeSelectionScreen(
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                label = { Text("Rechercher") },
+                label = { Text(stringResource(R.string.search_label)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -110,7 +128,7 @@ fun BlendshapeSelectionScreen(
                                 .padding(vertical = 8.dp),
                         ) {
                             Text(
-                                category.label,
+                                category.displayLabel(),
                                 color = Color.White,
                                 style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.weight(1f),
@@ -167,7 +185,7 @@ private fun BlendshapeSelectionRow(name: String, checked: Boolean, onToggle: () 
             Spacer(Modifier.width(4.dp))
             Icon(
                 imageVector = Icons.Filled.WarningAmber,
-                contentDescription = "Fiabilité limitée chez MediaPipe",
+                contentDescription = stringResource(R.string.cd_unreliable_blendshape),
                 tint = Color(0xFFFFB74D),
                 modifier = Modifier.size(14.dp),
             )
