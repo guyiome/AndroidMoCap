@@ -195,12 +195,17 @@ de l'UI (point 23) est traitée -- voir §12.
 
 ## 12. Localisation
 
-Texte utilisateur externalisé en ressources (`res/values/strings.xml` en français, valeurs par
-défaut ; `res/values-en/strings.xml` pour l'anglais), `android:localeConfig` déclaré dans
-`AndroidManifest.xml` (`res/xml/locales_config.xml`) pour le sélecteur de langue par app (réglages
-système, Android 13+). Les 52 noms de blendshapes ARKit (`jawOpen`, `mouthSmileLeft`...) et les
-identifiants techniques de protocole (`ConnectionType.IFACIALMOCAP`...) ne sont volontairement pas
-traduits -- vocabulaire de protocole, pas texte d'affichage. Les messages d'erreur émis hors
-`@Composable` (`MainViewModel`, `CameraController`, `FaceLandmarkerHelper`) sont résolus via
-`Context.getString()`, chacune de ces classes ayant déjà accès à un `Context`/`Application`. Détail
-du travail d'extraction : revue technique, point 23.
+Texte utilisateur externalisé en ressources : `res/values/strings.xml` contient l'anglais et sert de
+**repli par défaut** (toute langue système sans dossier dédié, y compris ni français ni anglais,
+retombe sur l'anglais -- plus universel) ; `res/values-fr/strings.xml` contient le français, utilisé
+explicitement quand la langue système (ou le choix fait via le sélecteur par app) est le français.
+`android:localeConfig` déclaré dans `AndroidManifest.xml` (`res/xml/locales_config.xml`, ordre
+en/fr) pour le sélecteur de langue par app (réglages système, **Android 13+ seulement** -- sur
+Android 11/12, l'app suit uniquement la langue système, sans possibilité de la forcer autrement dans
+l'app elle-même ; voir revue technique, point 30). Les 52 noms de blendshapes ARKit (`jawOpen`,
+`mouthSmileLeft`...) et les identifiants techniques de protocole (`ConnectionType.IFACIALMOCAP`...)
+ne sont volontairement pas traduits -- vocabulaire de protocole, pas texte d'affichage. Les messages
+d'erreur émis hors `@Composable` (`MainViewModel`, `CameraController`, `FaceLandmarkerHelper`) sont
+résolus via `Context.getString()`, chacune de ces classes ayant déjà accès à un `Context`/
+`Application`. Détail du travail d'extraction : revue technique, point 23. Traductions FR/EN pas
+encore validées par un locuteur natif -- revue technique, point 29.

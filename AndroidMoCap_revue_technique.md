@@ -63,6 +63,8 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 20 | Orientation grand écran / tablette | Constat documenté, aucune décision de mise en œuvre |
 | 21 | Tri en sous-écrans des réglages | **Implémenté sur `main`, voir point 26** (l'index le disait encore "aucun code écrit" par erreur) |
 | 28 | Fiabilisation du clignement des yeux avec lunettes | Idée de conception ouverte le 6 août 2026, voir section dédiée plus bas -- aucun code écrit |
+| 29 | Validation des traductions FR/EN par locuteurs natifs | Backlog, voir point 23 -- texte rédigé sans relecture native, ni le français ni l'anglais (repli par défaut) n'ont été validés |
+| 30 | Sélecteur de langue dans l'app pour Android 11/12 | Backlog, voir point 23 -- pas d'équivalent au sélecteur système Android 13+ sur ces versions, demanderait `androidx.appcompat` + `AppCompatDelegate` |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -286,9 +288,34 @@ pour le sélecteur de langue par app (Android 13+, fr/en).
 
 Vérifié : `testDebugUnitTest` (49 tests, 0 échec, identique à l'état pré-refactor -- confirme
 qu'aucun comportement n'a changé) + `assembleDebug` → succès. Vérification croisée FR/EN : 78 clés de
-chaque côté, aucune manquante ni orpheline, aucune référence `R.string.*` cassée dans le code. **Reste
-ouvert** : la repasse visuelle sur device (les deux langues, sur chaque écran) -- seule étape qui en
-dépendait, comme anticipé.
+chaque côté, aucune manquante ni orpheline, aucune référence `R.string.*` cassée dans le code.
+
+**Question soulevée après coup par l'utilisateur, traitée le même jour : que se passe-t-il sur
+Android 11/12 ?** Le sélecteur manuel de langue par app (`localeConfig`) est spécifique à Android
+13+ -- sur 11/12 (couverts par `minSdk = 30`), aucune UI système équivalente n'existe. Sur toutes les
+versions cependant, la résolution de ressources Android standard (indépendante de `localeConfig`,
+fonctionne depuis toujours) fait déjà suivre l'app à la langue système du téléphone : francophone →
+FR, anglophone → EN, autre langue → repli sur le dossier par défaut (`res/values/`, sans qualificatif
+de langue). Décision actée en discussion : **ce repli par défaut passe du français à l'anglais**
+(commit `9454bb8`) -- l'anglais étant plus universel, un utilisateur non francophone ni anglophone a
+statistiquement plus de chances de comprendre l'anglais. Concrètement : `res/values/` (défaut/repli)
+contient désormais le texte anglais, `res/values-fr/` (nouveau) le texte français explicite ;
+`res/values-en/` supprimé, devenu redondant avec le défaut. Le français reste entièrement disponible
+(langue système française, ou sélecteur par app sur 13+) -- rien n'est retiré, seule la priorité de
+repli change. Offrir un vrai sélecteur de langue *dans l'app* pour Android 11/12 (équivalent du
+sélecteur système 13+) demanderait `androidx.appcompat` + `AppCompatDelegate.setApplicationLocales()`
+plus un contrôle dédié dans les réglages -- pas fait ici, `MainActivity` reste un `ComponentActivity`
+100% Compose sans AppCompat ; à reconsidérer si Android 11/12 s'avèrent représenter une part notable
+du parc visé.
+
+**Backlog ouvert par ce travail : validation des traductions.** Le texte anglais (`res/values/`,
+maintenant le repli par défaut pour la majorité des locales non reconnues) et le texte français
+(`res/values-fr/`) ont été rédigés dans cette session sans relecture native -- à faire valider par un
+locuteur natif de chaque langue avant une diffusion plus large, en particulier l'anglais vu son rôle
+de repli universel. Aucun code bloquant, juste une relecture de contenu.
+
+**Reste ouvert** : la repasse visuelle sur device (les deux langues, sur chaque écran) -- seule étape
+qui dépendait d'un accès device, comme anticipé.
 
 ## Priorités suggérées (mise à jour)
 
