@@ -102,6 +102,15 @@ couvert, dans `AndroidMoCap_tests_unitaires.md`. Lancer avec :
 ./gradlew testDebugUnitTest
 ```
 
+## Documentation
+
+- `AndroidMoCap_spec_fonctionnelle.md` -- ce que l'app fait aujourd'hui, côté utilisateur.
+- `AndroidMoCap_spec_technique.md` -- architecture, pipeline de capture, protocoles réseau,
+  contraintes non-fonctionnelles.
+- `AndroidMoCap_revue_technique.md` -- journal de revue et backlog : raisonnement détaillé derrière
+  chaque décision, chantiers en cours ou en réflexion.
+- `AndroidMoCap_tests_unitaires.md` -- détail de la couverture de tests.
+
 ## Feuille de route
 
 Suivi détaillé dans `AndroidMoCap_revue_technique.md`. Points principaux :
