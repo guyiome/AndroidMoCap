@@ -30,6 +30,7 @@ class AppSettingsStore(private val context: Context) {
         val POWER_SAVE_MODE = booleanPreferencesKey("power_save_mode_enabled")
         val POWER_SAVE_DELAY = intPreferencesKey("power_save_delay_seconds")
         val FACE_MESH_OVERLAY = booleanPreferencesKey("face_mesh_overlay_enabled")
+        val KEEP_MESH_OVERLAY_IN_POWER_SAVE = booleanPreferencesKey("keep_mesh_overlay_in_power_save")
         val PERSIST_BLENDSHAPE_SELECTION = booleanPreferencesKey("persist_blendshape_selection_enabled")
         val PERSISTED_BLENDSHAPE_SELECTION = stringSetPreferencesKey("persisted_blendshape_selection")
     }
@@ -72,6 +73,19 @@ class AppSettingsStore(private val context: Context) {
 
     suspend fun setFaceMeshOverlayEnabled(enabled: Boolean) {
         context.appSettingsDataStore.edit { prefs -> prefs[Keys.FACE_MESH_OVERLAY] = enabled }
+    }
+
+    /**
+     * Garde l'overlay du mesh visible même en mode économie d'énergie (tous paliers confondus) --
+     * désactivé par défaut, l'overlay disparaît alors en mode éco comme le reste de l'aperçu. Voir
+     * `ui/MeshOverlayVisibility.kt`.
+     */
+    val keepMeshOverlayInPowerSave: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[Keys.KEEP_MESH_OVERLAY_IN_POWER_SAVE] ?: false
+    }
+
+    suspend fun setKeepMeshOverlayInPowerSave(enabled: Boolean) {
+        context.appSettingsDataStore.edit { prefs -> prefs[Keys.KEEP_MESH_OVERLAY_IN_POWER_SAVE] = enabled }
     }
 
     /**

@@ -64,6 +64,9 @@
     <string name="diagnostics_inference_latency">Inference latency: %1$d ms</string>
     <string name="diagnostics_calibrated">Neutral pose: calibrated</string>
     <string name="diagnostics_not_calibrated">Neutral pose: not calibrated</string>
+    <string name="diagnostics_camera_source">Camera source: %1$s</string>
+    <string name="diagnostics_camera_source_arcore">ARCore</string>
+    <string name="diagnostics_camera_source_camerax">CameraX</string>
 
     <!-- Display & comfort screen -->
     <string name="display_settings_title">Display &amp; comfort</string>
@@ -73,6 +76,7 @@
     <string name="display_persist_selection_label">Remember this selection on next launch</string>
     <string name="display_mesh_overlay_title">Tracking mesh overlay</string>
     <string name="display_mesh_overlay_description">Overlays the points detected by MediaPipe on the camera preview -- handy to check tracking quality without depending on VTube Studio/Blender.</string>
+    <string name="display_keep_mesh_overlay_in_power_save_label">Keep mesh overlay visible in power save mode</string>
     <string name="display_power_save_title">Power save mode</string>
     <string name="display_power_save_description">After the delay below with no screen touch: screen dimmed, camera preview hidden (tracking and sending keep running normally). A single tap on the screen exits it.</string>
     <string name="display_power_save_delay">Idle delay: %1$d s</string>

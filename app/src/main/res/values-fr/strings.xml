@@ -62,6 +62,9 @@
     <string name="diagnostics_inference_latency">Latence inférence : %1$d ms</string>
     <string name="diagnostics_calibrated">Pose neutre : calibrée</string>
     <string name="diagnostics_not_calibrated">Pose neutre : non calibrée</string>
+    <string name="diagnostics_camera_source">Source caméra : %1$s</string>
+    <string name="diagnostics_camera_source_arcore">ARCore</string>
+    <string name="diagnostics_camera_source_camerax">CameraX</string>
 
     <!-- Écran Affichage & confort -->
     <string name="display_settings_title">Affichage &amp; confort</string>
@@ -71,6 +74,7 @@
     <string name="display_persist_selection_label">Mémoriser cette sélection au prochain lancement</string>
     <string name="display_mesh_overlay_title">Overlay du mesh de tracking</string>
     <string name="display_mesh_overlay_description">Superpose les points détectés par MediaPipe sur l\'aperçu caméra -- pratique pour vérifier la qualité du tracking sans dépendre de VTube Studio/Blender.</string>
+    <string name="display_keep_mesh_overlay_in_power_save_label">Garder l\'overlay du mesh visible en mode économie d\'énergie</string>
     <string name="display_power_save_title">Mode économie d\'énergie</string>
     <string name="display_power_save_description">Après le délai ci-dessous sans toucher l\'écran : écran assombri, aperçu caméra masqué (le tracking et l\'envoi continuent normalement). Un simple toucher de l\'écran en ressort.</string>
     <string name="display_power_save_delay">Délai d\'inactivité : %1$d s</string>

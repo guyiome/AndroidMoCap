@@ -44,6 +44,7 @@ fun DisplaySettingsScreen(
     onSetPowerSaveMode: (Boolean) -> Unit,
     onSetPowerSaveDelay: (Int) -> Unit,
     onSetFaceMeshOverlay: (Boolean) -> Unit,
+    onSetKeepMeshOverlayInPowerSave: (Boolean) -> Unit,
 ) {
     BackHandler(onBack = onClose)
     Box(
@@ -114,6 +115,16 @@ fun DisplaySettingsScreen(
                     )
                 }
                 Switch(checked = uiState.faceMeshOverlayEnabled, onCheckedChange = onSetFaceMeshOverlay)
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    stringResource(R.string.display_keep_mesh_overlay_in_power_save_label),
+                    color = Color.White.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(checked = uiState.keepMeshOverlayInPowerSave, onCheckedChange = onSetKeepMeshOverlayInPowerSave)
             }
 
             Spacer(Modifier.height(24.dp))

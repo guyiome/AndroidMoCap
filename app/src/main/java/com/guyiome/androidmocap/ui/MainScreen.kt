@@ -1,6 +1,7 @@
 package com.guyiome.androidmocap.ui
 
 import android.app.Activity
+import android.opengl.GLSurfaceView
 import android.view.WindowManager
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Box
@@ -58,6 +59,12 @@ fun MainScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
     val previewView = remember { PreviewView(context) }
+    // Hébergement de la texture caméra ARCore (palier OPTIMAL, voir ArCoreHeadPoseTracker) --
+    // requis par ARCore même si rien n'y est dessiné visuellement pour l'instant (voir
+    // computeMeshOverlayVisible : le mesh de tracking sert de seul retour visuel dans ce cas).
+    // Toujours créé (même coût que previewView ci-dessus, symétrique) mais seulement attaché à
+    // ArCoreHeadPoseTracker quand uiState.usingArCoreCameraSource est actif, voir plus bas.
+    val glSurfaceView = remember { GLSurfaceView(context) }
     // Menu des réglages + ses quatre sous-écrans (voir rapport technique, point 21) -- même
     // principe "un booléen par écran conditionnel" que showBlendshapeSelection ci-dessous,
     // désormais ouvert depuis DisplaySettingsScreen plutôt que directement depuis ce menu.
@@ -154,29 +161,64 @@ fun MainScreen(
             },
     ) {
         if (hasCameraPermission) {
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { previewView },
-            )
-
-            // Overlay optionnel du mesh de tracking -- masqué en mode éco comme le reste de
-            // l'aperçu (PowerSaveOverlay le recouvrira de toute façon, mais autant ne pas dessiner
-            // 478 points par frame pour rien pendant que l'écran est délibérément assombri).
-            if (uiState.faceMeshOverlayEnabled && !uiState.isPowerSaveActive) {
-                FaceMeshOverlay(
-                    landmarks = trackingFrame.faceLandmarks,
-                    imageWidthPx = trackingFrame.imageWidthPx,
-                    imageHeightPx = trackingFrame.imageHeightPx,
+            // Aperçu caméra : PreviewView (CameraX) normalement, ou GLSurfaceView (ARCore) au
+            // palier OPTIMAL avec ARCore actif -- les deux ne coexistent jamais (voir revue
+            // technique, point 13). Rien n'est visuellement dessiné dans le GLSurfaceView pour
+            // l'instant (pas de rendu live caméra ARCore dans cette passe, voir MeshOverlayVisibility) --
+            // il n'existe que parce qu'ARCore exige une texture GL pour piloter la caméra.
+            if (uiState.usingArCoreCameraSource) {
+                AndroidView(
                     modifier = Modifier.fillMaxSize(),
+                    factory = {
+                        viewModel.attachArCoreSurface(glSurfaceView)
+                        glSurfaceView
+                    },
+                )
+            } else {
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { previewView },
                 )
             }
 
+            // Overlay du mesh de tracking -- affiché soit sur choix explicite de l'utilisateur
+            // (réglage Affichage & confort), soit forcé quand ARCore est la source caméra active
+            // (aucun aperçu live dans ce cas, le mesh devient le seul retour visuel). Masqué par
+            // défaut en mode éco comme le reste de l'aperçu, sauf si l'utilisateur a choisi de le
+            // garder visible même en éco -- voir computeMeshOverlayVisible.
+            val meshOverlayVisible = computeMeshOverlayVisible(
+                usingArCoreCameraSource = uiState.usingArCoreCameraSource,
+                faceMeshOverlayEnabled = uiState.faceMeshOverlayEnabled,
+                isPowerSaveActive = uiState.isPowerSaveActive,
+                keepMeshOverlayInPowerSave = uiState.keepMeshOverlayInPowerSave,
+            )
+
             // Mode économie d'énergie : masque l'aperçu (déjà coupé côté CameraX, voir
-            // setPreviewEnabled) et le panneau blendshapes derrière un fond noir -- les 4
-            // contrôles du HUD restent accessibles (dont l'icône "Visage détecté").
+            // setPreviewEnabled ; sans objet côté ARCore, qui n'a pas d'aperçu live) et le panneau
+            // blendshapes derrière un fond noir -- les 4 contrôles du HUD restent accessibles
+            // (dont l'icône "Visage détecté"). Le mesh overlay, lui, se dessine PAR-DESSUS ce fond
+            // noir plutôt que d'être simplement masqué comme avant, pour permettre
+            // keepMeshOverlayInPowerSave -- FaceMeshOverlay a un fond transparent (seuls les
+            // points sont dessinés), il se superpose donc proprement.
             if (uiState.isPowerSaveActive) {
                 PowerSaveOverlay()
+                if (meshOverlayVisible) {
+                    FaceMeshOverlay(
+                        landmarks = trackingFrame.faceLandmarks,
+                        imageWidthPx = trackingFrame.imageWidthPx,
+                        imageHeightPx = trackingFrame.imageHeightPx,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             } else {
+                if (meshOverlayVisible) {
+                    FaceMeshOverlay(
+                        landmarks = trackingFrame.faceLandmarks,
+                        imageWidthPx = trackingFrame.imageWidthPx,
+                        imageHeightPx = trackingFrame.imageHeightPx,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
                 val selectedBlendshapeValues = trackingFrame.allBlendshapes
                     .filter { it.name in uiState.selectedBlendshapeNames }
                     .sortedBy { it.name }
@@ -242,6 +284,7 @@ fun MainScreen(
                     onSetPowerSaveMode = { enabled -> viewModel.setPowerSaveModeEnabled(enabled) },
                     onSetPowerSaveDelay = { seconds -> viewModel.setPowerSaveDelaySeconds(seconds) },
                     onSetFaceMeshOverlay = { enabled -> viewModel.setFaceMeshOverlayEnabled(enabled) },
+                    onSetKeepMeshOverlayInPowerSave = { enabled -> viewModel.setKeepMeshOverlayInPowerSave(enabled) },
                 )
             }
 

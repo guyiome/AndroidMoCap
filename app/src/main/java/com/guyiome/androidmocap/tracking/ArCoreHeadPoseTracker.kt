@@ -35,10 +35,19 @@ import javax.microedition.khronos.opengles.GL10
  * vérifié (rien, ici, au-delà de la relecture attentive) et des points les plus susceptibles de
  * demander un ajustement au premier build/run réel : le nom exact et la signature de
  * [MediaImageBuilder] (classe MediaPipe supposée exister pour construire un [MPImage] directement
- * depuis un `android.media.Image`, jamais exercée dans ce projet avant ce commit), et l'ordre exact
- * des appels ARCore (sélection de la configuration caméra frontale, liaison de la texture GL,
- * `resume()`) qui suit la séquence documentée dans les échantillons officiels ARCore mais n'a pas
- * été rejouée ici.
+ * depuis un `android.media.Image`, jamais exercée dans ce projet avant ce commit) -- **confirmé
+ * identique dans MediaPipe 1.0.0 par décompilation `javap` lors de l'intégration de ce fichier dans
+ * `main` (6 août 2026), donc plus un point d'incertitude** --, et l'ordre exact des appels ARCore
+ * (sélection de la configuration caméra frontale, liaison de la texture GL, `resume()`) qui suit la
+ * séquence documentée dans les échantillons officiels ARCore mais n'a pas été rejouée ici.
+ *
+ * ⚠️ **Risque connu et non résolu, identifié lors de l'intégration dans `main` (6 août 2026, voir
+ * revue technique point 3/13)** : [emitCameraImage] construit le [MPImage] directement depuis
+ * `frame.acquireCameraImage()`, sans aucune correction de rotation ni de miroir -- contrairement à
+ * `CameraController.processFrame()`, qui applique explicitement `rotationDegrees` selon
+ * l'orientation du capteur. Impact possible, à vérifier au premier test device : détection
+ * MediaPipe dégradée et/ou overlay du mesh mal projeté quand ce tracker est actif. Ne pas
+ * corriger à l'aveugle sans pouvoir observer le comportement réel sur un appareil.
  *
  * Raison d'être : ARCore Augmented Faces gère lui-même la capture caméra frontale en interne (via
  * `Session#setCameraTextureName`, qui nécessite un contexte GL) -- il ne peut donc pas cohabiter

@@ -1,6 +1,9 @@
 package com.guyiome.androidmocap.ui
 
 import android.app.Application
+import android.content.Context
+import android.opengl.GLSurfaceView
+import android.util.Log
 import androidx.camera.view.PreviewView
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.AndroidViewModel
@@ -21,10 +24,12 @@ import com.guyiome.androidmocap.settings.ConnectionSettingsStore
 import com.guyiome.androidmocap.settings.ConnectionType
 import com.guyiome.androidmocap.settings.DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT
 import com.guyiome.androidmocap.settings.DEFAULT_POWER_SAVE_DELAY_SECONDS
+import com.guyiome.androidmocap.tracking.ArCoreHeadPoseTracker
 import com.guyiome.androidmocap.tracking.BlendshapeScore
 import com.guyiome.androidmocap.tracking.FaceLandmarkerHelper
 import com.guyiome.androidmocap.tracking.FaceTrackingResult
 import com.guyiome.androidmocap.tracking.RotationMath
+import com.guyiome.androidmocap.tracking.TierConfig
 import com.guyiome.androidmocap.tracking.TrackingTier
 import com.guyiome.androidmocap.tracking.TrackingTierSelector
 import kotlinx.coroutines.Dispatchers
@@ -89,6 +94,18 @@ data class MainUiState(
     // réglages. Option activable indépendamment du futur aperçu 3D d'avatar (piste séparée, pas
     // encore implémentée).
     val faceMeshOverlayEnabled: Boolean = false,
+    // Garde l'overlay du mesh visible même en mode économie d'énergie (tous paliers confondus) --
+    // désactivé par défaut, comportement historique inchangé (l'overlay disparaît en mode éco)
+    // tant que l'utilisateur ne l'active pas lui-même. Voir ui/MeshOverlayVisibility.kt.
+    val keepMeshOverlayInPowerSave: Boolean = false,
+    // true si le palier OPTIMAL pilote la caméra via ARCore (voir ArCoreHeadPoseTracker) plutôt
+    // que CameraX -- dans ce cas MainScreen affiche l'overlay du mesh sur fond neutre à la place
+    // de l'aperçu caméra live (voir revue technique, point 13 : ARCore et CameraX ne peuvent pas
+    // se partager la caméra). Décidé dans initializeTracking() selon TierConfig.useArCorePose,
+    // peut repasser à false en cours de route si ARCore s'avère indisponible sur l'appareil malgré
+    // le palier choisi (voir ArCoreHeadPoseTracker.onUnavailable) -- l'app replie alors
+    // silencieusement sur CameraX. Non persisté, dérivé à l'exécution.
+    val usingArCoreCameraSource: Boolean = false,
     // Mémorise (ou non) la sélection de blendshapes affichés d'une session à l'autre -- désactivé
     // par défaut, comportement historique inchangé tant que l'utilisateur ne l'active pas
     // lui-même. Voir rapport technique, point 18.
@@ -120,6 +137,10 @@ data class TrackingFrame(
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
+    private companion object {
+        private const val TAG = "MainViewModel"
+    }
+
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
@@ -128,6 +149,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private var faceLandmarkerHelper: FaceLandmarkerHelper? = null
     private var cameraController: CameraController? = null
+    // Mutuellement exclusif avec cameraController -- l'un des deux est construit dans
+    // initializeTracking() selon TierConfig.useArCorePose, jamais les deux à la fois. Les
+    // callbacks qui doivent router vers "celui qui est actif" (releaseFrame, teardown) appellent
+    // les deux via ?. plutôt que de tester usingArCoreCameraSource : au plus un des deux fait
+    // réellement quelque chose, l'autre est un no-op gratuit sur null.
+    private var arCoreHeadPoseTracker: ArCoreHeadPoseTracker? = null
     private var vmcSender: VmcOscSender? = null
     private var iFacialMocapSender: IFacialMocapSender? = null
     private var deviceOrientationTracker: DeviceOrientationTracker? = null
@@ -141,6 +168,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Pose de tête brute au moment de la calibration : devient le nouveau "zéro" de l'avatar.
     private var headRotationReference: FloatArray = RotationMath.IDENTITY_3X3.copyOf()
     private var lastRawHeadRotationMatrix: FloatArray = RotationMath.IDENTITY_3X3.copyOf()
+    // Dernière pose de tête reçue d'ArCoreHeadPoseTracker (callback appelé depuis le thread GL de
+    // son GLSurfaceView, donc différent du thread de callback MediaPipe qui lit ce champ dans
+    // handleTrackingResult -- @Volatile suffit ici, on ne fait qu'échanger la référence du tableau
+    // en entier, jamais le muter en place). null tant qu'ARCore n'a pas encore émis de pose, ou si
+    // ARCore n'est pas la source active.
+    @Volatile private var latestArCoreHeadRotationMatrix: FloatArray? = null
     // Rotation du téléphone au moment de la calibration -- sert à calculer, à chaque frame, de
     // combien le téléphone a tourné TOUT SEUL depuis (mouvement du support/de la main, indépendant
     // du mouvement de la tête), pour l'annuler de la pose de tête envoyée.
@@ -208,6 +241,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         viewModelScope.launch {
+            appSettingsStore.keepMeshOverlayInPowerSave.collect { enabled ->
+                _uiState.update { it.copy(keepMeshOverlayInPowerSave = enabled) }
+            }
+        }
+        viewModelScope.launch {
             // Chargée une seule fois au lancement (first(), pas collect en continu comme les
             // collecteurs ci-dessus) : contrairement à un simple réglage on/off, réappliquer cette
             // valeur à chaque émission du Flow écraserait la sélection en cours dès que
@@ -246,10 +284,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             tierConfig = tierConfig,
             onResult = ::handleTrackingResult,
             // Signal de "frame terminé" (par timestamp, pas par objet MPImage -- voir le
-            // commentaire sur FaceLandmarkerHelper.onFrameProcessed) -- permet à CameraController
-            // de savoir quand un bitmap de son pool de réutilisation redevient libre, sans jamais
-            // écraser une image encore en cours d'analyse côté MediaPipe.
-            onFrameProcessed = { frameTimeMs -> cameraController?.releaseFrame(frameTimeMs) },
+            // commentaire sur FaceLandmarkerHelper.onFrameProcessed) -- permet à la source caméra
+            // active (CameraController OU ArCoreHeadPoseTracker, jamais les deux) de savoir quand
+            // une image de son pool de réutilisation redevient libre, sans jamais écraser une
+            // image encore en cours d'analyse côté MediaPipe. Les deux appels sûrs (?.) ci-dessous
+            // : un seul des deux fait quelque chose, l'autre est un no-op sur null.
+            onFrameProcessed = { frameTimeMs ->
+                cameraController?.releaseFrame(frameTimeMs)
+                arCoreHeadPoseTracker?.releaseFrame(frameTimeMs)
+            },
             onError = ::handleError,
         )
         helper.setup()
@@ -260,29 +303,93 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         _uiState.update { it.copy(activeDelegateIsGpu = helper.activeDelegateIsGpu) }
 
-        cameraController = CameraController(
-            context = context,
-            lifecycleOwner = lifecycleOwner,
-            onFrame = { image, timestampMs -> faceLandmarkerHelper?.detectAsync(image, timestampMs) },
-            // Débit cible du palier choisi (voir TrackingTierSelector) -- jusqu'ici jamais
-            // appliqué : les frames en trop sont désormais ignorées avant toute allocation.
-            initialTargetFps = tierConfig.targetFps,
-            onError = ::handleError,
-        )
+        // Palier OPTIMAL : ARCore Augmented Faces pilote sa propre caméra (frontale) et sert de
+        // source de pose de tête, à la place de CameraX -- les deux ne peuvent pas se partager la
+        // caméra (voir revue technique, point 13). Sinon (STANDARD/COMPATIBLE, ou repli), CameraX
+        // comme avant. ArCoreHeadPoseTracker continue de nourrir MediaPipe (blendshapes) via le
+        // même detectAsync que CameraController -- rien ne change côté FaceLandmarkerHelper.
+        if (tierConfig.useArCorePose) {
+            val arCoreTracker = ArCoreHeadPoseTracker(
+                context = context,
+                onFrame = { image, timestampMs -> faceLandmarkerHelper?.detectAsync(image, timestampMs) },
+                onHeadPoseRotationMatrix = { matrix -> latestArCoreHeadRotationMatrix = matrix },
+                onError = ::handleError,
+                // Repli automatique et silencieux sur CameraX si Augmented Faces s'avère
+                // indisponible à l'usage malgré le palier OPTIMAL choisi (ARCore non installé,
+                // appareil incompatible, config caméra frontale refusée...) -- pas d'erreur
+                // affichée à l'utilisateur pour ce cas précis, cohérent avec le comportement
+                // documenté au point 13 : c'est un repli attendu, pas une panne.
+                // Le fallback ne démarre pas cameraController lui-même (pas de PreviewView
+                // disponible ici, elle vit côté MainScreen) : le construire suffit -- l'appel
+                // startCamera(previewView) déjà fait par MainScreen juste après
+                // initializeTracking() (même LaunchedEffect) le démarrera normalement, puisque
+                // ce repli est synchrone (tryCreateSession() ne fait aucun appel asynchrone) et
+                // se termine donc avant que MainScreen n'appelle startCamera().
+                onUnavailable = { message ->
+                    Log.w(TAG, "ARCore indisponible, repli sur CameraX : $message")
+                    arCoreHeadPoseTracker = null
+                    _uiState.update { it.copy(usingArCoreCameraSource = false) }
+                    cameraController = createCameraController(context, lifecycleOwner, tierConfig)
+                },
+                initialTargetFps = tierConfig.targetFps,
+            )
+            arCoreHeadPoseTracker = arCoreTracker
+            _uiState.update { it.copy(usingArCoreCameraSource = true) }
+            // Tenté tout de suite (pas seulement sur ON_START ci-dessous) : appelé une seconde
+            // fois sans risque quand l'observer ON_START se déclenche (Session.resume() sur une
+            // session déjà reprise est un no-op documenté côté ARCore) -- le but ici est de
+            // détecter tout de suite une indisponibilité (onUnavailable ci-dessus) pendant qu'on
+            // est encore dans initializeTracking(), plutôt que de découvrir le repli plus tard.
+            arCoreTracker.start()
+        } else {
+            cameraController = createCameraController(context, lifecycleOwner, tierConfig)
+        }
 
         // Le capteur gyroscope tourne en continu tant qu'il est enregistré -- sans rattachement au
         // cycle de vie, il continuait à écouter même l'app mise en arrière-plan (contrairement à
         // CameraX, qui se coupe déjà tout seul via bindToLifecycle). On ne le garde actif qu'entre
-        // ON_START et ON_STOP, comme le fait CameraX pour la caméra.
+        // ON_START et ON_STOP, comme le fait CameraX pour la caméra -- même principe étendu ici à
+        // ArCoreHeadPoseTracker, qui doit lui aussi être explicitement pausé/repris (contrairement
+        // à CameraController, dont le cycle de vie est déjà géré par CameraX via bindToLifecycle).
         val tracker = DeviceOrientationTracker(context)
         deviceOrientationTracker = tracker
         lifecycleOwner.lifecycle.addObserver(LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> tracker.start()
-                Lifecycle.Event.ON_STOP -> tracker.stop()
+                Lifecycle.Event.ON_START -> {
+                    tracker.start()
+                    arCoreHeadPoseTracker?.start()
+                }
+                Lifecycle.Event.ON_STOP -> {
+                    tracker.stop()
+                    arCoreHeadPoseTracker?.stop()
+                }
                 else -> Unit
             }
         })
+    }
+
+    private fun createCameraController(
+        context: Context,
+        lifecycleOwner: LifecycleOwner,
+        tierConfig: TierConfig,
+    ): CameraController = CameraController(
+        context = context,
+        lifecycleOwner = lifecycleOwner,
+        onFrame = { image, timestampMs -> faceLandmarkerHelper?.detectAsync(image, timestampMs) },
+        // Débit cible du palier choisi (voir TrackingTierSelector) -- jusqu'ici jamais
+        // appliqué : les frames en trop sont désormais ignorées avant toute allocation.
+        initialTargetFps = tierConfig.targetFps,
+        onError = ::handleError,
+    )
+
+    /**
+     * À appeler avec le [GLSurfaceView] hébergé côté Compose ([MainScreen]) quand
+     * [MainUiState.usingArCoreCameraSource] est actif -- requis par ARCore, qui ne peut piloter la
+     * caméra qu'à travers une texture GL (voir [ArCoreHeadPoseTracker.attachTo]). No-op si ARCore
+     * n'est pas la source active (ex. repli CameraX déjà effectué).
+     */
+    fun attachArCoreSurface(glSurfaceView: GLSurfaceView) {
+        arCoreHeadPoseTracker?.attachTo(glSurfaceView)
     }
 
     fun startCamera(previewView: PreviewView) {
@@ -293,7 +400,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun handleTrackingResult(result: FaceTrackingResult) {
-        lastRawHeadRotationMatrix = result.headRotationMatrix
+        // En palier OPTIMAL avec ARCore actif, la pose de tête vient d'ArCoreHeadPoseTracker
+        // (callback onHeadPoseRotationMatrix, thread GL séparé -- voir latestArCoreHeadRotationMatrix)
+        // plutôt que de MediaPipe (facialTransformationMatrixes(), toujours calculée par
+        // FaceLandmarkerHelper mais ignorée ici dans ce cas) -- voir revue technique, point 13.
+        // Repli sur la matrice MediaPipe tant qu'ARCore n'a pas encore émis de pose (ex. tout
+        // premier frame après le démarrage de la session).
+        lastRawHeadRotationMatrix = if (_uiState.value.usingArCoreCameraSource) {
+            latestArCoreHeadRotationMatrix ?: result.headRotationMatrix
+        } else {
+            result.headRotationMatrix
+        }
 
         // Pas de calibration manuelle encore faite : on prend la toute première pose détectée
         // comme "zéro" par défaut, plutôt que d'envoyer une pose brute (relative à l'angle brut
@@ -405,6 +522,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Superposition du mesh de tracking sur l'aperçu caméra -- persisté, réglable dans les réglages. */
     fun setFaceMeshOverlayEnabled(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setFaceMeshOverlayEnabled(enabled) }
+    }
+
+    /**
+     * Garde l'overlay du mesh visible même en mode économie d'énergie (tous paliers confondus) --
+     * persisté, réglable dans les réglages. Voir ui/MeshOverlayVisibility.kt.
+     */
+    fun setKeepMeshOverlayInPowerSave(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setKeepMeshOverlayInPowerSave(enabled) }
     }
 
     /**
@@ -538,6 +663,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     override fun onCleared() {
         super.onCleared()
         cameraController?.stop()
+        arCoreHeadPoseTracker?.stop()
+        arCoreHeadPoseTracker?.close()
         faceLandmarkerHelper?.close()
         vmcSender?.close()
         iFacialMocapSender?.stopListening()

@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.guyiome.androidmocap.R
+import com.guyiome.androidmocap.tracking.TrackingTier
 
 /**
  * Diagnostics en lecture seule (palier de tracking, délégué, détection, latence, calibration) --
@@ -80,6 +81,22 @@ fun DiagnosticsScreen(
                 color = Color.White,
             )
             Text(stringResource(R.string.diagnostics_inference_latency, inferenceTimeMs), color = Color.White)
+            // Source caméra actuelle -- utile pour vérifier sur device si le repli silencieux
+            // CameraX (ArCoreHeadPoseTracker.onUnavailable) s'est déclenché malgré le palier
+            // OPTIMAL choisi. Sans objet pour les autres paliers (toujours CameraX).
+            if (uiState.tier == TrackingTier.OPTIMAL) {
+                Text(
+                    stringResource(
+                        R.string.diagnostics_camera_source,
+                        if (uiState.usingArCoreCameraSource) {
+                            stringResource(R.string.diagnostics_camera_source_arcore)
+                        } else {
+                            stringResource(R.string.diagnostics_camera_source_camerax)
+                        },
+                    ),
+                    color = Color.White,
+                )
+            }
             Text(
                 if (uiState.isCalibrated) {
                     stringResource(R.string.diagnostics_calibrated)
