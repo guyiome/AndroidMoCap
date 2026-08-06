@@ -98,6 +98,10 @@ Le téléphone et le PC receveur doivent être sur le même réseau Wi-Fi local 
 - **Navigation** : chaque écran superposé (réglages et ses 4 catégories, sélection des blendshapes)
   se ferme via une flèche retour standard, le bouton retour matériel, ou le geste de balayage
   système (predictive back, Android 13+) -- les trois déclenchent la même action.
+- **Langue** : interface disponible en français (défaut) et anglais, choix via le sélecteur de
+  langue par app du système (réglages Android, Android 13+). Les noms de blendshapes ARKit
+  (`jawOpen`, `mouthSmileLeft`...) restent en anglais technique quelle que soit la langue choisie --
+  ce sont des identifiants de protocole, pas du texte d'affichage.
 
 ### 3.5 Gestion de l'énergie
 

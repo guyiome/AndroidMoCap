@@ -227,7 +227,7 @@ où un tel produit existe réellement.
 Statut : décision actée et mise en œuvre -- `LICENSE`, `CLA.md`, `CONTRIBUTING.md` créés, `README.md`
 mis à jour (section Licence, correction de la mention "open source").
 
-### 23. Localisation complète de l'UI -- priorité, juste après la revue de la branche main en cours
+### 23. Localisation complète de l'UI -- ✅ extraction faite, vérification visuelle device en attente
 
 L'app a été construite au fil de l'eau entièrement en français : `strings.xml` ne contient que
 `app_name`, tout le texte utilisateur est écrit en dur dans les appels `Text(...)` Compose,
@@ -262,11 +262,43 @@ faire à l'aveugle sans pouvoir vérifier visuellement ensuite. La passe d'extra
 démarrer sans device (validable structurellement) ; seule la vérification visuelle finale attend un
 accès device.
 
+**Mise à jour (6 août 2026) : extraction faite**, commit `f0da6be`. 78 chaînes distinctes
+externalisées (moins que l'estimation ~90-110 : beaucoup de doublons regroupés sous une seule
+ressource -- "Retour" apparaissait 6 fois, "Réglages"/"Diagnostics"/"Affichage & confort" servaient à
+la fois de titre d'écran et de titre de ligne de menu, etc.) vers `res/values/strings.xml` (FR,
+défaut) + traduction complète dans `res/values-en/strings.xml`. Portée réelle : 11 des 14 fichiers
+`ui/` (`FaceMeshOverlay.kt`, `PowerSaveOverlay.kt`, `LandmarkProjection.kt` n'avaient aucune chaîne
+utilisateur, seulement des commentaires) plus `CameraController.kt` et `FaceLandmarkerHelper.kt`.
+
+Deux points prévus comme difficiles se sont révélés plus simples à l'usage :
+- **Messages d'erreur hors `@Composable`** : `MainViewModel` est un `AndroidViewModel`, qui a déjà
+  `getApplication<Application>()` ; `CameraController` et `FaceLandmarkerHelper` ont chacun déjà un
+  champ `Context` dans leur constructeur. Aucun changement d'architecture n'a donc été nécessaire
+  (contrairement à l'hypothèse "Context/Application à faire remonter" envisagée plus haut) --
+  `context.getString(R.string.x, ...)` suffit partout.
+- **Labels de `BlendshapeCategory`** : la classe reste une fonction pure inchangée dans
+  `tracking/BlendshapeCatalog.kt` (pas d'accès à `stringResource()` en dehors d'un `@Composable`, et
+  pas de raison d'en ajouter un pour un enum testé en JVM) -- un mapping `displayLabel()`
+  `@Composable` résout le texte localisé dans `ui/BlendshapeSelectionScreen.kt`, seul point d'usage.
+
+Ajouté dans la foulée : `android:localeConfig` (`AndroidManifest.xml`) + `res/xml/locales_config.xml`
+pour le sélecteur de langue par app (Android 13+, fr/en).
+
+Vérifié : `testDebugUnitTest` (49 tests, 0 échec, identique à l'état pré-refactor -- confirme
+qu'aucun comportement n'a changé) + `assembleDebug` → succès. Vérification croisée FR/EN : 78 clés de
+chaque côté, aucune manquante ni orpheline, aucune référence `R.string.*` cassée dans le code. **Reste
+ouvert** : la repasse visuelle sur device (les deux langues, sur chaque écran) -- seule étape qui en
+dépendait, comme anticipé.
+
 ## Priorités suggérées (mise à jour)
 
 Le point 9 est un correctif ciblé, sûr à faire sans pouvoir tester sur device (aucun impact visuel, juste un travail évité). Le point 10 est traité (README réécrit). Le point 3/13 (ARCore phase 2) est maintenant mieux cerné mais reste un investissement lourd et risqué à finir "à l'aveugle" -- la suite (bascule caméra CameraX→ARCore) attend un accès device. Le point 11 (signature + versionnage) est traité (point 12). Le point 8 (minify) reste pour plus tard, une fois les tests device de nouveau possibles. Le point 14 (vérification de mise à jour) est en backlog, pas urgent. Le point 15 (navigation retour) est traité. Le point 16 (dénomination du mode iFacialMocap) est traité. Le point 17 (CI build/tests sur PR) est traité. Le point 27 (projection du mesh overlay) est traité, corrigé sans dépendre d'un nouvel accès device (le bug avait déjà été reproduit par la photo fournie).
 
-**Ordre de priorité actuel (mis à jour) :** ~~1) revue/merge des PR #5 et #6 et test de l'état actuel de la branche `main` dès qu'un accès device est possible~~ -- fait, voir suivi PR #5/#6 ci-dessous (les deux validées, compilation/tests JVM et device). Priorité désormais : point 23 (localisation complète de l'UI) -- la passe d'extraction peut démarrer sans device, seule la vérification visuelle finale en dépend (device maintenant disponible si besoin).
+**Ordre de priorité actuel (mis à jour) :** ~~1) revue/merge des PR #5 et #6~~ -- fait, voir suivi
+PR #5/#6 ci-dessous. ~~2) point 23 (localisation complète de l'UI)~~ -- extraction faite (voir
+section dédiée ci-dessus), seule la vérification visuelle device reste ouverte. Prochain choix
+ouvert : pas de priorité unique déjà tranchée dans ce document au-delà de ces deux points -- voir
+l'index en tête de document pour le reste du backlog (points 3/13, 8, 14, 19, 20, 28).
 
 **Suivi PR #5/#6 (6 août 2026)** : PR #6 (Kotlin 2.3.20→2.4.10, risque jugé faible -- même clé de
 version pilote le plugin Compose, voir §CI ci-dessus) mergée sur GitHub (commit `030aae5`) suite à

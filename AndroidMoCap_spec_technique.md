@@ -190,6 +190,17 @@ Licence : PolyForm Shield 1.0.0 (voir `LICENSE`), CLA en place pour les contribu
 Liste vivante tenue dans `AndroidMoCap_revue_technique.md`, pas dupliquée ici. Points ouverts
 principaux au moment de la rédaction : throttling thermique dynamique non branché (point 3/13),
 fusion ARCore non mergée (point 13), minify désactivé (point 8), vérification de mise à jour non
-implémentée (point 14), localisation de l'UI entièrement en français (point 23, priorisé juste
-après la revue de la branche `main` en cours), comportement non défini sur grand écran/tablette
-(point 20).
+implémentée (point 14), comportement non défini sur grand écran/tablette (point 20). La localisation
+de l'UI (point 23) est traitée -- voir §12.
+
+## 12. Localisation
+
+Texte utilisateur externalisé en ressources (`res/values/strings.xml` en français, valeurs par
+défaut ; `res/values-en/strings.xml` pour l'anglais), `android:localeConfig` déclaré dans
+`AndroidManifest.xml` (`res/xml/locales_config.xml`) pour le sélecteur de langue par app (réglages
+système, Android 13+). Les 52 noms de blendshapes ARKit (`jawOpen`, `mouthSmileLeft`...) et les
+identifiants techniques de protocole (`ConnectionType.IFACIALMOCAP`...) ne sont volontairement pas
+traduits -- vocabulaire de protocole, pas texte d'affichage. Les messages d'erreur émis hors
+`@Composable` (`MainViewModel`, `CameraController`, `FaceLandmarkerHelper`) sont résolus via
+`Context.getString()`, chacune de ces classes ayant déjà accès à un `Context`/`Application`. Détail
+du travail d'extraction : revue technique, point 23.
