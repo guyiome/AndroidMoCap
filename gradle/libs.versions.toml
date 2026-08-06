@@ -8,7 +8,7 @@ activityCompose = "1.13.0"
 composeBom = "2026.06.01"
 camerax = "1.5.1"
 arcore = "1.54.0"
-mediapipeTasksVision = "0.10.35"
+mediapipeTasksVision = "1.0.0"
 javaosc = "0.9"
 datastorePreferences = "1.1.7"
 
