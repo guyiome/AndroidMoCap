@@ -209,10 +209,9 @@ premier coup sans aucun ajustement.
 
 **Risques connus, non résolus, à vérifier au premier accès device (pas deviner/corriger à
 l'aveugle) :**
-1. `ArCoreHeadPoseTracker.emitCameraImage()` ne corrige ni la rotation ni le miroir de l'image
-   caméra (contrairement à `CameraController.processFrame()`) -- détection MediaPipe et/ou overlay
-   potentiellement dégradés en mode ARCore tant que non vérifié. Documenté directement dans le
-   kdoc du fichier.
+1. ~~`ArCoreHeadPoseTracker.emitCameraImage()` ne corrige ni la rotation ni le miroir~~ -- toujours
+   vrai (voir plus bas), mais un problème plus fondamental a été trouvé en premier sur device (voir
+   "Suivi device" ci-dessous) : le format d'image lui-même faisait planter l'app.
 2. `DeviceCapabilityDetector.detect()` lit `ArCoreApk.checkAvailability().isSupported` de façon
    synchrone, un seul appel au démarrage -- un état transitoire `UNKNOWN_CHECKING` (tout premier
    appel ARCore jamais mis en cache sur l'appareil) serait interprété comme "non supporté" pour
@@ -223,6 +222,28 @@ l'aveugle) :**
 4. Coût thermique/batterie du duo GL (`RENDERMODE_CONTINUOUSLY`) + inférence MediaPipe simultanés,
    sur un palier qui ne bénéficie toujours pas du throttling thermique dynamique (jamais branché,
    voir plus haut dans ce même point).
+
+**Suivi device (6 août 2026, même jour) : crash au premier lancement réel, corrigé.**
+`frame.acquireCameraImage()` d'ARCore renvoie toujours du YUV_420_888 (aucune option RGBA côté
+ARCore, contrairement à CameraX/`ImageAnalysis` que `CameraController` configure explicitement en
+RGBA) -- passer ça tel quel à `MediaImageBuilder` faisait planter l'app dès la première frame
+(`UnsupportedOperationException: Android media image must use RGBA_8888 config`, thread GL, logcat
+fourni par l'utilisateur). Corrigé (commit `250e94c`) : conversion manuelle YUV_420_888 → `Bitmap`
+ARGB_8888 (`ArCoreHeadPoseTracker.yuv420ToBitmap()`, coefficients BT.601) puis `BitmapImageBuilder`
+au lieu de `MediaImageBuilder` -- même format que celui déjà produit par `CameraController`.
+Simplification en cascade : l'`Image` ARCore n'a plus besoin d'être gardée ouverte jusqu'à la fin du
+traitement MediaPipe (fermée immédiatement après conversion), donc le pool d'images en vol
+(`inFlightImages`/`MAX_TRACKED_IMAGES`) n'a plus lieu d'être et a été supprimé ; `releaseFrame()`
+devient un no-op documenté.
+
+Deux nouveaux risques ouverts par ce correctif, non résolus, à vérifier/mesurer sur device plutôt
+que deviner :
+5. `yuv420ToBitmap()` alloue un nouveau `Bitmap` par frame et copie les pixels un par un (pas de
+   pool de réutilisation comme `CameraController.acquirePooledBitmap`) -- potentiellement coûteux à
+   60 fps (palier `OPTIMAL`). À mesurer avant d'optimiser.
+6. Le point 1 ci-dessus (rotation/miroir non corrigés) reste entièrement d'actualité malgré ce
+   correctif -- la conversion YUV→RGB ne fait que rendre l'image lisible par MediaPipe, elle ne dit
+   rien de son orientation.
 
 ### 14. Vérification de mise à jour semi-automatique -- à faire (backlog)
 
