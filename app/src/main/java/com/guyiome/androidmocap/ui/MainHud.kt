@@ -99,7 +99,10 @@ fun MainHud(
             }
             Spacer(Modifier.width(18.dp))
 
-            // Mise à zéro, avec l'anneau de compte à rebours autour.
+            // Mise à zéro, avec l'anneau de compte à rebours autour. Teinte rouge si une anomalie
+            // de calibrage a été détectée (voir tracking/CalibrationAnomaly.kt, revue technique
+            // point 19) -- suspendue pendant le compte à rebours (recalibrage imminent, rouge +
+            // anneau simultanés serait confus) ; se résout uniquement par un nouveau calibrage.
             Box(contentAlignment = Alignment.Center) {
                 if (countdown != null) {
                     CircularProgressIndicator(
@@ -108,6 +111,7 @@ fun MainHud(
                         color = Color(0xFF7CE0FF),
                     )
                 }
+                val calibrationAnomalyActive = uiState.calibrationAnomalyFlagged && countdown == null
                 IconButton(
                     onClick = onCalibrate,
                     enabled = countdown == null,
@@ -115,8 +119,12 @@ fun MainHud(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.CenterFocusStrong,
-                        contentDescription = stringResource(R.string.cd_calibrate),
-                        tint = Color.White,
+                        contentDescription = if (calibrationAnomalyActive) {
+                            stringResource(R.string.cd_calibrate_anomaly_detected)
+                        } else {
+                            stringResource(R.string.cd_calibrate)
+                        },
+                        tint = if (calibrationAnomalyActive) Color(0xFFFF8080) else Color.White,
                         modifier = Modifier.rotate(-iconRotationDegrees),
                     )
                 }

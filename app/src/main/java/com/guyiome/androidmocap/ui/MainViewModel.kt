@@ -26,10 +26,14 @@ import com.guyiome.androidmocap.settings.DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT
 import com.guyiome.androidmocap.settings.DEFAULT_POWER_SAVE_DELAY_SECONDS
 import com.guyiome.androidmocap.tracking.ArCoreHeadPoseTracker
 import com.guyiome.androidmocap.tracking.BlendshapeScore
+import com.guyiome.androidmocap.tracking.CalibrationAnomalyState
 import com.guyiome.androidmocap.tracking.FaceLandmarkerHelper
 import com.guyiome.androidmocap.tracking.FaceTrackingResult
+import com.guyiome.androidmocap.tracking.REST_VARIANCE_THRESHOLD
 import com.guyiome.androidmocap.tracking.RotationMath
 import com.guyiome.androidmocap.tracking.ThermalThrottleState
+import com.guyiome.androidmocap.tracking.maxAbsEulerDegrees
+import com.guyiome.androidmocap.tracking.meanAbsoluteBlendshapeDelta
 import com.guyiome.androidmocap.tracking.TierConfig
 import com.guyiome.androidmocap.tracking.next
 import com.guyiome.androidmocap.tracking.TrackingTier
@@ -83,6 +87,10 @@ data class MainUiState(
     val isCalibrated: Boolean = false,
     // Compte à rebours en cours avant capture de la calibration (secondes restantes), null si aucun.
     val calibrationCountdownSeconds: Int? = null,
+    // Anomalie de calibrage détectée (voir tracking/CalibrationAnomaly.kt, revue technique point
+    // 19) : sticky, remis à faux uniquement par performCalibration(). Purement informatif --
+    // pilote seulement la teinte du bouton de calibrage dans MainHud, aucune action automatique.
+    val calibrationAnomalyFlagged: Boolean = false,
     // Seuil (%) en dessous duquel l'alerte batterie faible s'affiche -- persisté, réglable dans les réglages.
     val lowBatteryThresholdPercent: Int = DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT,
     // Mode économie d'énergie : AUTORISE (persisté, réglable dans les réglages) la bascule
@@ -215,6 +223,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // combien le téléphone a tourné TOUT SEUL depuis (mouvement du support/de la main, indépendant
     // du mouvement de la tête), pour l'annuler de la pose de tête envoyée.
     private var deviceRotationReference: FloatArray = RotationMath.IDENTITY_3X3.copyOf()
+    // Détection d'anomalie de calibrage (voir tracking/CalibrationAnomaly.kt, revue technique
+    // point 19) -- calculée à chaque frame dans handleTrackingResult, réinitialisée à chaque
+    // calibrage (performCalibration). previousBlendshapesForAnomaly sert uniquement à mesurer la
+    // variance frame-à-frame (voir meanAbsoluteBlendshapeDelta), distinct de tout autre usage des
+    // blendshapes dans cette classe.
+    private var calibrationAnomalyState = CalibrationAnomalyState.INITIAL
+    private var previousBlendshapesForAnomaly: List<BlendshapeScore> = emptyList()
     private var calibrationCountdownJob: Job? = null
     // Minuteur d'inactivité avant bascule automatique en mode éco -- annulé/reprogrammé à chaque
     // toucher de l'écran (voir onUserInteraction) et à chaque changement de réglage.
@@ -554,6 +569,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         val calibrated = result.copy(headEulerDegrees = calibratedEuler)
 
+        // Détection d'anomalie de calibrage (voir tracking/CalibrationAnomaly.kt, revue technique
+        // point 19) -- gardée derrière isCalibrated : avant le tout premier calibrage, "proche de
+        // zéro" n'a pas de sens et ferait remonter de faux positifs. previousBlendshapesForAnomaly
+        // est mis à jour inconditionnellement plus bas, y compris avant le premier calibrage.
+        if (_uiState.value.isCalibrated) {
+            val variance = meanAbsoluteBlendshapeDelta(previousBlendshapesForAnomaly, result.blendshapes)
+            val nextAnomalyState = calibrationAnomalyState.next(
+                isAtRest = variance <= REST_VARIANCE_THRESHOLD,
+                poseMagnitudeDegrees = maxAbsEulerDegrees(calibratedEuler),
+                faceDetected = result.faceDetected,
+            )
+            // Ne pousse dans _uiState que si flagged change réellement -- pas de mise à jour de
+            // l'état froid à 20-60 Hz, même discipline hot/cold que le reste de ce fichier.
+            if (nextAnomalyState.flagged != calibrationAnomalyState.flagged) {
+                _uiState.update { it.copy(calibrationAnomalyFlagged = nextAnomalyState.flagged) }
+            }
+            calibrationAnomalyState = nextAnomalyState
+        }
+        previousBlendshapesForAnomaly = result.blendshapes
+
         _trackingFrame.update {
             it.copy(
                 faceDetected = calibrated.faceDetected,
@@ -594,7 +629,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun performCalibration() {
         headRotationReference = lastRawHeadRotationMatrix.copyOf()
         deviceRotationReference = deviceOrientationTracker?.snapshotRotationMatrix() ?: deviceRotationReference
-        _uiState.update { it.copy(isCalibrated = true) }
+        // Un recalibrage résout toujours l'anomalie signalée (voir tracking/CalibrationAnomaly.kt)
+        // -- c'est la seule façon de la réinitialiser, jamais automatique (voir revue technique,
+        // point 19). previousBlendshapesForAnomaly vidé pour ne jamais comparer une frame à
+        // travers la frontière du calibrage.
+        calibrationAnomalyState = CalibrationAnomalyState.INITIAL
+        previousBlendshapesForAnomaly = emptyList()
+        _uiState.update { it.copy(isCalibrated = true, calibrationAnomalyFlagged = false) }
     }
 
     private fun handleError(message: String) {

@@ -31,6 +31,7 @@
     <string name="cd_connected_tap_disconnect">Connecté -- appuyer pour déconnecter</string>
     <string name="cd_disconnected_tap_connect">Non connecté -- appuyer pour connecter</string>
     <string name="cd_calibrate">Mise à zéro</string>
+    <string name="cd_calibrate_anomaly_detected">Mise à zéro (dérive détectée)</string>
     <string name="settings_title">Réglages</string>
     <string name="cd_low_battery">Batterie faible</string>
 
