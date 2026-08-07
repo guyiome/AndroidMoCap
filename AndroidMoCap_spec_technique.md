@@ -215,8 +215,9 @@ Liste vivante tenue dans `AndroidMoCap_revue_technique.md`, pas dupliquée ici. 
 principaux au moment de la rédaction : minify désactivé (point 8), vérification de mise à jour non
 implémentée (point 14), comportement non défini sur grand écran/tablette (point 20). La
 localisation de l'UI (point 23) est traitée -- voir §12. La fusion ARCore (point 13) est intégrée
-sur `main` mais non testée sur device -- voir §4. Le throttling thermique dynamique (point 3/13,
-34) est branché mais non vérifié sur device -- voir §3.
+sur `main` mais non testée sur device -- voir §4. Le throttling thermique dynamique (point 3/13, 34)
+est branché et vérifié sur device via mock (point 35) -- le capteur thermique réel reste non exercé,
+l'appareil de test ne chauffant pas suffisamment en usage normal, voir §3.
 
 ## 12. Localisation
 

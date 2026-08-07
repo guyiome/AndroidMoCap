@@ -68,8 +68,8 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 31 | CI cassée depuis le premier run (`gradlew` sans bit exécutable), puis silencieusement bloquée depuis | **✅ entièrement résolu le 7 août 2026** (commit `df640a4` pour `gradlew` ; cause du blocage silencieux trouvée le même jour -- budget Actions à 0 $, "Stop usage" actif -- corrigée et vérifiée par un run CI réussi), voir section dédiée plus bas |
 | 32 | Panneau de blendshapes du HUD : tongueOut disparaissait, noms masqués par le bandeau système | **✅ corrigés le 7 août 2026**, vérification visuelle device en attente pour le second, voir section dédiée plus bas |
 | 33 | Proposer l'installation ARCore au lieu du repli silencieux | Backlog, priorité mineure, idée ouverte le 7 août 2026, aucun code écrit |
-| 34 | Throttling thermique dynamique (débit réduit en cas de chauffe) | **✅ implémenté le 7 août 2026**, voir section dédiée plus bas -- vérification device en attente |
-| 35 | Panneau de mocks de debug caché (thermique, ARCore, délégué GPU) | **✅ implémenté le 7 août 2026**, voir section dédiée plus bas -- vérification device en attente |
+| 34 | Throttling thermique dynamique (débit réduit en cas de chauffe) | **✅ implémenté et vérifié sur device (via mock) le 7 août 2026**, voir section dédiée plus bas -- capteur thermique réel non exercé (appareil de test ne chauffe pas assez), câblage bout en bout confirmé |
+| 35 | Panneau de mocks de debug caché (thermique, ARCore, délégué GPU) | **✅ implémenté et vérifié sur device le 7 août 2026**, voir section dédiée plus bas -- les trois mocks confirmés fonctionnels |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -1051,10 +1051,15 @@ testée en JVM sans dépendance de timing réel -- 9 tests, `ThermalThrottleTest
 réduit de moitié en throttling (plancher `MIN_THROTTLED_FPS = 10`), suggestion de rétrogradation
 après `SUSTAINED_THROTTLE_TICKS = 12` sondages consécutifs (~1 minute de chauffe continue).
 
-`./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL`, 9 nouveaux tests verts. **Aucun
-device dans ce sandbox** -- comme le reste des correctifs de cette session sans accès matériel,
-prêt pour premier test device, pas encore validé (en particulier : la formule de réduction du débit
-et l'apparence de l'icône n'ont jamais été vues tourner réellement).
+`./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL`, 9 nouveaux tests verts.
+
+**✅ Confirmé sur device (7 août 2026, même jour)**, via le mock thermique du point 35 (l'appareil de
+test, optimisé gaming, ne chauffe pas assez pour déclencher le vrai capteur) : icône ambre du HUD
+visible en forçant le throttling actif, débit effectivement réduit, remontée automatique confirmée
+en repassant sur Auto/Forcer inactif, et suggestion de rétrogradation (`downgradeSuggested`) bien
+apparue après ~1 minute de chauffe forcée continue. Le throttling thermique *réel* (capteur
+`PowerManager`, pas le mock) reste non exercé -- l'appareil de test ne chauffe pas suffisamment en
+usage normal, mais le câblage bout en bout est désormais vérifié indépendamment de la source du signal.
 
 ### 35. Panneau de mocks de debug caché (DiagnosticsScreen)
 
@@ -1106,11 +1111,15 @@ lu en direct dans `startThermalPolling()` (`_uiState.value.debugThermalOverride 
 DeviceCapabilityDetector.isThermalThrottling(context)`). `DiagnosticsScreen` enveloppée dans un
 `verticalScroll` (absente jusqu'ici, latent -- le nouveau contenu risquait de déborder).
 
-`./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL`, 6 nouveaux tests verts. **Aucun
-device dans ce sandbox** -- en particulier non vérifiés : le geste des 7 taps en conditions réelles,
-l'absence de débordement visuel du panneau débloqué, et surtout l'effet réel des trois mocks (le
-repli CameraX/CPU se déclenche-t-il vraiment après redémarrage, le débit baisse-t-il vraiment en
-direct pour le mock thermique) -- à confirmer par l'utilisateur sur son appareil.
+`./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL`, 6 nouveaux tests verts.
+
+**✅ Tous confirmés sur device (7 août 2026, même jour)** : le geste des 7 taps fonctionne, le
+panneau s'affiche sans débordement visuel, et les trois mocks produisent bien l'effet attendu --
+mock thermique vérifié en direct (voir point 34, y compris la suggestion de rétrogradation après
+chauffe forcée soutenue), mock ARCore indisponible confirmé après redémarrage (repli CameraX visible
+en diagnostic, "Source caméra : CameraX"), mock délégué GPU indisponible confirmé après redémarrage
+(diagnostic "Délégué : CPU", tracking fonctionnel sans régression). Les points 34 et 35 passent tous
+deux de "prêt pour test device" à "vérifié sur device".
 
 ## Automatisation
 
