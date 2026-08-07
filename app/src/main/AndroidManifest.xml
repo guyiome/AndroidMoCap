@@ -14,6 +14,17 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
+    <!--
+         Visibilité de package (Android 11+, API 30+) pour com.google.ar.core, recommandée par la
+         doc officielle ARCore pour fiabiliser ArCoreApk.checkAvailability()/Session() sous les
+         restrictions de visibilité de packages. Sans impact aujourd'hui : le repli sur CameraX est
+         déjà silencieux dans tous les cas (voir ArCoreHeadPoseTracker.onUnavailable), c'est un
+         correctif défensif. Voir revue technique, point 13 (risque 3) et point 33.
+    -->
+    <queries>
+        <package android:name="com.google.ar.core" />
+    </queries>
+
     <application
         android:name=".MoCapApplication"
         android:allowBackup="true"

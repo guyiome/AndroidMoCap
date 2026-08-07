@@ -83,8 +83,8 @@
     <string name="diagnostics_debug_override_on">Forcé indisponible</string>
     <string name="diagnostics_debug_relaunch_hint">S\'applique après un redémarrage complet de l\'app</string>
     <string name="diagnostics_debug_thermal_label">Forcer la régulation thermique (en direct, sans redémarrage)</string>
-    <string name="diagnostics_debug_thermal_forced_active">Forcer actif</string>
-    <string name="diagnostics_debug_thermal_forced_inactive">Forcer inactif</string>
+    <string name="diagnostics_debug_thermal_forced_active">Forcé actif</string>
+    <string name="diagnostics_debug_thermal_forced_inactive">Forcé inactif</string>
     <string name="diagnostics_debug_reset_all">Réinitialiser tous les mocks de debug</string>
     <string name="diagnostics_debug_override_active_warning">Un mock de debug est actif -- ne reflète pas forcément le comportement réel de l\'appareil</string>
     <string name="cd_thermal_throttling">Débit réduit pour cause de chauffe</string>

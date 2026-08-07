@@ -85,8 +85,8 @@
     <string name="diagnostics_debug_override_on">Forced unavailable</string>
     <string name="diagnostics_debug_relaunch_hint">Applies after a full app restart</string>
     <string name="diagnostics_debug_thermal_label">Force thermal throttling (live, no restart needed)</string>
-    <string name="diagnostics_debug_thermal_forced_active">Force active</string>
-    <string name="diagnostics_debug_thermal_forced_inactive">Force inactive</string>
+    <string name="diagnostics_debug_thermal_forced_active">Forced active</string>
+    <string name="diagnostics_debug_thermal_forced_inactive">Forced inactive</string>
     <string name="diagnostics_debug_reset_all">Reset all debug mocks</string>
     <string name="diagnostics_debug_override_active_warning">A debug mock is active -- may not reflect real device behavior</string>
     <string name="cd_thermal_throttling">Frame rate reduced due to heat</string>
