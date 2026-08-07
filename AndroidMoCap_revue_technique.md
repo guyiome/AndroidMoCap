@@ -67,6 +67,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 30 | Sélecteur de langue dans l'app pour Android 11/12 | Backlog, voir point 23 -- pas d'équivalent au sélecteur système Android 13+ sur ces versions, demanderait `androidx.appcompat` + `AppCompatDelegate` |
 | 31 | CI cassée depuis le premier run (`gradlew` sans bit exécutable) | **✅ corrigé le 6 août 2026** (commit `df640a4`), voir section dédiée plus bas |
 | 32 | Panneau de blendshapes du HUD : tongueOut disparaissait, noms masqués par le bandeau système | **✅ corrigés le 7 août 2026**, vérification visuelle device en attente pour le second, voir section dédiée plus bas |
+| 33 | Proposer l'installation ARCore au lieu du repli silencieux | Backlog, priorité mineure, idée ouverte le 7 août 2026, aucun code écrit |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -956,6 +957,36 @@ sécurité pour le résidu de débordement (calcul géométrique, pas mesuré su
 correctif (a) déterministe, sans risque ; correctif (b) raisonné géométriquement mais pas revérifié
 visuellement, à confirmer au prochain test réel (le nom complet de chaque blendshape doit rester
 entièrement lisible en tenant le téléphone à l'horizontale, dans les deux sens de rotation).
+
+### 33. Étudier une installation ARCore proposée à l'utilisateur au lieu du repli silencieux -- backlog, priorité mineure
+
+Idée ouverte en discussion (7 août 2026), à partir du point "pas de bloc `<queries>`" (point 13,
+risque 3). `ArCoreApk.Availability` a un état dédié `SUPPORTED_NOT_INSTALLED` -- "appareil
+compatible, mais l'APK ARCore (Google Play Services for AR) absente" -- et `isSupported` (lu par
+`DeviceCapabilityDetector.detect()`) renvoie `true` pour cet état, au même titre qu'installé. Vérifié
+dans le code : `ArCoreHeadPoseTracker.tryCreateSession()` catch déjà `UnavailableArcoreNotInstalledException`
+séparément de `UnavailableDeviceNotCompatibleException` (message de log distinct), mais les deux
+mènent au même repli silencieux vers `CameraX` via `onUnavailable` -- aucune différence de
+comportement visible pour l'utilisateur aujourd'hui entre "appareil incompatible" et "appareil
+compatible mais composant pas encore installé".
+
+Cas où ce dernier scénario est plausible : appareil sans Google Play Services (marché hors GMS, ROM
+custom), premier lancement hors ligne / appareil fraîchement réinitialisé, appareil géré en
+entreprise (MDM) restreignant les installations auto, composant désactivé/vidé manuellement par
+l'utilisateur. Sur un smartphone grand public avec GMS et Play Store à jour, Google provisionne
+plutôt fiablement ce composant en arrière-plan pour les appareils qu'il a certifiés ARCore -- donc le
+cas "durablement bloqué" est probablement minoritaire, mais aucune télémétrie n'existe côté app pour
+le confirmer ou le quantifier sur la base d'utilisateurs réelle.
+
+Piste à étudier : proposer explicitement l'installation (`ArCoreApk.requestInstall()`, flux canonique
+Google -- boucle avant la création de `Session`, gestion du retour `INSTALL_REQUESTED` en réessayant
+à `onResume()`) plutôt que de rétrograder silencieusement un utilisateur qui aurait pu accéder au
+palier `OPTIMAL` moyennant un petit téléchargement. Implique une vraie décision UX (écran de
+consentement, redirection Play Store, gestion du refus -- `UnavailableUserDeclinedInstallationException`
+déjà catché mais jamais déclenché puisque `requestInstall()` n'est jamais appelé) -- pas un simple
+correctif technique comme le bloc `<queries>` lui-même.
+
+Statut : idée notée en backlog, priorité mineure, aucun code écrit, aucune décision de mise en œuvre.
 
 ## Automatisation
 
