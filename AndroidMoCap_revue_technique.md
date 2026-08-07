@@ -63,7 +63,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 20 | Orientation grand écran / tablette | Constat documenté, aucune décision de mise en œuvre |
 | 21 | Tri en sous-écrans des réglages | **Implémenté sur `main`, voir point 26** (l'index le disait encore "aucun code écrit" par erreur) |
 | 28 | Fiabilisation du clignement des yeux avec lunettes | Idée de conception ouverte le 6 août 2026, voir section dédiée plus bas -- aucun code écrit |
-| 29 | Validation des traductions FR/EN par locuteurs natifs | Backlog, voir point 23 -- texte rédigé sans relecture native, ni le français ni l'anglais (repli par défaut) n'ont été validés |
+| 29 | Validation des traductions FR/EN par locuteurs natifs | Backlog, voir point 23 -- **deux passes de self-review faites** (6 août, commit `1b0030a`, 86 clés ; 7 août, clés des points 32-35, incohérence de style corrigée entre les puces ARCore/GPU et thermique), mais aucune relecture par un locuteur natif à ce jour, ni en français ni en anglais |
 | 30 | Sélecteur de langue dans l'app pour Android 11/12 | Backlog, voir point 23 -- pas d'équivalent au sélecteur système Android 13+ sur ces versions, demanderait `androidx.appcompat` + `AppCompatDelegate` |
 | 31 | CI cassée depuis le premier run (`gradlew` sans bit exécutable), puis silencieusement bloquée depuis | **✅ entièrement résolu le 7 août 2026** (commit `df640a4` pour `gradlew` ; cause du blocage silencieux trouvée le même jour -- budget Actions à 0 $, "Stop usage" actif -- corrigée et vérifiée par un run CI réussi), voir section dédiée plus bas |
 | 32 | Panneau de blendshapes du HUD : tongueOut disparaissait, noms masqués par le bandeau système | **✅ corrigés le 7 août 2026**, vérification visuelle device en attente pour le second, voir section dédiée plus bas |
@@ -220,9 +220,9 @@ l'aveugle) :**
    synchrone, un seul appel au démarrage -- un état transitoire `UNKNOWN_CHECKING` (tout premier
    appel ARCore jamais mis en cache sur l'appareil) serait interprété comme "non supporté" pour
    toute la session. Pré-existant, pas introduit par cette intégration.
-3. Pas de bloc `<queries>` pour `com.google.ar.core` dans le manifeste -- sans impact tant que le
-   repli reste silencieux (pas de flux `ArCoreApk.requestInstall()` prévu), à confirmer si un jour
-   un flux d'installation est ajouté.
+3. ~~Pas de bloc `<queries>` pour `com.google.ar.core` dans le manifeste~~ -- **✅ ajouté le 7 août
+   2026** (`AndroidManifest.xml`), correctif défensif sans changement de comportement observable
+   (le repli reste de toute façon silencieux).
 4. ~~Coût thermique/batterie du duo GL (`RENDERMODE_CONTINUOUSLY`) + inférence MediaPipe
    simultanés, sur un palier qui ne bénéficie toujours pas du throttling thermique dynamique~~ --
    **✅ throttling thermique dynamique branché le 7 août 2026**, voir point 34 plus bas.
@@ -293,8 +293,8 @@ corrigé, perf déportée sur thread dédié -- tracking fonctionnel confirmé p
   les deux paliers, seule la source caméra/pose diffère.
 
 Risques restants après cette série de correctifs (mise à jour de la liste ci-dessus) :
-- Point 2 (vérification `ArCoreApk` synchrone) et point 3 (pas de `<queries>`) : inchangés, toujours
-  ouverts.
+- Point 2 (vérification `ArCoreApk` synchrone) : inchangé, toujours ouvert. Point 3 (`<queries>`) :
+  **✅ corrigé le 7 août 2026**.
 - Point 4 (coût thermique du duo GL+MediaPipe) : partiellement atténué par le déport de thread
   ci-dessus (le thread GL est moins chargé) ; **throttling thermique dynamique branché le 7 août
   2026**, voir point 34 plus bas.
@@ -1014,7 +1014,10 @@ consentement, redirection Play Store, gestion du refus -- `UnavailableUserDeclin
 déjà catché mais jamais déclenché puisque `requestInstall()` n'est jamais appelé) -- pas un simple
 correctif technique comme le bloc `<queries>` lui-même.
 
-Statut : idée notée en backlog, priorité mineure, aucun code écrit, aucune décision de mise en œuvre.
+Statut : idée notée en backlog, priorité mineure, aucune décision de mise en œuvre. *[Mise à jour du
+même jour : le bloc `<queries>` évoqué ci-dessus comme point de départ de la discussion a lui-même
+été ajouté séparément, voir point 13 -- reste sans lien avec la décision produit ci-dessus (proposer
+ou non un flux d'installation), qui reste entière.]*
 
 ### 34. Throttling thermique dynamique branché (point 1 du top 3 priorisé le 7 août 2026)
 
