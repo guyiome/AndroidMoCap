@@ -115,12 +115,13 @@ couvert, dans `AndroidMoCap_tests_unitaires.md`. Lancer avec :
 
 Suivi détaillé dans `AndroidMoCap_revue_technique.md`. Points principaux :
 
-- **Fusion ARCore** (pose de tête, palier `OPTIMAL`) : implémentée sur la branche
-  `feature/arcore-fusion` (bascule de la source caméra vers ARCore pour ce palier), pas encore
-  fusionnée sur `main` ni testée sur device -- voir le point 13 de la revue technique.
-- Rétrogradation dynamique de palier en cas de throttling thermique -- la détection existe
-  (`DeviceCapabilityDetector.isThermalThrottling`), pas encore appelée en continu pendant la
-  capture.
+- **Fusion ARCore** (pose de tête, palier `OPTIMAL`) : intégrée sur `main` et fonctionnelle sur
+  device (bascule de la source caméra vers ARCore pour ce palier) -- voir le point 13 de la revue
+  technique pour le détail et les points mineurs encore ouverts.
+- Throttling thermique dynamique : débit cible réduit de moitié pendant une chauffe détectée
+  (`DeviceCapabilityDetector.isThermalThrottling`, sondée en continu pendant la capture), remonte
+  automatiquement une fois la chauffe retombée -- implémenté, pas encore confirmé sur device, voir
+  le point 34 de la revue technique.
 - Lissage temporel (One Euro Filter) sur les blendshapes.
 - Détection expérimentale de la langue tirée et des joues gonflées, derrière un interrupteur
   "Fonctionnalités expérimentales" dédié -- encore au stade de conception, voir les points 15 et 16.

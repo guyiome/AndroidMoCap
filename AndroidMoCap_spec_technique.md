@@ -65,9 +65,15 @@ Le débit cible (`targetFps`) par palier est appliqué dans `CameraController.pr
 frames en trop sont ignorées avant toute allocation/rotation, avant même d'atteindre MediaPipe --
 c'est le point où le filtrage coûte le moins cher.
 
-`DeviceCapabilityDetector.isThermalThrottling()` existe (surveille `PowerManager.currentThermalStatus`)
-mais n'est pas encore appelé en continu pendant une session pour déclencher une rétrogradation
-dynamique de palier -- voir revue technique, point 3/13.
+`DeviceCapabilityDetector.isThermalThrottling()` (surveille `PowerManager.currentThermalStatus`) est
+sondée en continu pendant la capture (`MainViewModel.startThermalPolling()`, toutes les 5 secondes,
+actif entre `ON_START`/`ON_STOP`) : en cas de chauffe, le débit cible est réduit de moitié (plancher
+10 fps) via les mêmes points d'ajustement à chaud que le débit par palier ci-dessus
+(`CameraController`/`ArCoreHeadPoseTracker.setTargetFps`), et remonte automatiquement dès que la
+chauffe retombe. Volontairement limité au débit cible -- ni le délégué GPU/CPU ni la source caméra
+(ARCore/CameraX) ne changent à chaud, seul un changement de palier complet (jamais fait en cours de
+session, voir §4 et le sélecteur de palier manuel) y toucherait. Logique pure et testée en JVM :
+`tracking/ThermalThrottle.kt` (`ThermalThrottleState.next()`). Voir revue technique, point 34.
 
 ## 4. Fusion ARCore (palier `OPTIMAL`) -- intégrée sur `main`, non testée sur device
 
@@ -194,10 +200,11 @@ Licence : PolyForm Shield 1.0.0 (voir `LICENSE`), CLA en place pour les contribu
 ## 11. Dette technique et limites connues
 
 Liste vivante tenue dans `AndroidMoCap_revue_technique.md`, pas dupliquée ici. Points ouverts
-principaux au moment de la rédaction : throttling thermique dynamique non branché (point 3/13),
-minify désactivé (point 8), vérification de mise à jour non implémentée (point 14), comportement
-non défini sur grand écran/tablette (point 20). La localisation de l'UI (point 23) est traitée --
-voir §12. La fusion ARCore (point 13) est intégrée sur `main` mais non testée sur device -- voir §4.
+principaux au moment de la rédaction : minify désactivé (point 8), vérification de mise à jour non
+implémentée (point 14), comportement non défini sur grand écran/tablette (point 20). La
+localisation de l'UI (point 23) est traitée -- voir §12. La fusion ARCore (point 13) est intégrée
+sur `main` mais non testée sur device -- voir §4. Le throttling thermique dynamique (point 3/13,
+34) est branché mais non vérifié sur device -- voir §3.
 
 ## 12. Localisation
 

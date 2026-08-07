@@ -14,6 +14,7 @@ Deux grandes catégories reviennent tout du long. Le code **logique pur** (maths
 | `FaceLandmarkerHelper.kt` | `computeEyeGazeDegrees()` (extraite en `internal`, pure) | `FaceLandmarkerHelperTest.kt` | ✅ Couvert. |
 | `FaceLandmarkerHelper.kt` | `setup()`, `tryCreateLandmarker()`, `detectAsync()`, `onLiveStreamResult()` (dont l'extraction de `faceLandmarks()`) | -- | ❌ Non testable en JUnit pur : enrobe le moteur natif MediaPipe (`FaceLandmarker.createFromOptions`, délégué GPU/CPU réel) -- nécessite un appareil/émulateur. `FaceLandmarkerResult` ne peut pas non plus être construit à la main en test (fabrique `create()` package-private côté MediaPipe). Test instrumenté à envisager si un bug survient ici. |
 | `FaceTrackingResult.kt` | Data class (`FaceTrackingResult`, `BlendshapeScore`) | -- | ➖ Pas de logique propre, sert de fixture aux autres tests (voir `IFacialMocapSenderTest`, `FaceLandmarkerHelperTest`). |
+| `ThermalThrottle.kt` | `ThermalThrottleState.next()` | `ThermalThrottleTest.kt` | ✅ Couvert (fonction pure, aucune dépendance de timing réel -- réduction/remontée du débit, plancher, seuil de sondages consécutifs pour `downgradeSuggested`, comportement sticky, rafales courtes qui ne déclenchent pas la suggestion). Voir revue technique, point 34. |
 
 ## network/
 
@@ -37,7 +38,7 @@ Deux grandes catégories reviennent tout du long. Le code **logique pur** (maths
 | Fichier | Élément couvert | Test(s) | Statut |
 |---|---|---|---|
 | `DeviceCapabilities.kt` | `DeviceCapabilities.looksHighEnd` | Exercée indirectement par `TrackingTierSelectorTest.kt` | ⚠️ Couverte en pratique (les tests de sélection de palier construisent des `DeviceCapabilities` et vérifient le palier qui en résulte), mais pas de test dédié isolé sur `looksHighEnd` seul. À ajouter si cette heuristique devient plus complexe. |
-| `DeviceCapabilities.kt` | `DeviceCapabilityDetector.detect()`, `isThermalThrottling()` | -- | ❌ Dépend de `ArCoreApk`, `ActivityManager`, `PowerManager` -- nécessite Robolectric ou un test instrumenté. `isThermalThrottling()` n'est de toute façon appelée nulle part encore dans le code (voir le rapport technique, section 3) : pas de test tant qu'elle n'est pas branchée. |
+| `DeviceCapabilities.kt` | `DeviceCapabilityDetector.detect()`, `isThermalThrottling()` | -- | ❌ Dépend de `ArCoreApk`, `ActivityManager`, `PowerManager` -- nécessite Robolectric ou un test instrumenté. Appelée en continu depuis le 7 août 2026 (`MainViewModel.startThermalPolling()`, revue technique point 34) ; la logique qui exploite son résultat (réduction/remontée du débit) est extraite en fonction pure et testée séparément, voir `ThermalThrottle.kt` ci-dessous. |
 
 ## sensors/
 

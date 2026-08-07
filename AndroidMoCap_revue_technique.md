@@ -68,6 +68,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 31 | CI cassée depuis le premier run (`gradlew` sans bit exécutable), puis silencieusement bloquée depuis | **✅ entièrement résolu le 7 août 2026** (commit `df640a4` pour `gradlew` ; cause du blocage silencieux trouvée le même jour -- budget Actions à 0 $, "Stop usage" actif -- corrigée et vérifiée par un run CI réussi), voir section dédiée plus bas |
 | 32 | Panneau de blendshapes du HUD : tongueOut disparaissait, noms masqués par le bandeau système | **✅ corrigés le 7 août 2026**, vérification visuelle device en attente pour le second, voir section dédiée plus bas |
 | 33 | Proposer l'installation ARCore au lieu du repli silencieux | Backlog, priorité mineure, idée ouverte le 7 août 2026, aucun code écrit |
+| 34 | Throttling thermique dynamique (débit réduit en cas de chauffe) | **✅ implémenté le 7 août 2026**, voir section dédiée plus bas -- vérification device en attente |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -221,9 +222,9 @@ l'aveugle) :**
 3. Pas de bloc `<queries>` pour `com.google.ar.core` dans le manifeste -- sans impact tant que le
    repli reste silencieux (pas de flux `ArCoreApk.requestInstall()` prévu), à confirmer si un jour
    un flux d'installation est ajouté.
-4. Coût thermique/batterie du duo GL (`RENDERMODE_CONTINUOUSLY`) + inférence MediaPipe simultanés,
-   sur un palier qui ne bénéficie toujours pas du throttling thermique dynamique (jamais branché,
-   voir plus haut dans ce même point).
+4. ~~Coût thermique/batterie du duo GL (`RENDERMODE_CONTINUOUSLY`) + inférence MediaPipe
+   simultanés, sur un palier qui ne bénéficie toujours pas du throttling thermique dynamique~~ --
+   **✅ throttling thermique dynamique branché le 7 août 2026**, voir point 34 plus bas.
 
 **Suivi device (6 août 2026, même jour) : crash au premier lancement réel, corrigé.**
 `frame.acquireCameraImage()` d'ARCore renvoie toujours du YUV_420_888 (aucune option RGBA côté
@@ -294,8 +295,8 @@ Risques restants après cette série de correctifs (mise à jour de la liste ci-
 - Point 2 (vérification `ArCoreApk` synchrone) et point 3 (pas de `<queries>`) : inchangés, toujours
   ouverts.
 - Point 4 (coût thermique du duo GL+MediaPipe) : partiellement atténué par le déport de thread
-  ci-dessus (le thread GL est moins chargé), mais le throttling thermique dynamique reste non
-  branché -- toujours pertinent pour une session longue.
+  ci-dessus (le thread GL est moins chargé) ; **throttling thermique dynamique branché le 7 août
+  2026**, voir point 34 plus bas.
 - Nouveau point mineur : `yuv420ToBitmap()` alloue toujours un `Bitmap` par frame (pas de pool de
   réutilisation) -- non prioritaire vu le gain déjà obtenu par le déport de thread, à reconsidérer
   seulement si un nouveau signal de coût apparaît. **Mise à jour (7 août 2026)** : la copie des
@@ -1013,6 +1014,46 @@ déjà catché mais jamais déclenché puisque `requestInstall()` n'est jamais a
 correctif technique comme le bloc `<queries>` lui-même.
 
 Statut : idée notée en backlog, priorité mineure, aucun code écrit, aucune décision de mise en œuvre.
+
+### 34. Throttling thermique dynamique branché (point 1 du top 3 priorisé le 7 août 2026)
+
+`DeviceCapabilityDetector.isThermalThrottling()` existait depuis le début de l'intégration ARCore
+(point 3/13) sans jamais être appelée -- premier des trois points priorisés en fin de session (avec
+le budget Actions à 0 $, point 31, et l'installation ARCore proposée, point 33).
+
+Décisions de conception actées avec l'utilisateur avant l'implémentation :
+- **Rétrogradation dynamique = débit cible réduit, pas un changement de palier complet.** Une vraie
+  rétrogradation de palier (`OPTIMAL` -> `STANDARD`) changerait aussi le délégué GPU/CPU et la
+  source caméra (ARCore -> CameraX) *à chaud* -- irait à l'encontre d'une décision déjà prise
+  explicitement de ne jamais reconstruire le pipeline caméra/MediaPipe en cours de session (même
+  principe que le sélecteur de palier manuel, point 13). Le débit cible, lui, était déjà prévu pour
+  un ajustement à chaud (`CameraController`/`ArCoreHeadPoseTracker.setTargetFps`, jamais utilisé
+  dynamiquement jusqu'ici) -- c'est le seul levier actionné.
+- **Retour utilisateur explicitement demandé** : une icône dans le bandeau principal (`MainHud`,
+  même famille visuelle que l'icône "visage détecté") apparaît tant que le débit est réduit, plus
+  une ligne équivalente dans l'écran Diagnostics -- même code couleur ambre que l'avertissement
+  "risque de performance" du sélecteur de palier manuel (cohérence visuelle, même famille de signal).
+- **Rétrogradation de palier suggérée, jamais appliquée automatiquement**, en cas de chauffe
+  *persistante* : un indicateur sticky (`downgradeSuggested`, ne redevient jamais faux une fois
+  déclenché) apparaît en diagnostic après une chauffe continue prolongée, renvoyant vers le
+  sélecteur de palier manuel déjà existant -- la décision de rétrograder pour de bon (au prochain
+  lancement) reste entièrement celle de l'utilisateur, jamais écrite automatiquement dans
+  `AppSettingsStore.tierOverride` (qui reste un choix explicite, pas une suggestion système).
+- **Remontée automatique** au débit nominal dès que la chauffe retombe (pas de dégradation
+  permanente pour le reste de la session) -- sondage périodique (5 secondes), pas d'hystérésis :
+  l'espacement du sondage suffit à éviter une oscillation visible.
+
+Implémentation : `tracking/ThermalThrottle.kt` (nouveau, `ThermalThrottleState` + `next()`, pure et
+testée en JVM sans dépendance de timing réel -- 9 tests, `ThermalThrottleTest.kt`) pilotée par
+`MainViewModel.startThermalPolling()` (sondage périodique démarré/arrêté avec le cycle de vie,
+`ON_START`/`ON_STOP`, même patron que `DeviceOrientationTracker`/`ArCoreHeadPoseTracker`). Débit
+réduit de moitié en throttling (plancher `MIN_THROTTLED_FPS = 10`), suggestion de rétrogradation
+après `SUSTAINED_THROTTLE_TICKS = 12` sondages consécutifs (~1 minute de chauffe continue).
+
+`./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL`, 9 nouveaux tests verts. **Aucun
+device dans ce sandbox** -- comme le reste des correctifs de cette session sans accès matériel,
+prêt pour premier test device, pas encore validé (en particulier : la formule de réduction du débit
+et l'apparence de l'icône n'ont jamais été vues tourner réellement).
 
 ## Automatisation
 
