@@ -60,7 +60,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 17 | Indicateur de fiabilité par blendshape | **Implémenté sur `main`, voir point 24** (l'index le disait encore "aucun code écrit" par erreur) |
 | 18 | Persistance sélection blendshapes + valeur brute/ajustée | **Persistance implémentée sur `main`, voir point 25** -- le volet "valeur brute à côté de la valeur ajustée" reste en attente (dépend d'une pondération par blendshape jamais construite) |
 | 19 | Détection d'anomalie de calibrage (bouton rouge) | Conception actée, aucun code écrit |
-| 20 | Orientation grand écran / tablette | Constat documenté, aucune décision de mise en œuvre |
+| 20 | Orientation grand écran / tablette | **Reproduit sur téléphone le 7 août 2026** (pas seulement en théorie sur tablette) -- direction actée (adapter les écrans de réglages au paysage) mais explicitement mise en backlog, aucune action immédiate |
 | 21 | Tri en sous-écrans des réglages | **Implémenté sur `main`, voir point 26** (l'index le disait encore "aucun code écrit" par erreur) |
 | 28 | Fiabilisation du clignement des yeux avec lunettes | Idée de conception ouverte le 6 août 2026, voir section dédiée plus bas -- aucun code écrit |
 | 29 | Validation des traductions FR/EN par locuteurs natifs | Backlog, voir point 23 -- texte rédigé sans relecture native, ni le français ni l'anglais (repli par défaut) n'ont été validés |
@@ -878,6 +878,21 @@ manquaient jusqu'ici à ce journal, maintenant rapatriés ci-dessus.]*
 Statut : constat factuel remonté en discussion, aucune décision prise sur la suite (adapter réellement
 l'écran de réglages et revoir la logique de rotation caméra, vs. accepter que le comportement sur
 tablette reste dégradé pour l'instant, l'usage principal visé restant le téléphone).
+
+**Mise à jour (7 août 2026) : reproduit sur téléphone, pas seulement en théorie sur tablette.**
+Test en conditions réelles par l'utilisateur : `BlendshapeSelectionScreen` affiché avec le téléphone
+tenu en paysage montre une mise en page cassée (bandeau système repositionné sur le bord, libellés de
+catégories rendus à la verticale, chevauchements) -- signature typique d'un système qui **force la
+rotation malgré le verrouillage portrait du manifeste** (`android:screenOrientation="portrait"`),
+plutôt qu'un souci propre à cet écran : aucun code de gestion du paysage n'existe nulle part dans le
+projet (recherché, aucune correspondance), donc n'importe quel écran se comporterait pareil si la
+rotation est forcée. Cause système précise non confirmée (candidat le plus probable : l'option
+développeur Android 12+ "Ignorer la demande d'orientation", ou un réglage constructeur équivalent sur
+ce téléphone) -- pas vérifiée sur l'appareil de test, donc pas retenue comme cause certaine.
+
+Décision de l'utilisateur : traiter le symptôme plutôt que la cause système (rendre les écrans de
+réglages réellement utilisables en paysage, sur le même principe que la piste tablette ci-dessus)
+**mais en backlog, sans action immédiate** -- aucun code écrit, pas de priorité fixée pour l'instant.
 
 ### 31. CI cassée depuis le premier run -- `gradlew` sans bit exécutable
 
