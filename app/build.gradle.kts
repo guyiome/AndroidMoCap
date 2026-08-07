@@ -118,7 +118,9 @@ dependencies {
     // Diffusion réseau : protocole VMC (OSC over UDP) vers VTube Studio / Blender / Unity
     implementation(libs.javaosc.core)
 
-    // Réglages de calibrage persistés (offset caméra, IP/port cible, sensibilité)
+    // Réglages persistés (AppSettingsStore, ConnectionSettingsStore) : mode éco, overlay du mesh,
+    // seuil batterie, palier forcé, mocks de debug, sélection de blendshapes (optionnelle), type de
+    // connexion et cible réseau
     implementation(libs.androidx.datastore.preferences)
 
     // Tests unitaires (JVM pur -- pas de dépendance Android, voir AndroidMoCap_tests_unitaires.md)

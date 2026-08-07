@@ -58,8 +58,10 @@ private fun BlendshapeCategory.displayLabel(): String = when (this) {
 
 /**
  * Écran de sélection des blendshapes à afficher sur la page principale -- catalogue complet des
- * 52 blendshapes ARKit, groupés par catégorie repliable, avec recherche. La sélection n'est PAS
- * persistée : elle est remise à zéro à chaque lancement de l'app, comme demandé.
+ * 52 blendshapes ARKit, groupés par catégorie repliable, avec recherche. Par défaut, la sélection
+ * n'est PAS persistée (remise à zéro à chaque lancement de l'app, comportement historique) -- un
+ * réglage dédié (Affichage & confort, voir `persistBlendshapeSelectionEnabled`) permet de la
+ * conserver d'une session à l'autre, voir revue technique point 18.
  */
 @Composable
 fun BlendshapeSelectionScreen(

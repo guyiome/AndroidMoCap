@@ -76,10 +76,18 @@ can still be used to test it. `OPTIMAL`'s ARCore fusion is merged into `main` an
 on device (revue technique point 3/13) — camera source switching (CameraX ↔ ARCore), rotation
 correction and the image-processing thread split are all implemented; a few minor items (a native
 MediaPipe warning of unconfirmed cause, no Bitmap pooling for the ARCore path) remain open, see the
-revue technique. `isThermalThrottling()` is now polled continuously during capture
+revue technique. `isThermalThrottling()` is polled continuously during capture
 (`MainViewModel.startThermalPolling()`, every 5s, tied to `ON_START`/`ON_STOP`) and halves the
 target FPS while throttling (`tracking/ThermalThrottle.kt`, pure and tested), ramping back up once
-it clears — not yet confirmed on device, see revue technique point 34.
+it clears — confirmed working end-to-end on device via the debug mock panel (see below), the real
+`PowerManager` thermal sensor itself hasn't fired yet on the test device (revue technique point 34).
+A calibration-anomaly detector (`tracking/CalibrationAnomaly.kt` + `BlendshapeStability.kt`, pure
+and tested) tints the existing calibrate button red when the head pose seems to have drifted since
+the last calibration — sticky until the next explicit calibration, never automatic — confirmed
+working on device across all three tiers (revue technique point 19). A hidden debug-mock panel in
+`DiagnosticsScreen` (7-tap unlock on a version-number row, see `ui/DebugPanelUnlock.kt`) lets these
+hard-to-trigger-naturally paths (thermal throttling, ARCore unavailable, GPU delegate unavailable)
+be forced for testing — confirmed working on device (revue technique point 35).
 
 **Capture pipeline.** `camera/CameraController.kt` drives CameraX (front camera → `MPImage`), with a
 bitmap pool (`acquirePooledBitmap`) to avoid a per-frame allocation, frame-rate throttling against
