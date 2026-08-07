@@ -126,8 +126,10 @@ data class MainUiState(
  */
 data class TrackingFrame(
     val faceDetected: Boolean = false,
-    // Liste complète des 52 blendshapes -- filtrée par [MainUiState.selectedBlendshapeNames] pour
-    // l'affichage sur l'écran principal.
+    // Liste des blendshapes réellement produits par MediaPipe (peut exclure tongueOut, jamais
+    // restitué en pratique -- voir BlendshapeCatalog). MainScreen part de
+    // [MainUiState.selectedBlendshapeNames], pas de cette liste, pour construire l'affichage --
+    // un blendshape coché mais absent d'ici reste affiché figé à 0 plutôt que de disparaître.
     val allBlendshapes: List<BlendshapeScore> = emptyList(),
     val inferenceTimeMs: Long = 0,
     // Points du mesh facial (478, coordonnées normalisées) -- toujours peuplé (coût négligeable),

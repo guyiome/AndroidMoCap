@@ -7,9 +7,12 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -219,15 +222,26 @@ fun MainScreen(
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
-                val selectedBlendshapeValues = trackingFrame.allBlendshapes
-                    .filter { it.name in uiState.selectedBlendshapeNames }
-                    .sortedBy { it.name }
-                    .map { it.name to it.score }
+                // Construit la liste à PARTIR de la sélection, pas en filtrant allBlendshapes par
+                // la sélection -- sinon un blendshape coché mais jamais produit par MediaPipe
+                // (ex. tongueOut, voir BlendshapeCatalog.unreliable) disparaît purement et
+                // simplement du panneau au lieu d'y rester affiché figé à 0 (retour utilisateur du
+                // 7 août 2026 : "elle devrait quand même apparaître à l'écran de debug, sans
+                // bouger si on la coche").
+                val blendshapeScoresByName = trackingFrame.allBlendshapes.associate { it.name to it.score }
+                val selectedBlendshapeValues = uiState.selectedBlendshapeNames
+                    .sorted()
+                    .map { name -> name to (blendshapeScoresByName[name] ?: 0f) }
                 BlendshapePanel(
                     values = selectedBlendshapeValues,
                     panelRotationDegrees = panelRotationDegrees,
+                    // windowInsetsPadding AVANT le padding(16.dp) fixe : marge de sécurité
+                    // supplémentaire pour le résidu de débordement du pivot de rotation (voir kdoc
+                    // de BlendshapePanel) -- l'app n'a par ailleurs aucune gestion des insets
+                    // système nulle part (edge-to-edge de facto vu compileSdk/targetSdk 37).
                     modifier = Modifier
                         .align(Alignment.TopStart)
+                        .windowInsetsPadding(WindowInsets.safeDrawing)
                         .padding(16.dp),
                 )
             }
