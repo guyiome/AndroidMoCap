@@ -174,6 +174,37 @@ fun DiagnosticsScreen(
                 },
                 color = if (uiState.isCalibrated) Color(0xFF9FE7B0) else Color.White,
             )
+            // Débit réduit en cas de chauffe (voir MainViewModel.startThermalPolling) -- même
+            // signal que l'icône du HUD principal, disponible ici aussi pour qui préfère consulter
+            // les diagnostics plutôt que l'aperçu caméra.
+            Text(
+                if (uiState.isThermalThrottling) {
+                    stringResource(R.string.diagnostics_thermal_throttling_active)
+                } else {
+                    stringResource(R.string.diagnostics_thermal_throttling_inactive)
+                },
+                color = if (uiState.isThermalThrottling) Color(0xFFFFB74D) else Color.White,
+            )
+            // Signal purement informatif après une chauffe persistante -- jamais appliqué tout
+            // seul (voir ThermalThrottleState.downgradeSuggested) : renvoie au sélecteur de palier
+            // manuel ci-dessus, où la décision reste entièrement celle de l'utilisateur.
+            if (uiState.thermalDowngradeSuggested) {
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.WarningAmber,
+                        contentDescription = null,
+                        tint = Color(0xFFFFB74D),
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        stringResource(R.string.diagnostics_thermal_downgrade_suggestion),
+                        color = Color(0xFFFFB74D),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
         }
     }
 }

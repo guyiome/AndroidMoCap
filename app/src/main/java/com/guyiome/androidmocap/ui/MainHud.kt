@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -67,6 +68,20 @@ fun MainHud(
                 tint = if (faceDetected) Color(0xFF9FE7B0) else Color.White.copy(alpha = 0.4f),
                 modifier = Modifier.rotate(-iconRotationDegrees),
             )
+
+            // Débit réduit pour cause de chauffe (voir MainViewModel.startThermalPolling) --
+            // purement informatif, n'apparaît que le temps que la chauffe dure (remonte tout seul
+            // ensuite). Même couleur/icône que l'avertissement "risque de performance" du
+            // sélecteur de palier (DiagnosticsScreen) -- cohérence visuelle, même famille de signal.
+            if (uiState.isThermalThrottling) {
+                Spacer(Modifier.width(18.dp))
+                Icon(
+                    imageVector = Icons.Filled.WarningAmber,
+                    contentDescription = stringResource(R.string.cd_thermal_throttling),
+                    tint = Color(0xFFFFB74D),
+                    modifier = Modifier.rotate(-iconRotationDegrees),
+                )
+            }
             Spacer(Modifier.width(18.dp))
 
             // Connexion -- appuyer connecte/déconnecte selon le type choisi dans les réglages.

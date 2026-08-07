@@ -29,7 +29,9 @@ import com.guyiome.androidmocap.tracking.BlendshapeScore
 import com.guyiome.androidmocap.tracking.FaceLandmarkerHelper
 import com.guyiome.androidmocap.tracking.FaceTrackingResult
 import com.guyiome.androidmocap.tracking.RotationMath
+import com.guyiome.androidmocap.tracking.ThermalThrottleState
 import com.guyiome.androidmocap.tracking.TierConfig
+import com.guyiome.androidmocap.tracking.next
 import com.guyiome.androidmocap.tracking.TrackingTier
 import com.guyiome.androidmocap.tracking.TrackingTierSelector
 import kotlinx.coroutines.Dispatchers
@@ -115,6 +117,13 @@ data class MainUiState(
     // par défaut, comportement historique inchangé tant que l'utilisateur ne l'active pas
     // lui-même. Voir rapport technique, point 18.
     val persistBlendshapeSelectionEnabled: Boolean = false,
+    // Débit réduit en réponse à une chauffe détectée (voir ThermalThrottleState, startThermalPolling)
+    // -- non persisté, dérivé à l'exécution, remonte tout seul dès que la chauffe retombe.
+    val isThermalThrottling: Boolean = false,
+    // Devient vrai (et le reste pour le reste de la session) après une chauffe persistante -- signal
+    // purement informatif affiché en diagnostic, à côté du sélecteur de palier manuel : jamais
+    // appliqué automatiquement, rétrograder le palier reste un choix explicite de l'utilisateur.
+    val thermalDowngradeSuggested: Boolean = false,
     val errorMessage: String? = null,
 )
 
@@ -146,6 +155,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private companion object {
         private const val TAG = "MainViewModel"
+
+        // Cadence du sondage de throttling thermique (voir startThermalPolling) -- doit rester
+        // cohérente avec ThermalThrottleState.SUSTAINED_THROTTLE_TICKS (12 sondages consécutifs,
+        // soit environ une minute à ce rythme) : les deux constantes sont documentées séparément
+        // plutôt que couplées techniquement, pour garder ThermalThrottleState pure et testable en
+        // JVM sans dépendre d'un vrai délai d'exécution.
+        private const val THERMAL_POLL_INTERVAL_MS = 5000L
     }
 
     private val _uiState = MutableStateFlow(MainUiState())
@@ -189,6 +205,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Minuteur d'inactivité avant bascule automatique en mode éco -- annulé/reprogrammé à chaque
     // toucher de l'écran (voir onUserInteraction) et à chaque changement de réglage.
     private var powerSaveTimerJob: Job? = null
+    // Sondage périodique du throttling thermique (voir startThermalPolling), démarré/arrêté avec le
+    // cycle de vie comme deviceOrientationTracker/arCoreHeadPoseTracker ci-dessus.
+    private var thermalPollingJob: Job? = null
+    // Débit nominal du palier choisi (TierConfig.targetFps) -- mémorisé pour servir de référence à
+    // chaque sondage thermique (voir ThermalThrottleState.next), constant pour toute la session.
+    private var nominalTargetFps: Int = 0
+    private var thermalThrottleState = ThermalThrottleState.initial(nominalFps = 0)
     // Garde contre un double appel à initializeTracking() (ex. permission caméra révoquée puis
     // ré-accordée sans destruction de l'Activity) -- sans cette garde, un second appel recréait un
     // FaceLandmarkerHelper et un CameraController complets par-dessus les précédents, sans jamais
@@ -289,6 +312,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val capabilities = DeviceCapabilityDetector.detect(context)
         val tierOverride = appSettingsStore.tierOverride.first()
         val tierConfig = TrackingTierSelector.select(capabilities, tierOverride)
+        nominalTargetFps = tierConfig.targetFps
+        thermalThrottleState = ThermalThrottleState.initial(nominalFps = tierConfig.targetFps)
 
         _uiState.update {
             it.copy(
@@ -381,14 +406,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 Lifecycle.Event.ON_START -> {
                     tracker.start()
                     arCoreHeadPoseTracker?.start()
+                    startThermalPolling(context)
                 }
                 Lifecycle.Event.ON_STOP -> {
                     tracker.stop()
                     arCoreHeadPoseTracker?.stop()
+                    thermalPollingJob?.cancel()
                 }
                 else -> Unit
             }
         })
+    }
+
+    /**
+     * Sondage périodique du throttling thermique (voir [DeviceCapabilityDetector.isThermalThrottling])
+     * pendant que la capture est active -- réduit le débit cible en cas de chauffe
+     * ([ThermalThrottleState.next], remonte automatiquement dès qu'elle retombe), via les mêmes
+     * points d'entrée déjà prévus pour un ajustement à chaud (`CameraController`/
+     * `ArCoreHeadPoseTracker.setTargetFps`). Ne touche ni au délégué GPU/CPU ni à la source caméra
+     * -- décision explicite de ne pas reconstruire le pipeline caméra/MediaPipe à chaud, même
+     * principe que le sélecteur de palier manuel (voir TrackingTierSelector). Démarré/arrêté avec
+     * le cycle de vie (ON_START/ON_STOP), comme deviceOrientationTracker/arCoreHeadPoseTracker.
+     */
+    private fun startThermalPolling(context: Context) {
+        thermalPollingJob?.cancel()
+        thermalPollingJob = viewModelScope.launch {
+            while (true) {
+                delay(THERMAL_POLL_INTERVAL_MS)
+                val throttling = DeviceCapabilityDetector.isThermalThrottling(context)
+                thermalThrottleState = thermalThrottleState.next(nominalTargetFps, throttling)
+                cameraController?.setTargetFps(thermalThrottleState.currentFps)
+                arCoreHeadPoseTracker?.setTargetFps(thermalThrottleState.currentFps)
+                _uiState.update {
+                    it.copy(
+                        isThermalThrottling = thermalThrottleState.isThrottling,
+                        thermalDowngradeSuggested = thermalThrottleState.downgradeSuggested,
+                    )
+                }
+            }
+        }
     }
 
     private fun createCameraController(
@@ -703,5 +759,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         deviceOrientationTracker?.stop()
         calibrationCountdownJob?.cancel()
         powerSaveTimerJob?.cancel()
+        thermalPollingJob?.cancel()
     }
 }

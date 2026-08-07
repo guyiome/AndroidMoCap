@@ -71,6 +71,10 @@
     <string name="diagnostics_camera_source">Camera source: %1$s</string>
     <string name="diagnostics_camera_source_arcore">ARCore</string>
     <string name="diagnostics_camera_source_camerax">CameraX</string>
+    <string name="diagnostics_thermal_throttling_active">Thermal throttling: frame rate reduced</string>
+    <string name="diagnostics_thermal_throttling_inactive">Thermal throttling: none</string>
+    <string name="diagnostics_thermal_downgrade_suggestion">Sustained heat detected this session -- consider forcing a lower tier above</string>
+    <string name="cd_thermal_throttling">Frame rate reduced due to heat</string>
 
     <!-- Display & comfort screen -->
     <string name="display_settings_title">Display &amp; comfort</string>

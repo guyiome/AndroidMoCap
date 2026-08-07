@@ -69,6 +69,10 @@
     <string name="diagnostics_camera_source">Source caméra : %1$s</string>
     <string name="diagnostics_camera_source_arcore">ARCore</string>
     <string name="diagnostics_camera_source_camerax">CameraX</string>
+    <string name="diagnostics_thermal_throttling_active">Régulation thermique : débit réduit</string>
+    <string name="diagnostics_thermal_throttling_inactive">Régulation thermique : aucune</string>
+    <string name="diagnostics_thermal_downgrade_suggestion">Chauffe persistante détectée pendant cette session -- envisage de forcer un palier inférieur ci-dessus</string>
+    <string name="cd_thermal_throttling">Débit réduit pour cause de chauffe</string>
 
     <!-- Écran Affichage & confort -->
     <string name="display_settings_title">Affichage &amp; confort</string>
