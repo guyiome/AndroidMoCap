@@ -65,7 +65,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 28 | Fiabilisation du clignement des yeux avec lunettes | Idée de conception ouverte le 6 août 2026, voir section dédiée plus bas -- aucun code écrit |
 | 29 | Validation des traductions FR/EN par locuteurs natifs | Backlog, voir point 23 -- texte rédigé sans relecture native, ni le français ni l'anglais (repli par défaut) n'ont été validés |
 | 30 | Sélecteur de langue dans l'app pour Android 11/12 | Backlog, voir point 23 -- pas d'équivalent au sélecteur système Android 13+ sur ces versions, demanderait `androidx.appcompat` + `AppCompatDelegate` |
-| 31 | CI cassée depuis le premier run (`gradlew` sans bit exécutable), puis silencieusement bloquée depuis | **✅ corrigé le 6 août 2026** (commit `df640a4`) ; cause du blocage silencieux ensuite trouvée le 7 août (budget Actions à 0 $, "Stop usage" actif -- réglage GitHub, pas le dépôt), correctif en attente d'un moyen de paiement côté utilisateur, voir section dédiée plus bas |
+| 31 | CI cassée depuis le premier run (`gradlew` sans bit exécutable), puis silencieusement bloquée depuis | **✅ entièrement résolu le 7 août 2026** (commit `df640a4` pour `gradlew` ; cause du blocage silencieux trouvée le même jour -- budget Actions à 0 $, "Stop usage" actif -- corrigée et vérifiée par un run CI réussi), voir section dédiée plus bas |
 | 32 | Panneau de blendshapes du HUD : tongueOut disparaissait, noms masqués par le bandeau système | **✅ corrigés le 7 août 2026**, vérification visuelle device en attente pour le second, voir section dédiée plus bas |
 | 33 | Proposer l'installation ARCore au lieu du repli silencieux | Backlog, priorité mineure, idée ouverte le 7 août 2026, aucun code écrit |
 
@@ -929,10 +929,18 @@ jusqu'ici faute d'accès `gh` authentifié.
 
 Correctif : relever ce budget au-dessus de 0 $ (`Stop usage` conservé -- garde la garantie "jamais
 facturé", le seuil ne se déclenchera qu'en cas de dépassement réel des minutes gratuites) plutôt que
-le supprimer (ce qui rendrait l'usage réellement illimité, sans garde-fou). **En attente côté
-utilisateur** : GitHub exige un moyen de paiement enregistré avant de pouvoir modifier un budget,
-même pour le relever à un montant qui ne sera jamais facturé -- pas encore fait au moment de cette
-note.
+le supprimer (ce qui rendrait l'usage réellement illimité, sans garde-fou).
+
+**✅ Résolu (7 août 2026, même jour).** Moyen de paiement ajouté côté utilisateur (exigé par GitHub
+avant toute modification de budget), budget "Actions" relevé à 1,00 $ (`Stop usage` conservé).
+Vérifié en poussant les 9 commits locaux en attente (`1b0030a..8db6a9a`, sur demande explicite de
+l'utilisateur) : run `31169132739` déclenché normalement dans la minute, `build-and-test` ✅ réussi
+en 5m55s (`testDebugUnitTest assembleDebug` verts). La CI est de nouveau pleinement fonctionnelle.
+
+Deux annotations mineures relevées sur ce run, sans rapport avec ce point, notées pour plus tard :
+`actions/checkout@v4`/`actions/setup-java@v4` tournent sur un Node.js 20 déprécié (forcé en Node 24
+par GitHub), et `setup-java@v4` est lui-même déprécié au profit de `v5` -- simples mises à jour de
+versions d'actions dans `ci.yml`, aucune urgence.
 
 ### 32. Panneau de blendshapes du HUD : deux bugs remontés par test device -- ✅ corrigés, vérification visuelle en attente
 
