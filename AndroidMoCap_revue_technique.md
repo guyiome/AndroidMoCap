@@ -296,7 +296,9 @@ Risques restants après cette série de correctifs (mise à jour de la liste ci-
   branché -- toujours pertinent pour une session longue.
 - Nouveau point mineur : `yuv420ToBitmap()` alloue toujours un `Bitmap` par frame (pas de pool de
   réutilisation) -- non prioritaire vu le gain déjà obtenu par le déport de thread, à reconsidérer
-  seulement si un nouveau signal de coût apparaît.
+  seulement si un nouveau signal de coût apparaît. **Mise à jour (7 août 2026)** : la copie des
+  plans YUV elle-même (pas l'allocation du `Bitmap`) a été optimisée -- voir plus bas, "deux
+  optimisations mineures".
 
 **Suivi device (6 août 2026, même jour, suite) : palier forçable manuellement, pour diagnostiquer
 sans second appareil.** L'utilisateur n'a pas d'appareil qui qualifie naturellement pour `STANDARD`
@@ -342,6 +344,25 @@ d'abord, correctifs appliqués sur demande séparée le lendemain) :
 
 Aucun des deux n'a de conséquence visible en usage normal (fuites mineures, pas de crash) --
 trouvés par relecture de code, pas par un symptôme observé sur device.
+
+**Deux optimisations mineures de la même relecture, appliquées le même jour** (commit `de01fba`,
+sur confirmation explicite de l'utilisateur) :
+3. `yuv420ToBitmap()` copiait chaque plan YUV octet par octet via `ByteBuffer.get(index)` (accès
+   virtuel par appel). Remplacé par une copie en bloc de chaque plan dans un `ByteArray` (nouvelle
+   extension `ByteBuffer.toByteArray()`) suivie d'un accès indexé direct -- même formule de
+   conversion BT.601, juste moins d'overhead par pixel. Le pool de `Bitmap` (déjà noté comme piste
+   possible ci-dessus) reste volontairement laissé de côté : refonte plus large (réintroduirait un
+   suivi de libération façon `inFlightImages`, supprimé plus haut) avec un risque de correction plus
+   élevé, sans gain mesuré sur device pour le justifier.
+4. `rotateBitmap()` passait `null` comme `Paint` à `Canvas.drawBitmap` -- incohérent avec
+   `CameraController.rotationPaint`, qui fixe explicitement `isFilterBitmap = false` (aucun intérêt
+   à lisser une rotation par multiples de 90°). Ajout du même champ ici par cohérence ; comportement
+   fonctionnel inchangé (`null` équivaut déjà à un filtrage désactivé côté `Canvas`), correctif
+   cosmétique.
+
+`./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL`. Non vérifié sur device (aucun
+device dans ce sandbox) -- gain de perf non mesuré, cohérent avec le reste des optimisations de
+cette session qui restent "prêtes pour test device" plutôt que "validées".
 
 ### 14. Vérification de mise à jour semi-automatique -- à faire (backlog)
 
