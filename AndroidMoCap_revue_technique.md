@@ -59,7 +59,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 16 | Détection joues (cascade allégée) | Conception actée, aucun code écrit. **Confirmé par observation device le 6 août 2026** : le mesh bouge très peu au gonflement des joues -- le signal géométrique disponible pour une cascade risque d'être faible/bruité, point d'attention à garder pour la conception détaillée. |
 | 17 | Indicateur de fiabilité par blendshape | **Implémenté sur `main`, voir point 24** (l'index le disait encore "aucun code écrit" par erreur) |
 | 18 | Persistance sélection blendshapes + valeur brute/ajustée | **Persistance implémentée sur `main`, voir point 25** -- le volet "valeur brute à côté de la valeur ajustée" reste en attente (dépend d'une pondération par blendshape jamais construite) |
-| 19 | Détection d'anomalie de calibrage (bouton rouge) | **✅ implémenté le 7 août 2026**, voir section dédiée -- seuils non calés sur device, vérification en attente |
+| 19 | Détection d'anomalie de calibrage (bouton rouge) | **✅ implémenté et vérifié sur device le 7 août 2026** (tous paliers testés), voir section dédiée -- seuils encore non calés sur un corpus d'usage réel, piste de retours utilisateurs notée pour plus tard |
 | 20 | Orientation grand écran / tablette | Constat documenté, aucune décision de mise en œuvre |
 | 21 | Tri en sous-écrans des réglages | **Implémenté sur `main`, voir point 26** (l'index le disait encore "aucun code écrit" par erreur) |
 | 28 | Fiabilisation du clignement des yeux avec lunettes | Idée de conception ouverte le 6 août 2026, voir section dédiée plus bas -- aucun code écrit |
@@ -870,14 +870,20 @@ disponible), même traitement que `SUSTAINED_THROTTLE_TICKS` au point 34 :
   assumé, jamais mesuré.
 - `MIN_FACE_LOSS_FRAMES_FOR_REACQUISITION = 3`.
 
-`./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL`, 17 nouveaux tests verts. **Aucun
-device dans ce sandbox** -- en particulier non vérifiés : si les seuils séparent vraiment "au repos"
-de "expression tenue" sur de vraies sorties MediaPipe, si `SUSTAINED_DRIFT_FRAMES` se ressent bien en
-temps réel selon le palier, si le rouge est lisible sur fond HUD semi-transparent, et le risque de
-clignotement rouge/blanc déjà évoqué dans la conception d'origine -- a priori exclu par le design
-sticky (le signal ne peut que passer de faux à vrai, jamais osciller), à confirmer en usage réel.
-Scénario de test device : bouger physiquement le téléphone en cours de session, observer le bouton
-passer au rouge ; recalibrer, observer qu'il redevient blanc.
+`./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL`, 17 nouveaux tests verts.
+
+**✅ Confirmé sur device (7 août 2026, même jour)** : fonctionnel sur les différents paliers de
+performance testés par l'utilisateur (COMPATIBLE/STANDARD/OPTIMAL) -- le bouton réagit bien à une
+dérive physique et redevient blanc après recalibrage, pas de clignotement rouge/blanc observé
+(cohérent avec l'exclusion attendue du design sticky).
+
+**Piste ouverte, notée pour plus tard** : les seuils (`REST_VARIANCE_THRESHOLD`,
+`DRIFT_POSE_THRESHOLD_DEGREES`, `SUSTAINED_DRIFT_FRAMES`, `MIN_FACE_LOSS_FRAMES_FOR_REACQUISITION`)
+restent des estimations raisonnées, jamais calées sur un vrai corpus d'usage -- l'utilisateur
+suggère qu'il sera probablement pertinent de collecter des retours utilisateurs réels (faux
+positifs/négatifs perçus en usage prolongé, sur différents appareils/paliers) pour affiner ces
+seuils plutôt que de deviner davantage depuis un seul appareil de test. Aucune décision de mise en
+œuvre (pas de mécanisme de collecte envisagé pour l'instant, juste l'idée à garder en tête).
 
 ### 20. Écrans de réglages non adaptatifs -- et un verrouillage portrait déjà ignoré par le système sur grand écran
 
