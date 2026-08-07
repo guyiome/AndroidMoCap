@@ -50,6 +50,12 @@ blendshapes (`BlendshapeScore`), matrice/angles de rotation de tête, angles de 
 (calculés en fonction pure, `computeEyeGazeDegrees`, testable en JVM), et le mesh de 478 points
 (extrait uniquement si un overlay en a besoin -- voir `setLandmarksNeeded`, coût évité sinon).
 
+Le bouton de calibrage (`MainHud`) se teinte en rouge si une dérive de la pose calibrée est détectée
+(visage au repos mais pose qui ne revient pas près de zéro, ou perte de détection du visage puis
+redétection) -- purement informatif, jamais d'action automatique, se résout uniquement par un
+nouveau calibrage explicite. Logique pure et testée en JVM :
+`tracking/CalibrationAnomaly.kt`/`BlendshapeStability.kt`. Voir revue technique, point 19.
+
 ## 3. Sélection de palier (`TrackingTier`)
 
 `DeviceCapabilityDetector.detect()` établit une photo des capacités de l'appareil (support ARCore,

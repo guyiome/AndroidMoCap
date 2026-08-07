@@ -59,7 +59,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 16 | Détection joues (cascade allégée) | Conception actée, aucun code écrit. **Confirmé par observation device le 6 août 2026** : le mesh bouge très peu au gonflement des joues -- le signal géométrique disponible pour une cascade risque d'être faible/bruité, point d'attention à garder pour la conception détaillée. |
 | 17 | Indicateur de fiabilité par blendshape | **Implémenté sur `main`, voir point 24** (l'index le disait encore "aucun code écrit" par erreur) |
 | 18 | Persistance sélection blendshapes + valeur brute/ajustée | **Persistance implémentée sur `main`, voir point 25** -- le volet "valeur brute à côté de la valeur ajustée" reste en attente (dépend d'une pondération par blendshape jamais construite) |
-| 19 | Détection d'anomalie de calibrage (bouton rouge) | Conception actée, aucun code écrit |
+| 19 | Détection d'anomalie de calibrage (bouton rouge) | **✅ implémenté le 7 août 2026**, voir section dédiée -- seuils non calés sur device, vérification en attente |
 | 20 | Orientation grand écran / tablette | Constat documenté, aucune décision de mise en œuvre |
 | 21 | Tri en sous-écrans des réglages | **Implémenté sur `main`, voir point 26** (l'index le disait encore "aucun code écrit" par erreur) |
 | 28 | Fiabilisation du clignement des yeux avec lunettes | Idée de conception ouverte le 6 août 2026, voir section dédiée plus bas -- aucun code écrit |
@@ -809,7 +809,7 @@ traiter comme un objectif de conception à part entière et pas comme un détail
 
 Statut : idée de conception actée suite à discussion, aucun code écrit.
 
-### 19. Détection d'anomalie de calibrage -- alerte discrète, jamais d'action automatique
+### 19. Détection d'anomalie de calibrage -- ✅ implémentée le 7 août 2026, vérification device en attente
 
 Suite à la discussion sur une éventuelle relance automatique de calibrage : écarté sous cette forme,
 risque réel de se déclencher en pleine expression tenue volontairement (effet comique, surprise jouée
@@ -836,7 +836,48 @@ de popup ; se résout de lui-même dès que l'utilisateur appuie pour recalibrer
 explicite : le seuil/la durée d'observation doivent être réglés pour éviter un clignotement
 rouge/blanc si la mesure oscille près de la limite -- sans quoi le signal cesse d'être discret.
 
-Statut : idée de conception actée suite à discussion, aucun code écrit.
+**Implémentation (7 août 2026), après une passe de réduction de backlog** (points 13/29) où le
+gisement de vrais quick-wins s'est tari -- basculement sur cette feature, la seule des deux
+candidates restantes (avec le point 28) dont la conception était réellement actée.
+
+`tracking/CalibrationAnomaly.kt` (nouveau) : `CalibrationAnomalyState` (`flagged`,
+`consecutiveRestDriftFrames`, `consecutiveMissingFaceFrames`) + `next(isAtRest, poseMagnitudeDegrees,
+faceDetected)`, pure et testée en JVM (10 tests, `CalibrationAnomalyTest.kt`) -- même famille que
+`ThermalThrottleState`. `flagged` est **sticky** : ne redevient jamais faux tout seul, remis à zéro
+uniquement par `MainViewModel.performCalibration()`. La redétection de visage (signal complémentaire)
+court-circuite le critère principal (n'a pas besoin d'être "au repos") mais exige une perte d'au
+moins `MIN_FACE_LOSS_FRAMES_FOR_REACQUISITION = 3` frames consécutives avant de compter, pour ignorer
+une frame MediaPipe isolée ratée. `tracking/BlendshapeStability.kt` (nouveau) :
+`meanAbsoluteBlendshapeDelta()` (delta absolu moyen entre deux jeux de blendshapes appariés par nom,
+7 tests, `BlendshapeStabilityTest.kt`) fournit le signal "au repos".
+
+Câblage dans `MainViewModel.handleTrackingResult()` : les 3 signaux (variance blendshapes, magnitude
+de la pose calibrée déjà calculée, `faceDetected`) sont calculés à chaque frame, mais `_uiState`
+n'est mis à jour que si `flagged` change réellement (même discipline hot/cold que le reste du
+fichier, pas de recomposition à 20-60 Hz). `MainHud.kt` : le bouton de calibrage
+(`Icons.Filled.CenterFocusStrong`, teinte codée en dur en blanc jusqu'ici) devient rouge
+(`0xFFFF8080`, même couleur que les messages d'erreur de `SettingsScreen.kt:114`, précédent déjà cité
+dans la conception d'origine) tant que l'anomalie est signalée -- suspendu pendant le compte à
+rebours de calibrage (rouge + anneau simultanés serait confus).
+
+Constantes -- toutes des estimations raisonnées, non calées sur device (aucune télémétrie
+disponible), même traitement que `SUSTAINED_THROTTLE_TICKS` au point 34 :
+- `REST_VARIANCE_THRESHOLD = 0.01f` -- delta moyen sur ~50 blendshapes, lisse largement le bruit
+  MediaPipe par blendshape isolée.
+- `DRIFT_POSE_THRESHOLD_DEGREES = 8f` -- au-dessus du bruit résiduel habituel d'une calibration.
+- `SUSTAINED_DRIFT_FRAMES = 90` -- calé sur ~30 fps (palier STANDARD), soit ~3s d'immobilité
+  persistante ; se traduit en ~1.5s sur OPTIMAL (60 fps) et ~4.5s sur COMPATIBLE (20 fps), écart
+  assumé, jamais mesuré.
+- `MIN_FACE_LOSS_FRAMES_FOR_REACQUISITION = 3`.
+
+`./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL`, 17 nouveaux tests verts. **Aucun
+device dans ce sandbox** -- en particulier non vérifiés : si les seuils séparent vraiment "au repos"
+de "expression tenue" sur de vraies sorties MediaPipe, si `SUSTAINED_DRIFT_FRAMES` se ressent bien en
+temps réel selon le palier, si le rouge est lisible sur fond HUD semi-transparent, et le risque de
+clignotement rouge/blanc déjà évoqué dans la conception d'origine -- a priori exclu par le design
+sticky (le signal ne peut que passer de faux à vrai, jamais osciller), à confirmer en usage réel.
+Scénario de test device : bouger physiquement le téléphone en cours de session, observer le bouton
+passer au rouge ; recalibrer, observer qu'il redevient blanc.
 
 ### 20. Écrans de réglages non adaptatifs -- et un verrouillage portrait déjà ignoré par le système sur grand écran
 
