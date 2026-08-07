@@ -327,6 +327,22 @@ icône d'avertissement ambre à côté du nom si risque de performance seulement
 que l'avertissement des blendshapes peu fiables (`BlendshapeSelectionScreen`), cohérence visuelle
 avec le reste de l'app plutôt qu'un nouveau langage visuel.
 
+**Relecture globale post-intégration (7 août 2026), deux fuites de ressource corrigées** (commit
+`c466d5b`), remontées par une relecture demandée explicitement, sans device (identification
+d'abord, correctifs appliqués sur demande séparée le lendemain) :
+1. `MainViewModel` : le repli `onUnavailable` (ARCore indisponible) remplaçait
+   `arCoreHeadPoseTracker` par `null` sans jamais appeler `.close()` sur l'instance abandonnée --
+   son `imageProcessingExecutor` (thread dédié créé dès la construction, avant même `start()`)
+   tournait à vide pour le reste de la session. Corrigé : `.close()` avant de nuller.
+2. `ArCoreHeadPoseTracker.tryCreateSession()` : seul le chemin "pas de config caméra frontale"
+   fermait explicitement la `Session` en cas d'échec -- si `getSupportedCameraConfigs`/
+   `setCameraConfig`/`configure()` levait une exception après `Session(context)`, le `catch`
+   générique retournait `null` sans jamais fermer la session, fuite de ressource native ARCore.
+   Corrigé : session hissée hors du `try` pour être fermée dans ce cas.
+
+Aucun des deux n'a de conséquence visible en usage normal (fuites mineures, pas de crash) --
+trouvés par relecture de code, pas par un symptôme observé sur device.
+
 ### 14. Vérification de mise à jour semi-automatique -- à faire (backlog)
 
 Discuté suite au point 12 (distribution GitHub Releases) : pas de mise à jour automatique possible
