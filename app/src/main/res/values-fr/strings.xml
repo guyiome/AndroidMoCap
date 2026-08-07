@@ -4,6 +4,7 @@
     <!-- Commun à plusieurs écrans -->
     <string name="cd_back">Retour</string>
     <string name="action_stop">Stop</string>
+    <string name="action_reset">Réinitialiser</string>
     <string name="placeholder_unknown">…</string>
     <string name="bool_yes">oui</string>
     <string name="bool_no">non</string>
@@ -72,6 +73,20 @@
     <string name="diagnostics_thermal_throttling_active">Régulation thermique : débit réduit</string>
     <string name="diagnostics_thermal_throttling_inactive">Régulation thermique : aucune</string>
     <string name="diagnostics_thermal_downgrade_suggestion">Chauffe persistante détectée pendant cette session -- envisage de forcer un palier inférieur ci-dessus</string>
+    <string name="diagnostics_app_version">Version de l\'app : %1$s</string>
+    <string name="diagnostics_debug_taps_remaining">%1$d appuis pour déverrouiller les mocks de debug</string>
+    <string name="diagnostics_debug_section_title">Mocks de debug (développeur uniquement)</string>
+    <string name="diagnostics_debug_section_hint">Pour exercer des chemins de code que cet appareil ne peut pas déclencher naturellement. Ne pas laisser actif.</string>
+    <string name="diagnostics_debug_arcore_unavailable_label">Forcer ARCore indisponible</string>
+    <string name="diagnostics_debug_gpu_unavailable_label">Forcer le délégué GPU indisponible</string>
+    <string name="diagnostics_debug_override_off">Normal</string>
+    <string name="diagnostics_debug_override_on">Forcé indisponible</string>
+    <string name="diagnostics_debug_relaunch_hint">S\'applique après un redémarrage complet de l\'app</string>
+    <string name="diagnostics_debug_thermal_label">Forcer la régulation thermique (en direct, sans redémarrage)</string>
+    <string name="diagnostics_debug_thermal_forced_active">Forcer actif</string>
+    <string name="diagnostics_debug_thermal_forced_inactive">Forcer inactif</string>
+    <string name="diagnostics_debug_reset_all">Réinitialiser tous les mocks de debug</string>
+    <string name="diagnostics_debug_override_active_warning">Un mock de debug est actif -- ne reflète pas forcément le comportement réel de l\'appareil</string>
     <string name="cd_thermal_throttling">Débit réduit pour cause de chauffe</string>
 
     <!-- Écran Affichage & confort -->

@@ -2,6 +2,7 @@ package com.guyiome.androidmocap.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,20 +14,28 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.guyiome.androidmocap.BuildConfig
 import com.guyiome.androidmocap.R
 import com.guyiome.androidmocap.tracking.TierCompatibility
 import com.guyiome.androidmocap.tracking.TrackingTier
@@ -35,10 +44,20 @@ import com.guyiome.androidmocap.tracking.TrackingTierSelector
 /**
  * Diagnostics -- une des quatre catégories de [SettingsScreen] (voir rapport technique, point 21).
  * Très majoritairement en lecture seule (palier de tracking, délégué, détection, latence,
- * calibration), à l'exception du forçage de palier ([onSetTierOverride]) -- outil de diagnostic,
- * pas une fonctionnalité utilisateur normale (voir sa doc). Reçoit l'état chaud
- * ([faceDetected]/[inferenceTimeMs], issus de [MainViewModel.trackingFrame]) séparément de
- * [uiState], même séparation froid/chaud que partout ailleurs dans l'app.
+ * calibration), à l'exception du forçage de palier ([onSetTierOverride]) et du panneau de mocks de
+ * debug caché ci-dessous -- outils de diagnostic, pas des fonctionnalités utilisateur normales.
+ * Reçoit l'état chaud ([faceDetected]/[inferenceTimeMs], issus de [MainViewModel.trackingFrame])
+ * séparément de [uiState], même séparation froid/chaud que partout ailleurs dans l'app.
+ *
+ * **Panneau de mocks de debug** (voir revue technique, point 35) : révélé en tapant
+ * [DEBUG_PANEL_UNLOCK_TAP_COUNT] fois sur la ligne "Version de l'app" en bas de l'écran, même
+ * principe que le menu développeur Android. Permet de mocker trois comportements difficiles à
+ * déclencher naturellement sur un appareil donné (chauffe, ARCore, délégué GPU) -- voir
+ * [onSetDebugThermalOverride]/[onSetDebugForceArCoreUnavailable]/[onSetDebugForceGpuUnavailable].
+ * Le bandeau d'avertissement piloté par [onResetDebugOverrides] reste volontairement visible même
+ * sans déverrouiller le panneau : un mock persistant resté actif par erreur (ARCore/GPU forcés,
+ * survivent à un redémarrage -- voir leur doc côté `AppSettingsStore`) doit rester réparable sans
+ * avoir à refaire le geste.
  */
 @Composable
 fun DiagnosticsScreen(
@@ -47,14 +66,29 @@ fun DiagnosticsScreen(
     inferenceTimeMs: Long,
     onClose: () -> Unit,
     onSetTierOverride: (TrackingTier?) -> Unit,
+    onSetDebugForceArCoreUnavailable: (Boolean) -> Unit,
+    onSetDebugForceGpuUnavailable: (Boolean) -> Unit,
+    onSetDebugThermalOverride: (Boolean?) -> Unit,
+    onResetDebugOverrides: () -> Unit,
 ) {
     BackHandler(onBack = onClose)
+    // État local, volontairement non hoisté au ViewModel/persisté -- voir kdoc de DebugPanelUnlockState.
+    var debugUnlock by remember { mutableStateOf(DebugPanelUnlockState()) }
+    val anyDebugOverrideActive = uiState.debugForceArCoreUnavailable ||
+        uiState.debugForceGpuUnavailable ||
+        uiState.debugThermalOverride != null
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.92f))
     ) {
-        Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(R.string.diagnostics_title),
@@ -69,6 +103,30 @@ fun DiagnosticsScreen(
                         tint = Color.White,
                         modifier = Modifier.size(28.dp),
                     )
+                }
+            }
+
+            // Toujours visible (pas gaté par debugUnlock.unlocked) : un mock persistant resté actif
+            // par erreur doit rester réparable même si le geste de déverrouillage est oublié.
+            if (anyDebugOverrideActive) {
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.WarningAmber,
+                        contentDescription = null,
+                        tint = Color(0xFFEF5350),
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        stringResource(R.string.diagnostics_debug_override_active_warning),
+                        color = Color(0xFFEF5350),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = onResetDebugOverrides) {
+                        Text(stringResource(R.string.action_reset))
+                    }
                 }
             }
 
@@ -204,6 +262,125 @@ fun DiagnosticsScreen(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
+            }
+
+            Spacer(Modifier.height(24.dp))
+            // Cible du déverrouillage du panneau de mocks de debug -- voir kdoc de la fonction.
+            Text(
+                stringResource(R.string.diagnostics_app_version, BuildConfig.VERSION_NAME),
+                color = Color.White.copy(alpha = 0.4f),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.clickable {
+                    debugUnlock = debugUnlock.registerTap(System.currentTimeMillis())
+                },
+            )
+
+            if (debugUnlock.unlocked) {
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    stringResource(R.string.diagnostics_debug_section_title),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    stringResource(R.string.diagnostics_debug_section_hint),
+                    color = Color.White.copy(alpha = 0.6f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+
+                // Mock ARCore indisponible -- persisté, s'applique au prochain lancement.
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    stringResource(R.string.diagnostics_debug_arcore_unavailable_label),
+                    color = Color.White.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Row(modifier = Modifier.padding(top = 4.dp)) {
+                    FilterChip(
+                        selected = !uiState.debugForceArCoreUnavailable,
+                        onClick = { onSetDebugForceArCoreUnavailable(false) },
+                        label = { Text(stringResource(R.string.diagnostics_debug_override_off)) },
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    FilterChip(
+                        selected = uiState.debugForceArCoreUnavailable,
+                        onClick = { onSetDebugForceArCoreUnavailable(true) },
+                        label = { Text(stringResource(R.string.diagnostics_debug_override_on)) },
+                    )
+                }
+                Text(
+                    stringResource(R.string.diagnostics_debug_relaunch_hint),
+                    color = Color.White.copy(alpha = 0.5f),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+
+                // Mock délégué GPU indisponible -- même forme, même contrainte de relance.
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    stringResource(R.string.diagnostics_debug_gpu_unavailable_label),
+                    color = Color.White.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Row(modifier = Modifier.padding(top = 4.dp)) {
+                    FilterChip(
+                        selected = !uiState.debugForceGpuUnavailable,
+                        onClick = { onSetDebugForceGpuUnavailable(false) },
+                        label = { Text(stringResource(R.string.diagnostics_debug_override_off)) },
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    FilterChip(
+                        selected = uiState.debugForceGpuUnavailable,
+                        onClick = { onSetDebugForceGpuUnavailable(true) },
+                        label = { Text(stringResource(R.string.diagnostics_debug_override_on)) },
+                    )
+                }
+                Text(
+                    stringResource(R.string.diagnostics_debug_relaunch_hint),
+                    color = Color.White.copy(alpha = 0.5f),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+
+                // Mock thermique -- session-only, effet immédiat, pas de redémarrage requis.
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    stringResource(R.string.diagnostics_debug_thermal_label),
+                    color = Color.White.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Row(modifier = Modifier.padding(top = 4.dp)) {
+                    FilterChip(
+                        selected = uiState.debugThermalOverride == null,
+                        onClick = { onSetDebugThermalOverride(null) },
+                        label = { Text(stringResource(R.string.diagnostics_tier_override_auto)) },
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    FilterChip(
+                        selected = uiState.debugThermalOverride == true,
+                        onClick = { onSetDebugThermalOverride(true) },
+                        label = { Text(stringResource(R.string.diagnostics_debug_thermal_forced_active)) },
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    FilterChip(
+                        selected = uiState.debugThermalOverride == false,
+                        onClick = { onSetDebugThermalOverride(false) },
+                        label = { Text(stringResource(R.string.diagnostics_debug_thermal_forced_inactive)) },
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+                Button(onClick = onResetDebugOverrides) {
+                    Text(stringResource(R.string.diagnostics_debug_reset_all))
+                }
+            } else if (debugUnlock.tapCount > 0) {
+                // Retour identique à la convention Android "numéro de build" -- confirme que les
+                // appuis sont bien comptés, sans révéler le panneau avant le dernier appui.
+                Text(
+                    stringResource(R.string.diagnostics_debug_taps_remaining, debugUnlock.remainingTaps),
+                    color = Color.White.copy(alpha = 0.5f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
     }

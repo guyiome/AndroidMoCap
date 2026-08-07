@@ -274,6 +274,10 @@ fun MainScreen(
                     inferenceTimeMs = trackingFrame.inferenceTimeMs,
                     onClose = { showDiagnostics = false },
                     onSetTierOverride = { tier -> viewModel.setTierOverride(tier) },
+                    onSetDebugForceArCoreUnavailable = { enabled -> viewModel.setDebugForceArCoreUnavailable(enabled) },
+                    onSetDebugForceGpuUnavailable = { enabled -> viewModel.setDebugForceGpuUnavailable(enabled) },
+                    onSetDebugThermalOverride = { override -> viewModel.setDebugThermalOverride(override) },
+                    onResetDebugOverrides = { viewModel.resetDebugOverrides() },
                 )
             }
 

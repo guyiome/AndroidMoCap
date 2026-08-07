@@ -21,6 +21,12 @@ import com.guyiome.androidmocap.R
 class FaceLandmarkerHelper(
     private val context: Context,
     private val tierConfig: TierConfig,
+    /**
+     * Mock de debug (panneau caché de `DiagnosticsScreen`, voir `AppSettingsStore.debugForceGpuUnavailable`
+     * et revue technique point 35) : force le repli CPU même si [TierConfig.preferGpuDelegate] est
+     * vrai -- réutilise le chemin de repli CPU déjà existant dans [setup] sans le modifier.
+     */
+    private val forceGpuUnavailable: Boolean = false,
     private val onResult: (FaceTrackingResult) -> Unit,
     /**
      * Appelé une fois qu'un frame donné a été entièrement traité (résultat reçu ou non), avec le
@@ -82,7 +88,7 @@ class FaceLandmarkerHelper(
     }
 
     fun setup() {
-        if (tierConfig.preferGpuDelegate) {
+        if (tierConfig.preferGpuDelegate && !forceGpuUnavailable) {
             val gpuOk = tryCreateLandmarker(Delegate.GPU)
             if (gpuOk) {
                 activeDelegateIsGpu = true

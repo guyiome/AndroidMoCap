@@ -124,6 +124,20 @@ data class MainUiState(
     // purement informatif affiché en diagnostic, à côté du sélecteur de palier manuel : jamais
     // appliqué automatiquement, rétrograder le palier reste un choix explicite de l'utilisateur.
     val thermalDowngradeSuggested: Boolean = false,
+    // Mocks de debug (panneau caché de DiagnosticsScreen, voir revue technique point 35) --
+    // permettent d'exercer des chemins de code qu'un appareil de test donné (ex. haut de gamme,
+    // thermiquement irréprochable) ne peut pas naturellement déclencher.
+    //
+    // Persistés (comme tierOverride), lus une seule fois au lancement (initializeTracking) : leur
+    // effet ne s'applique qu'au prochain redémarrage complet de l'app, le pipeline caméra/MediaPipe
+    // n'étant jamais reconstruit à chaud.
+    val debugForceArCoreUnavailable: Boolean = false,
+    val debugForceGpuUnavailable: Boolean = false,
+    // Mock thermique : tri-état (null = capteur réel/automatique, true = forcer throttling, false =
+    // forcer non-throttling) -- lu à chaque sondage (startThermalPolling), effet immédiat.
+    // Volontairement NON persisté (absent d'AppSettingsStore) : bascule de session active, pas un
+    // réglage de lancement -- repart toujours à null (automatique) au prochain démarrage de l'app.
+    val debugThermalOverride: Boolean? = null,
     val errorMessage: String? = null,
 )
 
@@ -284,6 +298,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         viewModelScope.launch {
+            // Même logique que tierOverride ci-dessus -- collecté en continu pour l'affichage
+            // Diagnostics, appliqué au pipeline seulement au prochain lancement (voir
+            // initializeTracking, first()).
+            appSettingsStore.debugForceArCoreUnavailable.collect { forced ->
+                _uiState.update { it.copy(debugForceArCoreUnavailable = forced) }
+            }
+        }
+        viewModelScope.launch {
+            appSettingsStore.debugForceGpuUnavailable.collect { forced ->
+                _uiState.update { it.copy(debugForceGpuUnavailable = forced) }
+            }
+        }
+        viewModelScope.launch {
             // Chargée une seule fois au lancement (first(), pas collect en continu comme les
             // collecteurs ci-dessus) : contrairement à un simple réglage on/off, réappliquer cette
             // valeur à chaque émission du Flow écraserait la sélection en cours dès que
@@ -311,6 +338,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val context = getApplication<Application>()
         val capabilities = DeviceCapabilityDetector.detect(context)
         val tierOverride = appSettingsStore.tierOverride.first()
+        // Mocks de debug (voir MainUiState.debugForceArCoreUnavailable/debugForceGpuUnavailable,
+        // AppSettingsStore, DiagnosticsScreen) -- lus une seule fois ici, même contrainte que
+        // tierOverride : pas de reconstruction à chaud du pipeline caméra/MediaPipe.
+        val debugForceArCoreUnavailable = appSettingsStore.debugForceArCoreUnavailable.first()
+        val debugForceGpuUnavailable = appSettingsStore.debugForceGpuUnavailable.first()
         val tierConfig = TrackingTierSelector.select(capabilities, tierOverride)
         nominalTargetFps = tierConfig.targetFps
         thermalThrottleState = ThermalThrottleState.initial(nominalFps = tierConfig.targetFps)
@@ -326,6 +358,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val helper = FaceLandmarkerHelper(
             context = context,
             tierConfig = tierConfig,
+            forceGpuUnavailable = debugForceGpuUnavailable,
             onResult = ::handleTrackingResult,
             // Signal de "frame terminé" (par timestamp, pas par objet MPImage -- voir le
             // commentaire sur FaceLandmarkerHelper.onFrameProcessed) -- permet à la source caméra
@@ -352,7 +385,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // caméra (voir revue technique, point 13). Sinon (STANDARD/COMPATIBLE, ou repli), CameraX
         // comme avant. ArCoreHeadPoseTracker continue de nourrir MediaPipe (blendshapes) via le
         // même detectAsync que CameraController -- rien ne change côté FaceLandmarkerHelper.
-        if (tierConfig.useArCorePose) {
+        if (tierConfig.useArCorePose && !debugForceArCoreUnavailable) {
             val arCoreTracker = ArCoreHeadPoseTracker(
                 context = context,
                 onFrame = { image, timestampMs -> faceLandmarkerHelper?.detectAsync(image, timestampMs) },
@@ -390,6 +423,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // est encore dans initializeTracking(), plutôt que de découvrir le repli plus tard.
             arCoreTracker.start()
         } else {
+            if (tierConfig.useArCorePose && debugForceArCoreUnavailable) {
+                Log.w(TAG, "Mock de debug : ARCore forcé indisponible, repli CameraX simulé.")
+            }
             cameraController = createCameraController(context, lifecycleOwner, tierConfig)
         }
 
@@ -433,7 +469,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         thermalPollingJob = viewModelScope.launch {
             while (true) {
                 delay(THERMAL_POLL_INTERVAL_MS)
-                val throttling = DeviceCapabilityDetector.isThermalThrottling(context)
+                // Mock de debug (voir MainUiState.debugThermalOverride, DiagnosticsScreen) : lu en
+                // direct à chaque sondage, prioritaire sur le capteur réel tant qu'il est non-null.
+                val throttling = _uiState.value.debugThermalOverride
+                    ?: DeviceCapabilityDetector.isThermalThrottling(context)
                 thermalThrottleState = thermalThrottleState.next(nominalTargetFps, throttling)
                 cameraController?.setTargetFps(thermalThrottleState.currentFps)
                 arCoreHeadPoseTracker?.setTargetFps(thermalThrottleState.currentFps)
@@ -618,6 +657,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun setTierOverride(tier: TrackingTier?) {
         viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setTierOverride(tier) }
+    }
+
+    // --- Mocks de debug (panneau caché de DiagnosticsScreen, voir revue technique point 35) ---
+
+    /**
+     * Mock de debug : force le repli CameraX au palier OPTIMAL même si ARCore est supporté --
+     * persisté, ne s'applique qu'au prochain lancement (voir MainUiState.debugForceArCoreUnavailable).
+     */
+    fun setDebugForceArCoreUnavailable(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setDebugForceArCoreUnavailable(enabled) }
+    }
+
+    /** Mock de debug : force le repli CPU même si le délégué GPU est disponible -- persisté, même contrainte. */
+    fun setDebugForceGpuUnavailable(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setDebugForceGpuUnavailable(enabled) }
+    }
+
+    /**
+     * Mock de debug : force le throttling thermique en direct (true = forcer actif, false = forcer
+     * inactif, null = automatique/capteur réel) -- lu à chaque sondage (startThermalPolling), effet
+     * immédiat, jamais persisté (voir MainUiState.debugThermalOverride).
+     */
+    fun setDebugThermalOverride(override: Boolean?) {
+        _uiState.update { it.copy(debugThermalOverride = override) }
+    }
+
+    /**
+     * Réinitialise en un seul geste les trois mocks de debug -- accessible depuis le panneau
+     * déverrouillé ET depuis l'indicateur toujours visible (voir DiagnosticsScreen), sans avoir à
+     * refaire le geste de déverrouillage juste pour "réparer" un mock resté actif par erreur.
+     */
+    fun resetDebugOverrides() {
+        setDebugThermalOverride(null)
+        viewModelScope.launch(Dispatchers.IO) { appSettingsStore.resetDebugOverrides() }
     }
 
     /**

@@ -36,6 +36,8 @@ class AppSettingsStore(private val context: Context) {
         val PERSIST_BLENDSHAPE_SELECTION = booleanPreferencesKey("persist_blendshape_selection_enabled")
         val PERSISTED_BLENDSHAPE_SELECTION = stringSetPreferencesKey("persisted_blendshape_selection")
         val TIER_OVERRIDE = stringPreferencesKey("tier_override")
+        val DEBUG_FORCE_ARCORE_UNAVAILABLE = booleanPreferencesKey("debug_force_arcore_unavailable")
+        val DEBUG_FORCE_GPU_UNAVAILABLE = booleanPreferencesKey("debug_force_gpu_unavailable")
     }
 
     val lowBatteryThresholdPercent: Flow<Int> = context.appSettingsDataStore.data.map { prefs ->
@@ -130,6 +132,49 @@ class AppSettingsStore(private val context: Context) {
     suspend fun setTierOverride(tier: TrackingTier?) {
         context.appSettingsDataStore.edit { prefs ->
             if (tier == null) prefs.remove(Keys.TIER_OVERRIDE) else prefs[Keys.TIER_OVERRIDE] = tier.name
+        }
+    }
+
+    /**
+     * Mock de debug (panneau caché de `DiagnosticsScreen`, voir revue technique point 35) : force
+     * le repli CameraX au palier `OPTIMAL` même sur un appareil qui supporte réellement ARCore --
+     * permet de vérifier `ArCoreHeadPoseTracker.onUnavailable` sans dépendre d'un appareil
+     * incompatible. Désactivé par défaut. Persisté mais lu une seule fois au lancement
+     * (`initializeTracking`, comme [tierOverride]) : pas de reconstruction à chaud du pipeline
+     * caméra/MediaPipe, un changement ne s'applique qu'au prochain redémarrage complet de l'app.
+     */
+    val debugForceArCoreUnavailable: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[Keys.DEBUG_FORCE_ARCORE_UNAVAILABLE] ?: false
+    }
+
+    suspend fun setDebugForceArCoreUnavailable(enabled: Boolean) {
+        context.appSettingsDataStore.edit { prefs -> prefs[Keys.DEBUG_FORCE_ARCORE_UNAVAILABLE] = enabled }
+    }
+
+    /**
+     * Mock de debug : force le repli CPU au lieu du délégué GPU dans `FaceLandmarkerHelper`, même
+     * sur un appareil qui le supporte -- même principe et mêmes contraintes que
+     * [debugForceArCoreUnavailable] ci-dessus.
+     */
+    val debugForceGpuUnavailable: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[Keys.DEBUG_FORCE_GPU_UNAVAILABLE] ?: false
+    }
+
+    suspend fun setDebugForceGpuUnavailable(enabled: Boolean) {
+        context.appSettingsDataStore.edit { prefs -> prefs[Keys.DEBUG_FORCE_GPU_UNAVAILABLE] = enabled }
+    }
+
+    /**
+     * Réinitialise en un seul appel les mocks de debug persistés ci-dessus -- accessible depuis
+     * l'indicateur toujours visible de `DiagnosticsScreen` sans avoir à refaire le geste de
+     * déverrouillage juste pour corriger un mock resté actif par erreur. Ne touche pas à
+     * [tierOverride] (réglage diagnostic préexistant et distinct) ni au mock thermique
+     * (`MainUiState.debugThermalOverride`, volontairement non persisté -- voir `MainViewModel`).
+     */
+    suspend fun resetDebugOverrides() {
+        context.appSettingsDataStore.edit { prefs ->
+            prefs[Keys.DEBUG_FORCE_ARCORE_UNAVAILABLE] = false
+            prefs[Keys.DEBUG_FORCE_GPU_UNAVAILABLE] = false
         }
     }
 }

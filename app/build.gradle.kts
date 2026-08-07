@@ -76,6 +76,9 @@ android {
 
     buildFeatures {
         compose = true
+        // Requis pour BuildConfig.VERSION_NAME -- affiché dans DiagnosticsScreen (ligne "Version
+        // de l'app", cible du déverrouillage du panneau de mocks de debug caché).
+        buildConfig = true
     }
 
     packaging {

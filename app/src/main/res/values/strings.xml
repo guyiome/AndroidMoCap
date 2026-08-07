@@ -6,6 +6,7 @@
     <!-- Shared across screens -->
     <string name="cd_back">Back</string>
     <string name="action_stop">Stop</string>
+    <string name="action_reset">Reset</string>
     <string name="placeholder_unknown">…</string>
     <string name="bool_yes">yes</string>
     <string name="bool_no">no</string>
@@ -74,6 +75,20 @@
     <string name="diagnostics_thermal_throttling_active">Thermal throttling: frame rate reduced</string>
     <string name="diagnostics_thermal_throttling_inactive">Thermal throttling: none</string>
     <string name="diagnostics_thermal_downgrade_suggestion">Sustained heat detected this session -- consider forcing a lower tier above</string>
+    <string name="diagnostics_app_version">App version: %1$s</string>
+    <string name="diagnostics_debug_taps_remaining">%1$d taps to unlock debug mocks</string>
+    <string name="diagnostics_debug_section_title">Debug mocks (developer only)</string>
+    <string name="diagnostics_debug_section_hint">For exercising code paths this device can\'t trigger naturally. Do not leave enabled.</string>
+    <string name="diagnostics_debug_arcore_unavailable_label">Force ARCore unavailable</string>
+    <string name="diagnostics_debug_gpu_unavailable_label">Force GPU delegate unavailable</string>
+    <string name="diagnostics_debug_override_off">Normal</string>
+    <string name="diagnostics_debug_override_on">Forced unavailable</string>
+    <string name="diagnostics_debug_relaunch_hint">Applies after a full app restart</string>
+    <string name="diagnostics_debug_thermal_label">Force thermal throttling (live, no restart needed)</string>
+    <string name="diagnostics_debug_thermal_forced_active">Force active</string>
+    <string name="diagnostics_debug_thermal_forced_inactive">Force inactive</string>
+    <string name="diagnostics_debug_reset_all">Reset all debug mocks</string>
+    <string name="diagnostics_debug_override_active_warning">A debug mock is active -- may not reflect real device behavior</string>
     <string name="cd_thermal_throttling">Frame rate reduced due to heat</string>
 
     <!-- Display & comfort screen -->
