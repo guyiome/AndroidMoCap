@@ -60,12 +60,13 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 17 | Indicateur de fiabilité par blendshape | **Implémenté sur `main`, voir point 24** (l'index le disait encore "aucun code écrit" par erreur) |
 | 18 | Persistance sélection blendshapes + valeur brute/ajustée | **Persistance implémentée sur `main`, voir point 25** -- le volet "valeur brute à côté de la valeur ajustée" reste en attente (dépend d'une pondération par blendshape jamais construite) |
 | 19 | Détection d'anomalie de calibrage (bouton rouge) | Conception actée, aucun code écrit |
-| 20 | Orientation grand écran / tablette | **Reproduit sur téléphone le 7 août 2026** (pas seulement en théorie sur tablette) -- direction actée (adapter les écrans de réglages au paysage) mais explicitement mise en backlog, aucune action immédiate |
+| 20 | Orientation grand écran / tablette | Constat documenté, aucune décision de mise en œuvre |
 | 21 | Tri en sous-écrans des réglages | **Implémenté sur `main`, voir point 26** (l'index le disait encore "aucun code écrit" par erreur) |
 | 28 | Fiabilisation du clignement des yeux avec lunettes | Idée de conception ouverte le 6 août 2026, voir section dédiée plus bas -- aucun code écrit |
 | 29 | Validation des traductions FR/EN par locuteurs natifs | Backlog, voir point 23 -- texte rédigé sans relecture native, ni le français ni l'anglais (repli par défaut) n'ont été validés |
 | 30 | Sélecteur de langue dans l'app pour Android 11/12 | Backlog, voir point 23 -- pas d'équivalent au sélecteur système Android 13+ sur ces versions, demanderait `androidx.appcompat` + `AppCompatDelegate` |
 | 31 | CI cassée depuis le premier run (`gradlew` sans bit exécutable) | **✅ corrigé le 6 août 2026** (commit `df640a4`), voir section dédiée plus bas |
+| 32 | Panneau de blendshapes du HUD : tongueOut disparaissait, noms masqués par le bandeau système | **✅ corrigés le 7 août 2026**, vérification visuelle device en attente pour le second, voir section dédiée plus bas |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -879,20 +880,12 @@ Statut : constat factuel remonté en discussion, aucune décision prise sur la s
 l'écran de réglages et revoir la logique de rotation caméra, vs. accepter que le comportement sur
 tablette reste dégradé pour l'instant, l'usage principal visé restant le téléphone).
 
-**Mise à jour (7 août 2026) : reproduit sur téléphone, pas seulement en théorie sur tablette.**
-Test en conditions réelles par l'utilisateur : `BlendshapeSelectionScreen` affiché avec le téléphone
-tenu en paysage montre une mise en page cassée (bandeau système repositionné sur le bord, libellés de
-catégories rendus à la verticale, chevauchements) -- signature typique d'un système qui **force la
-rotation malgré le verrouillage portrait du manifeste** (`android:screenOrientation="portrait"`),
-plutôt qu'un souci propre à cet écran : aucun code de gestion du paysage n'existe nulle part dans le
-projet (recherché, aucune correspondance), donc n'importe quel écran se comporterait pareil si la
-rotation est forcée. Cause système précise non confirmée (candidat le plus probable : l'option
-développeur Android 12+ "Ignorer la demande d'orientation", ou un réglage constructeur équivalent sur
-ce téléphone) -- pas vérifiée sur l'appareil de test, donc pas retenue comme cause certaine.
-
-Décision de l'utilisateur : traiter le symptôme plutôt que la cause système (rendre les écrans de
-réglages réellement utilisables en paysage, sur le même principe que la piste tablette ci-dessus)
-**mais en backlog, sans action immédiate** -- aucun code écrit, pas de priorité fixée pour l'instant.
+*[7 août 2026 : une première lecture d'une capture utilisateur avait été rattachée ici par erreur --
+la capture montrait en fait `BlendshapeSelectionScreen` juste pour prouver que `tongueOut` était bien
+coché, pas un souci de rotation système. Le vrai souci remonté ce jour-là (panneau de blendshapes du
+HUD principal masqué par le bandeau système en tenant le téléphone à l'horizontale) est un bug
+autonome de `BlendshapePanel`, sans rapport avec le verrouillage portrait ignoré par le système décrit
+ici -- voir la section "Panneau de blendshapes masqué par le bandeau système" plus bas.]*
 
 ### 31. CI cassée depuis le premier run -- `gradlew` sans bit exécutable
 
@@ -921,6 +914,48 @@ réseau `api.github.com` authentifié pour lister les runs) -- hypothèses à v�
 désactivées après l'échec initial, quota de minutes, ou tout simplement pas encore redéclenché. Le
 commit `df640a4` (ce correctif) devrait le confirmer ou l'infirmer au prochain push : si la CI ne se
 redéclenche toujours pas dessus, le problème est réel et mérite sa propre investigation.
+
+### 32. Panneau de blendshapes du HUD : deux bugs remontés par test device -- ✅ corrigés, vérification visuelle en attente
+
+Test en temps réel de l'utilisateur (7 août 2026), deux captures d'écran à l'appui. Première lecture
+erronée de ma part (une des captures avait été prise pour un souci de rotation système, à tort -- voir
+la note de correction au point 20 ci-dessus) ; les deux vrais soucis, une fois clarifiés :
+
+**a) `tongueOut` coché mais absent du panneau, alors qu'il devrait y rester affiché figé à 0.**
+`MainScreen.kt` construisait la liste affichée en filtrant `trackingFrame.allBlendshapes` (ce que
+MediaPipe produit réellement à cette frame) par `selectedBlendshapeNames` (ce que l'utilisateur a
+coché) -- un blendshape coché mais jamais produit par MediaPipe (`tongueOut`, voir
+`BlendshapeCatalog.unreliable` et point 15) n'apparaissait donc jamais du tout dans le panneau, pas
+même à 0. Corrigé (commit local, voir ci-dessous) : la liste part maintenant de
+`selectedBlendshapeNames` (source de vérité de ce qui doit s'afficher) et cherche la valeur
+correspondante dans `allBlendshapes`, avec un repli à `0f` si absente -- un blendshape jamais restitué
+par le modèle reste donc visible, simplement statique à 0,00, ce qui est le comportement voulu par
+l'utilisateur.
+
+**b) Noms de blendshapes masqués par le bandeau système en tenant le téléphone à l'horizontale.**
+`BlendshapePanel` (ancré en haut de l'écran, `Alignment.TopStart`) applique une rotation cosmétique de
+±90° selon l'orientation physique du téléphone ([panelRotationDegrees], même principe que la rotation
+individuelle des icônes du `MainHud`) -- l'app reste verrouillée portrait (point 1), seul l'affichage
+du texte pivote pour rester lisible. Le bloc de texte étant nettement plus large que haut (peu de
+lignes, mais des noms de blendshapes longs), une rotation à ±90° autour du centre par défaut de
+`Modifier.rotate()` fait déborder le rectangle tourné *au-dessus* du bord physique de l'écran (le
+rectangle, deux fois plus "haut" une fois sur le côté, reste centré sur le même point) -- il finit
+sous le bandeau système, qui masque le début de chaque nom (`cheekPuff` affiché `eekPuff`, etc.).
+Confirmé indépendant du point 20 (verrouillage portrait ignoré par le système) : ici l'app reste
+authentiquement en portrait tout du long, c'est un pur défaut de géométrie de la rotation cosmétique
+elle-même, combiné au fait que l'app ne gère de nulle part les insets système (recherché,
+`WindowInsets`/`systemBars`/`safeDrawing` : aucune occurrence dans tout le projet avant ce correctif --
+`compileSdk`/`targetSdk = 37` rend l'app edge-to-edge de fait). Corrigé : le pivot de rotation de
+`BlendshapePanel` passe du centre (`TransformOrigin.Center`, implicite avec `Modifier.rotate()`) au
+bas du bloc (`Modifier.graphicsLayer(rotationZ = ..., transformOrigin = TransformOrigin(0.5f, 1f))`),
+ce qui fait déborder la rotation vers l'intérieur de l'écran plutôt que vers son bord ; en complément,
+`MainScreen` ajoute `windowInsetsPadding(WindowInsets.safeDrawing)` autour du panneau, en marge de
+sécurité pour le résidu de débordement (calcul géométrique, pas mesuré sur device).
+
+`./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL`. **Aucun device dans ce sandbox** --
+correctif (a) déterministe, sans risque ; correctif (b) raisonné géométriquement mais pas revérifié
+visuellement, à confirmer au prochain test réel (le nom complet de chaque blendshape doit rester
+entièrement lisible en tenant le téléphone à l'horizontale, dans les deux sens de rotation).
 
 ## Automatisation
 
