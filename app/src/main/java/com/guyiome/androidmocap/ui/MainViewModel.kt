@@ -828,11 +828,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val address = InetAddress.getByName(hostText)
                 vmcSender?.close()
-                vmcSender = VmcOscSender(address, port)
-                _uiState.update { it.copy(vmcEnabled = true, vmcTargetLabel = "$hostText:$port", errorMessage = null) }
-                // Mémorisée pour que le bouton de connexion de l'écran principal puisse s'y
-                // reconnecter directement, sans ressaisir l'IP.
-                connectionSettingsStore.setVmcHost(hostText)
+                val sender = VmcOscSender(address, port)
+                // Vérifié explicitement (relecture globale du 7 août 2026, point 2) : le
+                // constructeur ne propage jamais d'exception même si l'ouverture du port UDP
+                // local échoue (voir VmcOscSender.connect()) -- sans cette vérification, l'UI
+                // affichait "connecté" même quand rien ne pouvait être envoyé.
+                if (sender.isConnected) {
+                    vmcSender = sender
+                    _uiState.update { it.copy(vmcEnabled = true, vmcTargetLabel = "$hostText:$port", errorMessage = null) }
+                    // Mémorisée pour que le bouton de connexion de l'écran principal puisse s'y
+                    // reconnecter directement, sans ressaisir l'IP.
+                    connectionSettingsStore.setVmcHost(hostText)
+                } else {
+                    vmcSender = null
+                    val message = getApplication<Application>().getString(R.string.error_vmc_connection_failed, hostText)
+                    _uiState.update { it.copy(vmcEnabled = false, errorMessage = message) }
+                }
             } catch (e: Exception) {
                 val message = getApplication<Application>().getString(R.string.error_vmc_invalid_address, hostText)
                 _uiState.update { it.copy(errorMessage = message) }

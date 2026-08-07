@@ -124,6 +124,7 @@
     <string name="error_vmc_ip_missing">Renseigne d\'abord une IP VMC dans les réglages.</string>
     <string name="error_no_connection_type">Choisis un type de connexion dans les réglages.</string>
     <string name="error_vmc_invalid_address">Adresse IP invalide ou injoignable : %1$s</string>
+    <string name="error_vmc_connection_failed">Impossible d\'ouvrir la connexion vers %1$s</string>
     <string name="local_ip_unavailable">indisponible</string>
 
     <!-- Erreurs caméra (CameraController, non-@Composable) -->

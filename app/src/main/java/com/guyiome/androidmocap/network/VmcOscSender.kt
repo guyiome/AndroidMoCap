@@ -1,5 +1,6 @@
 package com.guyiome.androidmocap.network
 
+import android.util.Log
 import com.guyiome.androidmocap.tracking.FaceTrackingResult
 import com.illposed.osc.OSCBundle
 import com.illposed.osc.OSCMessage
@@ -30,6 +31,8 @@ class VmcOscSender(
     private var port: Int = DEFAULT_PORT,
 ) {
     companion object {
+        private const val TAG = "VmcOscSender"
+
         /** Port conventionnel du protocole VMC (cf. protocol.vmc.info) ; à adapter selon la config VTube Studio. */
         const val DEFAULT_PORT = 39539
 
@@ -52,14 +55,32 @@ class VmcOscSender(
     private val sendExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private var oscPortOut: OSCPortOut? = null
 
+    /**
+     * Reflète si le port UDP local a bien pu être ouvert (voir [connect]) -- à vérifier par
+     * l'appelant juste après construction plutôt que de supposer la connexion établie : le
+     * constructeur ne propage jamais d'exception (voir [connect]), un échec silencieux passerait
+     * sinon inaperçu. Relecture globale du 7 août 2026, point 2 : jusqu'ici `MainViewModel`
+     * affichait "connecté" inconditionnellement après construction, y compris en cas d'échec.
+     */
+    val isConnected: Boolean
+        get() = oscPortOut != null
+
     init {
         connect()
     }
 
+    /**
+     * Échec possible mais rare en UDP (`OSCPortOut` ouvre juste un socket local, aucun aller-retour
+     * réseau ici -- contrairement à une vraie connexion TCP, un hôte injoignable ne fait pas
+     * échouer cet appel) : port hors plage, ressources système épuisées, permission refusée. Loggé
+     * (voir [isConnected] pour la doc complète du raisonnement) -- auparavant totalement silencieux,
+     * seul fichier de ce type dans le projet à ne rien logger sur un chemin d'échec.
+     */
     private fun connect() {
         oscPortOut = try {
             OSCPortOut(host, port)
         } catch (e: Exception) {
+            Log.w(TAG, "Impossible d'ouvrir le port UDP local pour la cible VMC $host:$port", e)
             null
         }
     }
