@@ -75,6 +75,12 @@ chauffe retombe. Volontairement limité au débit cible -- ni le délégué GPU/
 session, voir §4 et le sélecteur de palier manuel) y toucherait. Logique pure et testée en JVM :
 `tracking/ThermalThrottle.kt` (`ThermalThrottleState.next()`). Voir revue technique, point 34.
 
+À côté du sélecteur de palier manuel (`tierOverride`, diagnostic uniquement), un panneau de mocks de
+debug caché (`DiagnosticsScreen`, déverrouillé par tap multiple sur la ligne de version de l'app)
+permet de forcer trois comportements difficiles à déclencher naturellement sur un appareil donné :
+throttling thermique (en direct), ARCore indisponible et délégué GPU indisponible (ces deux derniers
+au prochain lancement, même contrainte que `tierOverride` -- voir §6). Voir revue technique, point 35.
+
 ## 4. Fusion ARCore (palier `OPTIMAL`) -- intégrée sur `main`, non testée sur device
 
 Intégrée directement sur `main` le 6 août 2026 (réimplémentée à neuf plutôt que fusionnée depuis
@@ -125,6 +131,12 @@ et -- optionnellement -- la sélection de blendshapes affichés sur l'écran pri
 reste **non persistée par défaut** (remise à zéro à chaque lancement, comportement historique
 inchangé), mais un réglage dédié (`persistBlendshapeSelectionEnabled`) permet de la conserver d'une
 session à l'autre -- voir revue technique point 25.
+
+Deux mocks de debug persistés (`debugForceArCoreUnavailable`, `debugForceGpuUnavailable` -- voir §3
+et revue technique point 35) suivent exactement le même patron que `tierOverride` : lus une seule
+fois au lancement, un changement ne s'applique qu'au redémarrage suivant. Le troisième mock (débit
+thermique) est volontairement **absent** de ce store -- bascule de session active en direct, pas un
+réglage de lancement.
 
 ## 7. Contraintes non-fonctionnelles
 

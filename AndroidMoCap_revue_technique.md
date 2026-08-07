@@ -69,6 +69,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 32 | Panneau de blendshapes du HUD : tongueOut disparaissait, noms masqués par le bandeau système | **✅ corrigés le 7 août 2026**, vérification visuelle device en attente pour le second, voir section dédiée plus bas |
 | 33 | Proposer l'installation ARCore au lieu du repli silencieux | Backlog, priorité mineure, idée ouverte le 7 août 2026, aucun code écrit |
 | 34 | Throttling thermique dynamique (débit réduit en cas de chauffe) | **✅ implémenté le 7 août 2026**, voir section dédiée plus bas -- vérification device en attente |
+| 35 | Panneau de mocks de debug caché (thermique, ARCore, délégué GPU) | **✅ implémenté le 7 août 2026**, voir section dédiée plus bas -- vérification device en attente |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -1054,6 +1055,62 @@ après `SUSTAINED_THROTTLE_TICKS = 12` sondages consécutifs (~1 minute de chauf
 device dans ce sandbox** -- comme le reste des correctifs de cette session sans accès matériel,
 prêt pour premier test device, pas encore validé (en particulier : la formule de réduction du débit
 et l'apparence de l'icône n'ont jamais été vues tourner réellement).
+
+### 35. Panneau de mocks de debug caché (DiagnosticsScreen)
+
+En préparant le test device du point 34 (throttling thermique), l'utilisateur a signalé que son
+appareil de test est optimisé gaming et pourrait ne jamais chauffer suffisamment pour déclencher
+naturellement `PowerManager.currentThermalStatus >= THERMAL_STATUS_MODERATE`. Proposition : un mode
+debug "secret" (tap multiple sur une ligne d'affichage, même principe que le menu développeur
+Android) pour mocker cette détection -- étendu, après discussion, à deux autres comportements dans
+la même situation ("ne peut pas se déclencher naturellement sur cet appareil précis").
+
+Décisions actées :
+- Mock thermique : bascule **Auto / Forcer actif / Forcer inactif** (pas de courbe simulée -- la
+  logique de transition est déjà testée en JVM au point 34, une bascule suffit à vérifier le câblage
+  réel).
+- Deux mocks supplémentaires retenus : **ARCore indisponible** (vérifie le repli CameraX,
+  `ArCoreHeadPoseTracker.onUnavailable`, jamais déclenché sur un appareil où ARCore fonctionne
+  réellement) et **délégué GPU indisponible** (vérifie le repli CPU de `FaceLandmarkerHelper`,
+  jamais exercé sur un GPU aussi capable). Batterie faible explicitement écartée (déjà validée par
+  l'utilisateur en conditions réelles).
+- Déverrouillage : 7 taps sur une nouvelle ligne "Version de l'app" (`BuildConfig.VERSION_NAME`,
+  jamais affichée nulle part avant ce point -- `buildFeatures.buildConfig` activé pour l'occasion).
+- **Distinction en direct vs au lancement**, soulevée par l'utilisateur et confirmée en analysant le
+  code : le mock thermique est lu à chaque sondage (`startThermalPolling`, effet en quelques
+  secondes, aucun redémarrage), donc volontairement **non persisté** (`MainUiState.debugThermalOverride`,
+  absent d'`AppSettingsStore`). Les mocks ARCore/GPU, eux, ne peuvent agir qu'au moment de
+  `initializeTracking()` (jamais rejoué en cours de session, même contrainte que le sélecteur de
+  palier manuel) -- ils doivent donc être **persistés** (`AppSettingsStore.debugForceArCoreUnavailable`/
+  `debugForceGpuUnavailable`, même patron que `tierOverride`) pour survivre au redémarrage
+  nécessaire à leur propre test.
+- Le déverrouillage lui-même (avoir tapé 7 fois) n'est **pas** persisté -- état Compose local
+  (`remember`), remis à zéro à chaque fermeture de l'écran. Le geste ne coûte que quelques secondes ;
+  le persister casserait la propriété "vraiment caché" sans réel gain, alors que la vraie friction
+  (redémarrer l'app pour les mocks ARCore/GPU) reste incompressible de toute façon.
+- **Garde-fou ajouté à l'implémentation**, en réponse directe à la question de l'utilisateur sur la
+  persistance : un mock persistant resté actif par erreur dégraderait silencieusement l'app pour de
+  bon, sans moyen évident d'y remédier si le geste de déverrouillage est oublié. Un bandeau d'alerte
+  **toujours visible** (rouge, pas caché derrière le déverrouillage, pas la même couleur ambre que
+  les avertissements de performance -- catégorie différente, plus sévère) apparaît en haut de
+  `DiagnosticsScreen` dès qu'un mock est actif, avec un bouton de réinitialisation immédiat.
+
+Implémentation : `ui/DebugPanelUnlock.kt` (nouveau, `DebugPanelUnlockState` + `registerTap()`, pure
+et testée en JVM -- 6 tests, `DebugPanelUnlockTest.kt`, même famille que `MeshOverlayVisibility.kt`/
+`ThermalThrottleState`). Câblage dans `MainViewModel.initializeTracking()` : les deux mocks persistés
+sont lus une seule fois (`.first()`, comme `tierOverride`) et court-circuitent respectivement la
+construction d'`ArCoreHeadPoseTracker` (repli direct vers `createCameraController()` déjà existant,
+sans toucher `ArCoreHeadPoseTracker`) et le paramètre `forceGpuUnavailable` de `FaceLandmarkerHelper`
+(nouveau paramètre constructeur, une seule condition modifiée dans `setup()`). Le mock thermique est
+lu en direct dans `startThermalPolling()` (`_uiState.value.debugThermalOverride ?:
+DeviceCapabilityDetector.isThermalThrottling(context)`). `DiagnosticsScreen` enveloppée dans un
+`verticalScroll` (absente jusqu'ici, latent -- le nouveau contenu risquait de déborder).
+
+`./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL`, 6 nouveaux tests verts. **Aucun
+device dans ce sandbox** -- en particulier non vérifiés : le geste des 7 taps en conditions réelles,
+l'absence de débordement visuel du panneau débloqué, et surtout l'effet réel des trois mocks (le
+repli CameraX/CPU se déclenche-t-il vraiment après redémarrage, le débit baisse-t-il vraiment en
+direct pour le mock thermique) -- à confirmer par l'utilisateur sur son appareil.
 
 ## Automatisation
 
