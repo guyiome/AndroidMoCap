@@ -65,7 +65,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 28 | Fiabilisation du clignement des yeux avec lunettes | Idée de conception ouverte le 6 août 2026, voir section dédiée plus bas -- aucun code écrit |
 | 29 | Validation des traductions FR/EN par locuteurs natifs | Backlog, voir point 23 -- texte rédigé sans relecture native, ni le français ni l'anglais (repli par défaut) n'ont été validés |
 | 30 | Sélecteur de langue dans l'app pour Android 11/12 | Backlog, voir point 23 -- pas d'équivalent au sélecteur système Android 13+ sur ces versions, demanderait `androidx.appcompat` + `AppCompatDelegate` |
-| 31 | CI cassée depuis le premier run (`gradlew` sans bit exécutable) | **✅ corrigé le 6 août 2026** (commit `df640a4`), voir section dédiée plus bas |
+| 31 | CI cassée depuis le premier run (`gradlew` sans bit exécutable), puis silencieusement bloquée depuis | **✅ corrigé le 6 août 2026** (commit `df640a4`) ; cause du blocage silencieux ensuite trouvée le 7 août (budget Actions à 0 $, "Stop usage" actif -- réglage GitHub, pas le dépôt), correctif en attente d'un moyen de paiement côté utilisateur, voir section dédiée plus bas |
 | 32 | Panneau de blendshapes du HUD : tongueOut disparaissait, noms masqués par le bandeau système | **✅ corrigés le 7 août 2026**, vérification visuelle device en attente pour le second, voir section dédiée plus bas |
 | 33 | Proposer l'installation ARCore au lieu du repli silencieux | Backlog, priorité mineure, idée ouverte le 7 août 2026, aucun code écrit |
 
@@ -907,14 +907,32 @@ sa création, silencieusement.
 Corrigé : `git update-index --chmod=+x gradlew` (mode `100755`), commit `df640a4`. `gradlew.bat`
 laissé tel quel (`100644`), le bit d'exécution Unix n'a pas de sens pour un script Windows.
 
-**Point non résolu, à vérifier au prochain accès `gh`/API GitHub authentifiée** : la même
-vérification a également remonté qu'aucun run CI n'existe pour les 6 commits poussés après
-`a6e5327` (jusqu'à `41d04dc` au moment du rapport), alors que `ci.yml` est censé se déclencher sur
-chaque push vers `main`. Cause non déterminée depuis ce sandbox (pas d'accès `gh` local ni accès
-réseau `api.github.com` authentifié pour lister les runs) -- hypothèses à vérifier : Actions
-désactivées après l'échec initial, quota de minutes, ou tout simplement pas encore redéclenché. Le
-commit `df640a4` (ce correctif) devrait le confirmer ou l'infirmer au prochain push : si la CI ne se
-redéclenche toujours pas dessus, le problème est réel et mérite sa propre investigation.
+**✅ Cause déterminée (7 août 2026) : budget "Actions" à 0 $ avec "Stop usage" actif.**
+`gh` installé et authentifié dans ce sandbox (`winget install GitHub.cli`, `gh auth login --web` --
+flux navigateur, aucun jeton n'a transité par la conversation) pour investiguer : confirmé qu'aucun
+run CI n'existe pour les 27 commits poussés sur `main` après `a6e5327` (jusqu'à `1b0030a`), et pas
+seulement absent de la liste -- `gh api .../actions/runs?head_sha=...` renvoie `total_count: 0` pour
+chacun, alors que l'API `events` du dépôt confirme que ces push sont bien arrivés normalement
+(`PushEvent` authentiques, acteur humain `guyiome`, sur `refs/heads/main`). Dépôt actif, non archivé,
+workflow `CI` à l'état `active`, Actions activées (`allowed_actions: all`) -- rien de tout ça
+n'expliquait le blocage.
+
+Cause réelle trouvée en inspectant `github.com/settings/billing/budgets` (accès direct au compte,
+via l'extension navigateur) : un budget de compte sur le produit **Actions**, plafonné à **0 $**,
+avec **"Stop usage: Yes"**. Le tout premier run (`a6e5327`, 2 minutes consommées) a fait passer ce
+budget à 100 % de son plafond -- un budget à 0 $ se déclenche dès le moindre usage brut, même
+intégralement couvert par les 2 000 minutes gratuites incluses (`/settings/billing` confirme 2/2000
+minutes utilisées ce mois-ci, 0 $ facturable) -- et "Stop usage" bloque alors silencieusement tout
+nouveau run *avant même sa création*, ce qui explique exactement le symptôme observé. Pas un bug
+GitHub ni un problème côté dépôt/workflow : un réglage de compte préexistant, pas mis en cause
+jusqu'ici faute d'accès `gh` authentifié.
+
+Correctif : relever ce budget au-dessus de 0 $ (`Stop usage` conservé -- garde la garantie "jamais
+facturé", le seuil ne se déclenchera qu'en cas de dépassement réel des minutes gratuites) plutôt que
+le supprimer (ce qui rendrait l'usage réellement illimité, sans garde-fou). **En attente côté
+utilisateur** : GitHub exige un moyen de paiement enregistré avant de pouvoir modifier un budget,
+même pour le relever à un montant qui ne sera jamais facturé -- pas encore fait au moment de cette
+note.
 
 ### 32. Panneau de blendshapes du HUD : deux bugs remontés par test device -- ✅ corrigés, vérification visuelle en attente
 
