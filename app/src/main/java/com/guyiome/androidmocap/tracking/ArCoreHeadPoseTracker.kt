@@ -111,6 +111,15 @@ import javax.microedition.khronos.opengles.GL10
  * corriger : ne pas déplacer la génération du timestamp à l'aveugle sans confirmer cette hypothèse
  * (ex. logger la valeur réelle passée à `detectAsync` et la comparer au timestamp du message natif).
  *
+ * ⚠️ **Fuite de ressource, corrigée (7 août 2026, relecture globale post-intégration)** :
+ * [tryCreateSession] pouvait laisser fuir la `Session` ARCore native si une étape après
+ * `Session(context)` échouait (`getSupportedCameraConfigs`/`setCameraConfig`/`configure()`) --
+ * seul le chemin "pas de config caméra frontale" fermait explicitement en cas d'échec. Le `catch`
+ * générique ferme désormais `newSession` s'il a été créé. Fuite distincte, également corrigée le
+ * même jour côté appelant : `MainViewModel` ne fermait pas cette instance avant de l'abandonner
+ * sur repli `onUnavailable`, laissant tourner [imageProcessingExecutor] pour rien le reste de la
+ * session.
+ *
  * Raison d'être : ARCore Augmented Faces gère lui-même la capture caméra frontale en interne (via
  * `Session#setCameraTextureName`, qui nécessite un contexte GL) -- il ne peut donc pas cohabiter
  * avec CameraX sur la même caméra (Camera2 n'autorise qu'un seul client actif). Ce tracker pilote
@@ -276,8 +285,13 @@ class ArCoreHeadPoseTracker(
     }
 
     private fun tryCreateSession(): Session? {
+        // Hissé hors du try (au lieu d'un val local) pour pouvoir le fermer depuis le catch
+        // générique ci-dessous si une étape après Session(context) échoue (relecture du 7 août
+        // 2026, point 2) -- jusqu'ici seul le chemin "pas de config caméra frontale" fermait
+        // explicitement la session en cas d'échec, les autres fuyaient la Session ARCore native.
+        var newSession: Session? = null
         return try {
-            val newSession = Session(context)
+            newSession = Session(context)
 
             // Augmented Faces exige la caméra frontale -- la configuration caméra par défaut d'une
             // Session ARCore n'est pas garantie de l'être, doit être sélectionnée explicitement
@@ -299,6 +313,9 @@ class ArCoreHeadPoseTracker(
 
             newSession
         } catch (e: UnavailableArcoreNotInstalledException) {
+            // newSession reste null dans ces 5 cas -- Session(context) elle-même est ce qui lève
+            // ces exceptions précises (vérification de disponibilité faite à la construction),
+            // rien à fermer.
             onUnavailable("ARCore n'est pas installé sur cet appareil.")
             null
         } catch (e: UnavailableApkTooOldException) {
@@ -317,8 +334,12 @@ class ArCoreHeadPoseTracker(
             // Filet de sécurité générique -- notamment le cas où la caméra frontale ne supporte pas
             // Augmented Faces sur cet appareil précis (device ARCore-compatible mais sans face
             // mode) : ARCore ne garantit pas un type d'exception dédié distinct pour ce cas selon
-            // les versions du SDK. Toujours traité comme un repli, jamais un crash.
+            // les versions du SDK. Toujours traité comme un repli, jamais un crash. Contrairement
+            // aux 5 catch ci-dessus, newSession peut très bien être non-null ici (échec après
+            // Session(context), ex. getSupportedCameraConfigs()/setCameraConfig()/configure()) --
+            // à fermer pour ne pas fuir la Session ARCore native.
             Log.e(TAG, "Session ARCore/Augmented Faces indisponible", e)
+            newSession?.close()
             onUnavailable("Configuration ARCore Augmented Faces refusée par cet appareil (${e.message}).")
             null
         }

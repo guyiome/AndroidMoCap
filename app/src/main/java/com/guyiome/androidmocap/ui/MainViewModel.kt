@@ -344,6 +344,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // se termine donc avant que MainScreen n'appelle startCamera().
                 onUnavailable = { message ->
                     Log.w(TAG, "ARCore indisponible, repli sur CameraX : $message")
+                    // close() avant de nuller la référence -- sans ça, imageProcessingExecutor
+                    // (thread dédié créé dès la construction, avant même start()) fuyait pour le
+                    // reste de la session (relecture du 7 août 2026, point 1).
+                    arCoreHeadPoseTracker?.close()
                     arCoreHeadPoseTracker = null
                     _uiState.update { it.copy(usingArCoreCameraSource = false) }
                     cameraController = createCameraController(context, lifecycleOwner, tierConfig)
