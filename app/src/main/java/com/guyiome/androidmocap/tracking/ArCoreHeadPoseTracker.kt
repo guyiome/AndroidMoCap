@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Matrix
+import android.graphics.Paint
 import android.graphics.RectF
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
@@ -31,6 +32,7 @@ import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationExceptio
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.MPImage
 import com.guyiome.androidmocap.camera.CameraController
+import java.nio.ByteBuffer
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
@@ -203,6 +205,11 @@ class ArCoreHeadPoseTracker(
     // vérifiée visuellement -- à confirmer au prochain test (le mesh doit apparaître à l'endroit,
     // tourner la tête doit bouger le mesh dans le sens intuitif).
     @Volatile private var cameraRotationDegrees: Int = 0
+
+    // Réutilisé à chaque appel de rotateBitmap() plutôt que de passer `null` à Canvas.drawBitmap
+    // -- même convention que CameraController.rotationPaint (isFilterBitmap = false : rotation
+    // par multiples de 90°, aucun intérêt à lisser).
+    private val rotationPaint = Paint().apply { isFilterBitmap = false }
 
     /**
      * À appeler avec le [GLSurfaceView] hébergé côté Compose (voir `MainScreen`). Requis par ARCore
@@ -489,9 +496,18 @@ class ArCoreHeadPoseTracker(
      * Convertit une `Image` caméra YUV_420_888 (format renvoyé par ARCore, voir [emitCameraImage])
      * en `Bitmap` ARGB_8888 -- coefficients BT.601 standard, identiques à ceux utilisés par la
      * plupart des conversions YUV->RGB caméra Android. Alloue un nouveau `Bitmap` à chaque appel
-     * (pas de pool de réutilisation pour l'instant, voir le risque de performance documenté dans le
-     * kdoc de cette classe). Gère le cas où U et V sont entrelacés (`pixelStride == 2`, format
-     * NV21/NV12 courant) comme le cas où ils sont sur des plans séparés (`pixelStride == 1`).
+     * (pas de pool de réutilisation, voir le risque de performance documenté dans le kdoc de cette
+     * classe -- option écartée ici : demanderait de réintroduire un mécanisme de "rendu au pool une
+     * fois MediaPipe terminé" comme l'ancienne version de ce fichier avant sa simplification, pour
+     * un gain incertain sans pouvoir mesurer sur device). Gère le cas où U et V sont entrelacés
+     * (`pixelStride == 2`, format NV21/NV12 courant) comme le cas où ils sont sur des plans séparés
+     * (`pixelStride == 1`).
+     *
+     * Perf (7 août 2026, relecture globale) : chaque plan est copié en bloc dans un `ByteArray`
+     * une seule fois ([ByteBuffer.toByteArray]) plutôt que lu pixel par pixel via
+     * `ByteBuffer.get(index)` (jusqu'à ~1.5 lecture par pixel × 3 plans, contre 3 transferts en
+     * bloc ici) -- même valeurs lues, même formule appliquée, uniquement le mécanisme d'accès qui
+     * change.
      */
     private fun yuv420ToBitmap(image: Image): Bitmap {
         val width = image.width
@@ -500,9 +516,9 @@ class ArCoreHeadPoseTracker(
         val yPlane = image.planes[0]
         val uPlane = image.planes[1]
         val vPlane = image.planes[2]
-        val yBuffer = yPlane.buffer
-        val uBuffer = uPlane.buffer
-        val vBuffer = vPlane.buffer
+        val yBytes = yPlane.buffer.toByteArray()
+        val uBytes = uPlane.buffer.toByteArray()
+        val vBytes = vPlane.buffer.toByteArray()
 
         val pixels = IntArray(width * height)
         for (row in 0 until height) {
@@ -511,10 +527,10 @@ class ArCoreHeadPoseTracker(
             val uRowOffset = uvRow * uPlane.rowStride
             val vRowOffset = uvRow * vPlane.rowStride
             for (col in 0 until width) {
-                val y = yBuffer.get(yRowOffset + col).toInt() and 0xFF
+                val y = yBytes[yRowOffset + col].toInt() and 0xFF
                 val uvCol = col / 2
-                val u = (uBuffer.get(uRowOffset + uvCol * uPlane.pixelStride).toInt() and 0xFF) - 128
-                val v = (vBuffer.get(vRowOffset + uvCol * vPlane.pixelStride).toInt() and 0xFF) - 128
+                val u = (uBytes[uRowOffset + uvCol * uPlane.pixelStride].toInt() and 0xFF) - 128
+                val v = (vBytes[vRowOffset + uvCol * vPlane.pixelStride].toInt() and 0xFF) - 128
 
                 val r = (y + 1.370705f * v).toInt().coerceIn(0, 255)
                 val g = (y - 0.337633f * u - 0.698001f * v).toInt().coerceIn(0, 255)
@@ -525,6 +541,20 @@ class ArCoreHeadPoseTracker(
         }
 
         return Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
+    }
+
+    /**
+     * Copie l'intégralité d'un `ByteBuffer` (typiquement direct, cas des plans d'`Image` caméra)
+     * dans un `ByteArray` neuf, en bloc -- indépendant de la position courante du buffer d'origine
+     * ([duplicate] partage le contenu mais a sa propre position/limite, jamais mutée ici) et sans
+     * supposer qu'elle vaut déjà 0 ([rewind] avant lecture).
+     */
+    private fun ByteBuffer.toByteArray(): ByteArray {
+        val duplicate = duplicate()
+        duplicate.rewind()
+        val bytes = ByteArray(duplicate.remaining())
+        duplicate.get(bytes)
+        return bytes
     }
 
     /**
@@ -545,7 +575,7 @@ class ArCoreHeadPoseTracker(
             postTranslate(-bounds.left, -bounds.top)
         }
         val rotated = Bitmap.createBitmap(outWidth, outHeight, Bitmap.Config.ARGB_8888)
-        Canvas(rotated).drawBitmap(source, matrix, null)
+        Canvas(rotated).drawBitmap(source, matrix, rotationPaint)
         source.recycle()
         return rotated
     }
