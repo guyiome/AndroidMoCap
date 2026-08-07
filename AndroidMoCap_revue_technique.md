@@ -1171,6 +1171,44 @@ en diagnostic, "Source caméra : CameraX"), mock délégué GPU indisponible con
 (diagnostic "Délégué : CPU", tracking fonctionnel sans régression). Les points 34 et 35 passent tous
 deux de "prêt pour test device" à "vérifié sur device".
 
+### 36. Relecture globale (code mort, optimisations, incohérences) -- 7 août 2026
+
+Passe demandée explicitement, identification d'abord (trois explorations en parallèle sur les zones
+non touchées récemment + relecture personnelle des fichiers les plus modifiés cette session),
+correctifs ensuite sur demande séparée. Deux volets traités :
+
+**Documentation désynchronisée** (le vrai gros du constat) -- `AndroidMoCap_spec_fonctionnelle.md`
+et `CLAUDE.md` étaient restés en retard de plusieurs jours sur `AndroidMoCap_revue_technique.md` :
+la fusion ARCore (point 13) encore décrite "pas testée sur device" (faux depuis le 6 août),
+l'anomalie de calibrage (point 19) encore listée "non implémentée" (faux depuis le 7 août), le
+throttling thermique (point 34) absent de `CLAUDE.md`. Corrigé (commit `7428afa`), plus deux kdoc/
+commentaires ponctuellement faux (`BlendshapeSelectionScreen.kt` sur la persistance, `build.gradle.kts`
+sur ce que `AppSettingsStore` persiste réellement). **Note ajoutée en mémoire persistante** : mettre à
+jour tous les documents (pas seulement la revue technique) au moment où une feature est *confirmée
+sur device*, pas seulement au moment où elle est implémentée -- ce sont deux moments distincts.
+
+**`VmcOscSender` : échec de connexion totalement silencieux** -- `connect()` avalait toute exception
+sans log ni callback, et `MainViewModel.connectVmcTarget()` affichait "connecté" inconditionnellement
+juste après construction. Corrigé (commit `42a82f6`) : nouvelle propriété `isConnected`, vérifiée par
+l'appelant avant de mettre à jour l'UI ; log ajouté côté `VmcOscSender`.
+
+**Reste en backlog, non traité cette passe** (priorité mineure à moyenne, aucun n'est un bug
+utilisateur silencieux comme le point ci-dessus) :
+- `VmcOscSender.updateTarget()` : code mort, jamais appelé depuis le premier commit.
+- `ConnectionSettingsScreen.kt` : le champ IP peut rester figé sur la valeur par défaut si l'écran
+  se compose avant la première émission DataStore (fenêtre de course étroite).
+- `MainHud.kt`/`MainViewModel.kt` : la durée du compte à rebours de calibrage (`5`) est dupliquée
+  sans source commune entre les deux fichiers.
+- Couleurs `Color(0xFF...)` dupliquées (5-6 fois chacune) au lieu de réutiliser `MaterialTheme.colorScheme`.
+- `CameraController.stop()` ne remet pas `imageAnalysis`/`previewUseCase` à `null` (dormant, un seul
+  appelant aujourd'hui).
+- Optimisations mineures non prioritaires : `computeEyeGazeDegrees()` (8 scans linéaires/frame),
+  `meanAbsoluteBlendshapeDelta` (une `HashMap` par frame), `LandmarkProjection.toScreenPoint` (`Pair`
+  boxé × 478 points/frame), `RotationMath.multiply`/`transpose` (allocation par appel sur le chemin
+  de calibration), tri redondant de `selectedBlendshapeNames` dans `MainScreen.kt` à chaque frame.
+
+`./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL` pour les deux commits.
+
 ## Automatisation
 
 **Vérification nocturne GitHub (Claude Code cloud, routine planifiée)** -- créée le 6 août 2026,
