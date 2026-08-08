@@ -1336,9 +1336,25 @@ WebSocket générique se connecte avec succès à `192.168.1.49:8001` depuis un 
 Le serveur accepte donc bien des connexions entrantes depuis le réseau local, pas seulement en
 loopback -- l'hypothèse de conception de ce point tient. Reste à vérifier en conditions réelles
 avec l'app elle-même (pas juste un testeur WebSocket générique) : le popup d'autorisation, la
-création effective des paramètres, et le mapping dans un vrai modèle Live2D. "Prêt pour premier
-test device avec l'app, pas encore validé de bout en bout", même formulation que le reste du
-travail de cette session.
+création effective des paramètres, et le mapping dans un vrai modèle Live2D.
+
+**Bug bloquant trouvé et corrigé au premier essai avec l'app (8 août 2026)** : `NetworkSecurityException`
+("not permitted by network security policy") à la connexion. Cause : Android bloque par défaut le
+trafic non chiffré depuis l'API 28, et **OkHttp respecte cette politique** contrairement au
+`DatagramSocket` brut utilisé par `VmcOscSender`/`IFacialMocapSender` (jamais soumis à cette
+vérification -- c'est pour ça que ce problème n'était jamais apparu avant, malgré du trafic tout
+aussi non chiffré). Corrigé par un `network_security_config.xml` (`<base-config
+cleartextTrafficPermitted="true">`, référencé depuis `AndroidManifest.xml`) plutôt qu'un simple
+`android:usesCleartextTraffic="true"` -- équivalent fonctionnellement ici mais plus explicite sur
+le raisonnement, et point d'extension si une restriction plus fine s'avérait utile un jour.
+`base-config` plutôt que `domain-config` : l'IP cible est saisie librement par l'utilisateur (VMC
+et VTube Studio), donc inconnue à la compilation -- un `domain-config` à noms fixes ne peut pas
+s'appliquer ici. Justifié par le modèle de l'app (déjà documenté dans le README, section "Vie
+privée et réseau") : uniquement du trafic réseau local, jamais de serveur distant, jamais de
+donnée sensible.
+
+"Prêt pour premier test device avec l'app, pas encore validé de bout en bout", même formulation
+que le reste du travail de cette session.
 
 ### 38. VMC crashait systématiquement sur Android 11/API 30 -- ✅ corrigé, bug critique
 

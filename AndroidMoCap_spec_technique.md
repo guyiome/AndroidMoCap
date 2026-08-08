@@ -147,6 +147,12 @@ appareil du réseau), mais le flux complet -- popup d'autorisation, création ef
 paramètres, mapping dans un vrai modèle Live2D -- reste à tester avec l'app. Voir revue technique
 point 39.
 
+Nécessite `res/xml/network_security_config.xml` (`<base-config cleartextTrafficPermitted="true">`,
+référencé depuis `AndroidManifest.xml`) : OkHttp respecte la politique de sécurité réseau
+d'Android (trafic non chiffré bloqué par défaut depuis l'API 28), contrairement au `DatagramSocket`
+brut utilisé par VMC/iFacialMocap, qui n'y est pas soumis -- c'est pourquoi ce projet n'en avait
+jamais eu besoin avant ce sender.
+
 Les trois protocoles (VMC, iFacialMocap, VTube Studio) sont mutuellement exclusifs à l'exécution
 (un seul `ConnectionType` actif), choix persisté via `ConnectionSettingsStore`.
 

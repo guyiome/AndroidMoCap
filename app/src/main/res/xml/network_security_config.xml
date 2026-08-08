@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Autorise le trafic non chiffré (bloqué par défaut depuis Android 9 / API 28), sur base-config
+     plutôt que domain-config : l'IP du PC est saisie librement par l'utilisateur (VMC, VTube
+     Studio), donc inconnue à la compilation, un domain-config à noms fixes ne peut pas s'appliquer
+     ici. Justifié par le modèle de l'app : uniquement du trafic réseau local (même Wi-Fi), jamais
+     de serveur distant, jamais de donnée sensible, voir "Vie privée et réseau" dans le README.
+     Nécessaire pour VTubeStudioSender (client WebSocket OkHttp, qui respecte
+     NetworkSecurityPolicy) ; VmcOscSender/IFacialMocapSender n'en avaient pas besoin, un
+     DatagramSocket brut n'étant pas soumis à cette vérification.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
