@@ -133,25 +133,31 @@ Cible : VTube Studio, en direct, via son API Plugin propriétaire (WebSocket JSO
 défaut) plutôt que VMC/OSC. Le téléphone est client WebSocket vers l'IP/port du PC (comme VMC, pas
 comme iFacialMocap). Cycle de connexion en plusieurs étapes asynchrones (`VTubeStudioConnectionState`,
 pur et testé) : ouverture du socket, authentification (jeton persisté après un premier popup
-d'autorisation utilisateur dans VTube Studio, réutilisé aux connexions suivantes), création d'un
-paramètre personnalisé par blendshape (noms ARKit, découverts dynamiquement à la première frame
-plutôt qu'une liste codée en dur), puis injection des valeurs à chaque frame
+d'autorisation utilisateur dans VTube Studio, réutilisé aux connexions suivantes -- avec retry
+automatique via un nouveau popup si le jeton stocké est refusé/révoqué, plus un bouton manuel
+"Oublier le jeton" dans l'écran Connexion), création d'un paramètre personnalisé par blendshape
+(noms ARKit, découverts dynamiquement à la première frame plutôt qu'une liste codée en dur -- une
+collision de nom avec un autre plugin déjà connecté, ex. VBridger, n'interrompt plus toute la
+connexion, seul ce paramètre est perdu), puis injection des valeurs à chaque frame
 (`InjectParameterDataRequest`). Encodage/décodage JSON pur et testé (`VTubeStudioProtocol.kt`) via
-kotlinx.serialization ; transport WebSocket via OkHttp (`VTubeStudioSender.kt`, seule pièce non
-testable en JVM). Les paramètres créés ne sont pas automatiquement reconnus par un modèle Live2D
-existant -- l'utilisateur doit les mapper une fois dans l'éditeur de paramètres de VTube Studio.
+kotlinx.serialization (`encodeDefaults = true` impératif -- voir son kdoc, un bug d'omission
+silencieuse de champs a bloqué toute réponse serveur avant correction) ; transport WebSocket via
+**nv-websocket-client** (`VTubeStudioSender.kt`, seule pièce non testable en JVM) -- **pas OkHttp**,
+qui propose systématiquement l'extension `permessage-deflate` sans réglage public pour la
+désactiver, incompatible avec le serveur `websocket-sharp` de VTube Studio (voir revue technique,
+point 39, pour le détail du diagnostic). Les paramètres créés ne sont pas automatiquement reconnus
+par un modèle Live2D existant -- l'utilisateur doit les mapper une fois dans l'éditeur de
+paramètres de VTube Studio.
 
-⚠️ Non vérifié sur device avec l'app elle-même à ce stade (prêt pour premier test) : la
-connectivité LAN du serveur WebSocket est confirmée (testeur générique connecté depuis un autre
-appareil du réseau), mais le flux complet -- popup d'autorisation, création effective des
-paramètres, mapping dans un vrai modèle Live2D -- reste à tester avec l'app. Voir revue technique
-point 39.
+✅ Confirmé fonctionnel de bout en bout sur device le 8 août 2026 : connexion, popup d'autorisation,
+création des paramètres, réception. Voir revue technique, point 39, pour le détail des bugs
+rencontrés et corrigés (encodage JSON, bibliothèque WebSocket, robustesse jeton/collisions).
 
 Nécessite `res/xml/network_security_config.xml` (`<base-config cleartextTrafficPermitted="true">`,
-référencé depuis `AndroidManifest.xml`) : OkHttp respecte la politique de sécurité réseau
-d'Android (trafic non chiffré bloqué par défaut depuis l'API 28), contrairement au `DatagramSocket`
-brut utilisé par VMC/iFacialMocap, qui n'y est pas soumis -- c'est pourquoi ce projet n'en avait
-jamais eu besoin avant ce sender.
+référencé depuis `AndroidManifest.xml`) : les bibliothèques WebSocket respectent la politique de
+sécurité réseau d'Android (trafic non chiffré bloqué par défaut depuis l'API 28), contrairement au
+`DatagramSocket` brut utilisé par VMC/iFacialMocap, qui n'y est pas soumis -- c'est pourquoi ce
+projet n'en avait jamais eu besoin avant ce sender.
 
 Les trois protocoles (VMC, iFacialMocap, VTube Studio) sont mutuellement exclusifs à l'exécution
 (un seul `ConnectionType` actif), choix persisté via `ConnectionSettingsStore`.
@@ -215,8 +221,10 @@ usage de réalité augmentée classique.
 
 **JavaOSC** -- implémentation du protocole OSC utilisé pour VMC.
 
-**OkHttp** -- client WebSocket utilisé par `VTubeStudioSender` (point 39) pour l'API Plugin de
-VTube Studio.
+**nv-websocket-client** -- client WebSocket utilisé par `VTubeStudioSender` (point 39) pour l'API
+Plugin de VTube Studio. OkHttp essayé en premier puis abandonné : propose systématiquement
+l'extension `permessage-deflate`, sans réglage public pour la désactiver, incompatible avec le
+serveur `websocket-sharp` de VTube Studio (voir revue technique, point 39).
 
 **kotlinx.serialization** -- encodage/décodage JSON pur pour le protocole de l'API Plugin VTube
 Studio (`VTubeStudioProtocol.kt`), préféré à `org.json` (déjà présent dans le SDK Android) car ce

@@ -29,7 +29,7 @@ Deux grandes catégories reviennent tout du long. Le code **logique pur** (maths
 | `NetworkUtils.kt` | `getLocalIpAddress()` | -- | ❌ Dépend des interfaces réseau réelles de l'appareil (`NetworkInterface.getNetworkInterfaces()`) -- environnement-dépendant, faible valeur à mocker pour une simple lecture d'IP locale. |
 | `VTubeStudioProtocol.kt` | Encodage/décodage JSON de chaque message de l'API Plugin VTube Studio (auth, création de paramètre, injection) -- pur, kotlinx.serialization | `VTubeStudioProtocolTest.kt` | ✅ Couvert -- point 39. Inclut le décodage de vrais payloads serveur (copiés depuis la doc officielle) et la tolérance aux champs inconnus (`ignoreUnknownKeys`). |
 | `VTubeStudioConnectionState.kt` | `nextVTubeStudioConnectionState()` (machine à état pure) | `VTubeStudioConnectionStateTest.kt` | ✅ Couvert -- point 39. Toutes les transitions valides, plus les événements hors séquence (ignorés sans planter) et `Disconnect`/`SocketFailed` valides depuis n'importe quel état. |
-| `VTubeStudioSender.kt` | Socket WebSocket réel (OkHttp), pilotage de la machine à état en réaction aux messages entrants | -- | ❌ Dépend d'un vrai `WebSocket`/serveur VTube Studio -- même limite que `VmcOscSender.send()`/`connect()`. La partie à risque (protocole JSON, transitions d'état) est déjà couverte séparément. |
+| `VTubeStudioSender.kt` | Socket WebSocket réel (nv-websocket-client), pilotage de la machine à état en réaction aux messages entrants | -- | ❌ Dépend d'un vrai `WebSocket`/serveur VTube Studio -- même limite que `VmcOscSender.send()`/`connect()`. La partie à risque (protocole JSON, transitions d'état) est déjà couverte séparément. Confirmé fonctionnel de bout en bout sur device (point 39). |
 
 ## camera/
 

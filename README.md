@@ -20,10 +20,9 @@ Projet personnel, développé et maintenu par une seule personne, en évolution 
   avec repli automatique GPU → CPU si le délégué GPU échoue.
 - **52 blendshapes ARKit** via MediaPipe Face Landmarker, plus une estimation de la direction du
   regard (non fournie nativement par MediaPipe, reconstruite à partir des blendshapes oculaires).
-- **Triple sortie réseau** : protocole VMC/OSC (Blender, Unity -- confirmé fonctionnel),
-  protocole iFacialMocap/UDP (VBridger), et intégration directe VTube Studio via son API Plugin
-  propriétaire (VTube Studio ne reçoit pas VMC/OSC en entrée -- encore en cours de validation sur
-  device, voir la feuille de route).
+- **Triple sortie réseau, toutes confirmées fonctionnelles sur device** : protocole VMC/OSC
+  (Blender, Unity), protocole iFacialMocap/UDP (VBridger), et intégration directe VTube Studio via
+  son API Plugin propriétaire (VTube Studio ne reçoit pas VMC/OSC en entrée).
 - **Calibrage de pose neutre** à la demande, avec compte à rebours.
 - HUD minimal et lisible quelle que soit l'orientation du téléphone, réglages détaillés (sélection
   des blendshapes affichés, seuil de batterie faible, mode économie d'énergie, overlay de debug du
@@ -59,7 +58,7 @@ L'app propose une intégration directe via l'API Plugin propriétaire de VTube S
 "VTube Studio" dans les réglages de connexion, IP du PC + port 8001 par défaut) : un popup
 d'autorisation apparaît dans VTube Studio à la première connexion, puis les paramètres créés
 doivent être mappés une fois dans l'éditeur de paramètres de VTube Studio pour animer le modèle.
-Encore en cours de validation sur device -- voir `AndroidMoCap_revue_technique.md`, point 39.
+Confirmé fonctionnel sur device -- voir `AndroidMoCap_revue_technique.md`, point 39.
 
 **VBridger** : sélectionner le protocole iFacialMocap dans les réglages de l'app, puis suivre les
 instructions VBridger en pointant vers l'IP affichée sur le téléphone -- c'est VBridger qui vient se
@@ -80,8 +79,8 @@ PC receveur.
    [Face landmark detection guide for Android](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker/android)
    (section "Model").
 2. Ouvrir le dossier dans Android Studio (`File > Open`). Le premier sync Gradle télécharge AGP,
-   Kotlin et les dépendances ARCore/CameraX/MediaPipe/JavaOSC/OkHttp/kotlinx.serialization listées
-   dans `gradle/libs.versions.toml`.
+   Kotlin et les dépendances ARCore/CameraX/MediaPipe/JavaOSC/nv-websocket-client/kotlinx.serialization
+   listées dans `gradle/libs.versions.toml`.
 3. Builder et lancer sur un **appareil physique** (voir Prérequis) -- pas d'émulateur possible pour
    tester le tracking.
 
@@ -129,9 +128,6 @@ Suivi détaillé dans `AndroidMoCap_revue_technique.md`. Points principaux :
   (`DeviceCapabilityDetector.isThermalThrottling`, sondée en continu pendant la capture), remonte
   automatiquement une fois la chauffe retombée -- implémenté, pas encore confirmé sur device, voir
   le point 34 de la revue technique.
-- Intégration directe VTube Studio (API Plugin, WebSocket/JSON) : implémentée, connectivité réseau
-  confirmée sur device, flux complet (autorisation, mapping des paramètres) pas encore testé avec
-  l'app -- voir le point 39 de la revue technique.
 - Lissage temporel (One Euro Filter) sur les blendshapes.
 - Détection expérimentale de la langue tirée et des joues gonflées, derrière un interrupteur
   "Fonctionnalités expérimentales" dédié -- encore au stade de conception, voir les points 15 et 16.

@@ -72,7 +72,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 35 | Panneau de mocks de debug caché (thermique, ARCore, délégué GPU) | **✅ implémenté et vérifié sur device le 7 août 2026**, voir section dédiée plus bas -- les trois mocks confirmés fonctionnels |
 | 37 | Lag ARCore en session, disparu après redémarrage complet | Signalé le 7 août 2026, cause non identifiée -- throttling thermique et coût de la détection d'anomalie écartés par le raisonnement, prochaine étape : capture logcat si reproduit |
 | 38 | VMC crashait systématiquement sur Android 11/API 30 (`NoSuchMethodError` javaosc-core) | **✅ corrigé et validé de bout en bout sur device le 8 août 2026** (plus de crash, connecteur VMC Blender reconnaît les paquets, contenu confirmé correct via Protokol -- noms et valeurs de blendshapes cohérents) -- voir section dédiée plus bas |
-| 39 | VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin | **Implémenté le 8 août 2026** (WebSocket/OkHttp + kotlinx.serialization, machine à état testée), voir section dédiée plus bas -- ✅ connectivité LAN du serveur VTube Studio confirmée (testeur WebSocket connecté à `192.168.1.49:8001` depuis le LAN), reste à tester le flux complet avec l'app (auth, création des paramètres, mapping Live2D) |
+| 39 | VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin | **✅ Validé de bout en bout sur device le 8 août 2026** (WebSocket/nv-websocket-client + kotlinx.serialization -- OkHttp abandonné, incompatible avec le serveur `websocket-sharp` de VTube Studio) -- connexion, popup d'autorisation, création des paramètres, réception confirmés fonctionnels, voir section dédiée plus bas |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -1254,7 +1254,7 @@ Statut : pas de correctif tenté à l'aveugle. Prochaine étape si ça se reprod
 continue pendant le lag (même méthode que les crashs diagnostiqués au point 13), pour voir si ARCore
 ou le driver GL logge un warning au moment où ça ralentit, plutôt que deviner davantage.
 
-### 39. VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin implémentée
+### 39. VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin -- ✅ validée de bout en bout sur device
 
 Suite à la confirmation device du correctif du point 38 (plus de crash), l'utilisateur signale
 n'avoir aucun retour visible côté VTube Studio, et ne pas trouver où paramétrer la réception VMC
@@ -1353,8 +1353,68 @@ s'appliquer ici. Justifié par le modèle de l'app (déjà documenté dans le RE
 privée et réseau") : uniquement du trafic réseau local, jamais de serveur distant, jamais de
 donnée sensible.
 
-"Prêt pour premier test device avec l'app, pas encore validé de bout en bout", même formulation
-que le reste du travail de cette session.
+**Bug de sérialisation trouvé par logcat (8 août 2026)** : `AuthenticationTokenRequest` partait
+bien, mais VTube Studio ne répondait jamais -- silence total, ni popup ni erreur. Le JSON réellement
+envoyé, révélé par le `Log.d` ajouté à cette occasion, était `{"requestID":"...",
+"messageType":"...","data":{}}` : `apiName`, `apiVersion`, `pluginName`, `pluginDeveloper` avaient
+tous disparu. Cause : sans `encodeDefaults = true`, kotlinx.serialization omet du JSON tout champ
+dont la valeur égale sa valeur par défaut Kotlin -- tous ces champs valaient justement leur défaut
+en pratique. Un round-trip encode->décode ne détecte PAS ce bug (le décodage réapplique les mêmes
+défauts pour les champs absents, masquant le problème dans les tests JVM) -- corrigé, plus un
+nouveau test asserte sur le texte JSON brut plutôt que sur un aller-retour pour empêcher cette
+classe de régression de revenir silencieusement. Voir le kdoc de `vtsJson`.
+
+**Bug de bibliothèque WebSocket trouvé par diagnostic croisé (8 août 2026)**, une fois le bug
+JSON ci-dessus corrigé -- toujours aucune réponse, malgré une requête cette fois bien formée.
+Méthode (jamais deviné, chaque hypothèse vérifiée séparément) :
+1. Testeur WebSocket générique sur le téléphone (déjà utilisé pour la connectivité LAN) : "connecté"
+   mais jamais testé l'envoi d'un vrai message -- gap identifié.
+2. Console JS d'un navigateur sur le PC, `ws://127.0.0.1:8001` : réponse reçue normalement.
+3. Même test vers `ws://192.168.1.49:8001` (IP LAN plutôt que loopback, toujours depuis le PC) :
+   réponse reçue normalement -- élimine l'hypothèse "VTube Studio ne répond qu'en loopback".
+4. Même test depuis le testeur WebSocket du téléphone (donc un vrai autre appareil, avec un JSON
+   envoyé manuellement cette fois) : réponse reçue normalement -- élimine réseau/LAN/téléphone.
+   **Conclusion : le problème est spécifique à notre client OkHttp.**
+5. En-têtes de la poignée de main loggés (`response.headers` dans `onOpen`) :
+   `Sec-WebSocket-Extensions: permessage-deflate; client_no_context_takeover;
+   server_no_context_takeover`, `Server: websocket-sharp/1.0`. OkHttp propose systématiquement
+   l'extension `permessage-deflate`, sans réglage public pour la désactiver -- même un intercepteur
+   réseau retirant l'en-tête `Sec-WebSocket-Extensions` de la requête ne change rien (testé et
+   confirmé inefficace sur device : OkHttp l'ajoute à un niveau plus bas que la chaîne
+   d'intercepteurs). `websocket-sharp` (le serveur VTube Studio) a une implémentation buguée de
+   cette extension avec `no_context_takeover` -- incompatibilité documentée et connue
+   (`github.com/sta/websocket-sharp/issues/666`).
+
+**Corrigé en basculant de bibliothèque WebSocket** : OkHttp remplacé par **nv-websocket-client**
+(`com.neovisionaries:nv-websocket-client`), qui ne propose `permessage-deflate` que si on l'active
+explicitement -- jamais par défaut. Confirmé sur device : connexion, authentification (popup
+d'autorisation affiché, jeton reçu), et création de 52 paramètres réussies immédiatement après la
+bascule.
+
+**Deux bugs de robustesse supplémentaires trouvés en conditions réelles, corrigés dans la foulée** :
+1. Le jeton stocké peut être refusé par VTube Studio (observé sur device : "token is invalid or
+   has been revoked") -- l'app restait bloquée en `Failed` sans moyen de s'en remettre. Ajout d'un
+   retry automatique (nouvelle demande de jeton sur le même socket si le jeton stocké est refusé)
+   + un bouton manuel "Oublier le jeton stocké" dans l'écran Connexion pour un nouveau départ
+   explicite en cas de besoin.
+2. Une collision de nom de paramètre avec un autre plugin déjà connecté (VBridger crée les mêmes
+   noms ARKit -- confirmé sur device, errorID 352 "Another plugin has already created a custom
+   parameter...") faisait échouer **toute** la connexion dès la première erreur, alors que 48 des
+   52 paramètres avaient réussi. Une erreur de création individuelle est maintenant comptée comme
+   "traitée" au même titre qu'un succès -- seul ce paramètre-là est perdu, le reste continue
+   normalement. Reste un angle non exploré : le comportement réel de `InjectParameterDataRequest`
+   (mode `set`) pour un paramètre dont la création a échoué faute d'appartenir à ce plugin -- pas
+   encore observé de dysfonctionnement associé, à surveiller si VBridger tourne en simultané.
+
+**Bug d'affichage mineur trouvé et corrigé après confirmation** : le texte de statut "Connecté à
+%1$s" affichait littéralement `%1$s` au lieu de l'IP:port -- l'argument de `stringResource()`
+n'était simplement pas passé à l'appel. Corrigé.
+
+**✅ Confirmé fonctionnel de bout en bout sur device (8 août 2026)** : connexion, popup
+d'autorisation, création des paramètres, réception confirmée par l'utilisateur ("Connexion établie,
+et fonctionnelle !"). Reste en dehors du périmètre de cette session : le mapping des paramètres
+dans un modèle Live2D réel (dépend du modèle de l'utilisateur, pas de l'app), et le comportement en
+cas d'usage simultané avec VBridger au-delà des collisions de création déjà tolérées ci-dessus.
 
 ### 38. VMC crashait systématiquement sur Android 11/API 30 -- ✅ corrigé, bug critique
 

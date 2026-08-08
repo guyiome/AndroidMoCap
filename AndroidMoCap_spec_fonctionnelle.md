@@ -71,22 +71,28 @@ fonctionnel sur device, tous paliers testés (point 19 de la revue technique).
 
 ### 3.3 Connectivité réseau
 
-Deux protocoles de sortie, mutuellement exclusifs (un seul actif à la fois, choix dans les
+Trois protocoles de sortie, mutuellement exclusifs (un seul actif à la fois, choix dans les
 réglages) :
 
 - **VMC/OSC** -- destiné à Blender, Unity (pas VTube Studio, qui ne reçoit vraisemblablement pas ce
-  protocole en entrée -- voir revue technique point 39 ; une intégration directe VTube Studio via
-  son API Plugin propriétaire existe séparément, encore en cours de validation sur device). L'app
-  envoie les données vers une IP/port PC saisis manuellement dans les réglages. Confirmé fonctionnel
-  sur device, contenu des paquets vérifié (point 38 de la revue technique).
+  protocole en entrée -- voir revue technique point 39). L'app envoie les données vers une IP/port
+  PC saisis manuellement dans les réglages. Confirmé fonctionnel sur device, contenu des paquets
+  vérifié (point 38 de la revue technique).
 - **Protocole compatible iFacialMocap/UDP** -- destiné à VBridger. Affiché "UDP / VBridger" dans
   l'interface (le nom "iFacialMocap" reste en mention secondaire pour rester trouvable par qui
   cherche ce terme précis, mais l'app ne se connecte pas à cette application tierce, elle implémente
   seulement un protocole compatible). L'app écoute passivement ; c'est le logiciel PC qui vient se
   connecter, à partir de l'IP du téléphone affichée dans les réglages -- aucune saisie manuelle côté
   téléphone pour ce chemin.
+- **API Plugin VTube Studio** -- intégration directe, en contournant VMC/OSC que VTube Studio ne
+  reçoit pas. IP/port (8001 par défaut) saisis manuellement, comme pour VMC. Popup d'autorisation à
+  accepter dans VTube Studio à la première connexion (jeton ensuite mémorisé, avec nouvelle demande
+  automatique s'il est révoqué entre-temps, plus un bouton "Oublier le jeton" en secours). Une fois
+  connecté, les paramètres créés doivent être mappés une fois par l'utilisateur dans l'éditeur de
+  paramètres de VTube Studio pour animer un modèle Live2D -- l'app ne peut pas le faire à sa place.
+  Confirmé fonctionnel sur device (point 39 de la revue technique).
 
-Le téléphone et le PC receveur doivent être sur le même réseau Wi-Fi local dans les deux cas.
+Le téléphone et le PC receveur doivent être sur le même réseau Wi-Fi local dans les trois cas.
 
 ### 3.4 Interface utilisateur
 

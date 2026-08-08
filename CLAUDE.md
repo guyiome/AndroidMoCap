@@ -8,8 +8,8 @@ AndroidMoCap turns an Android phone into a standalone facial motion-capture trac
 front camera → MediaPipe Face Landmarker (52 ARKit blendshapes + gaze/head pose) → streamed live
 over the local network to Blender/Unity (VMC/OSC, confirmed end-to-end on device — see revue
 technique point 38), VBridger (iFacialMocap-compatible UDP protocol), or directly to VTube Studio
-via its own Plugin API (WebSocket/JSON, not VMC — see point 39, implemented but not yet confirmed
-end-to-end on device). No cloud, no third-party app dependency, single-developer personal project.
+via its own Plugin API (WebSocket/JSON, not VMC — confirmed end-to-end on device, see point 39).
+No cloud, no third-party app dependency, single-developer personal project.
 
 Read `README.md` first for features, prerequisites and the PC-side connection setup. For anything
 beyond a quick orientation, three living docs are the source of truth and take precedence over
@@ -126,13 +126,19 @@ confirmed end-to-end on device including packet content, not just connectivity (
 `network/IFacialMocapSender.kt` implements the iFacialMocap wire protocol for VBridger
 (`buildMessage()`, pure, tested), listening passively for the PC software to connect in rather than
 dialing out. `network/VTubeStudioSender.kt` talks directly to VTube Studio's own Plugin API
-(WebSocket/JSON, port 8001 by default) instead of VMC — protocol encoding (`VTubeStudioProtocol.kt`)
-and the connection state machine (`VTubeStudioConnectionState.kt`) are pure and tested; the socket
-itself isn't (point 39, LAN reachability confirmed, full connect/auth/parameter-mapping flow not yet
-tested with the app on device). UI-facing naming for iFacialMocap was deliberately decoupled from
-its internal naming (chip reads "UDP / VBridger", not "iFacialMocap") to avoid implying a connection
-to the third-party app — don't propagate that rename into the protocol-level identifiers
-(`ConnectionType.IFACIALMOCAP`, class name, handshake constants), which are intentionally left as-is.
+(WebSocket/JSON, port 8001 by default) instead of VMC — protocol encoding (`VTubeStudioProtocol.kt`,
+`encodeDefaults = true` is load-bearing, see its kdoc) and the connection state machine
+(`VTubeStudioConnectionState.kt`) are pure and tested; the socket itself isn't, confirmed
+end-to-end on device instead (point 39). WebSocket client is **nv-websocket-client, not OkHttp**:
+OkHttp proposes the `permessage-deflate` extension unconditionally with no public way to disable
+it, incompatible with VTube Studio's `websocket-sharp` server (see point 39 for the full diagnosis
+— don't reintroduce OkHttp here without re-reading it). A stored auth token that gets rejected
+triggers one automatic re-request before giving up; a stale-parameter-name collision with another
+plugin (e.g. VBridger, same ARKit names) no longer aborts the whole connection, just that one
+parameter. UI-facing naming for iFacialMocap was deliberately decoupled from its internal naming
+(chip reads "UDP / VBridger", not "iFacialMocap") to avoid implying a connection to the third-party
+app — don't propagate that rename into the protocol-level identifiers (`ConnectionType.IFACIALMOCAP`,
+class name, handshake constants), which are intentionally left as-is.
 
 **Settings persistence.** `settings/AppSettingsStore.kt` and `settings/ConnectionSettingsStore.kt`
 wrap Jetpack DataStore Preferences. Blendshape selection persistence across sessions is opt-in
