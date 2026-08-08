@@ -70,6 +70,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 33 | Proposer l'installation ARCore au lieu du repli silencieux | Backlog, priorité mineure, idée ouverte le 7 août 2026, aucun code écrit |
 | 34 | Throttling thermique dynamique (débit réduit en cas de chauffe) | **✅ implémenté et vérifié sur device (via mock) le 7 août 2026**, voir section dédiée plus bas -- capteur thermique réel non exercé (appareil de test ne chauffe pas assez), câblage bout en bout confirmé |
 | 35 | Panneau de mocks de debug caché (thermique, ARCore, délégué GPU) | **✅ implémenté et vérifié sur device le 7 août 2026**, voir section dédiée plus bas -- les trois mocks confirmés fonctionnels |
+| 37 | Lag ARCore en session, disparu après redémarrage complet | Signalé le 7 août 2026, cause non identifiée -- throttling thermique et coût de la détection d'anomalie écartés par le raisonnement, prochaine étape : capture logcat si reproduit |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -1210,6 +1211,34 @@ utilisateur silencieux comme le point ci-dessus) :
   de calibration), tri redondant de `selectedBlendshapeNames` dans `MainScreen.kt` à chaque frame.
 
 `./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL` pour les deux commits.
+
+### 37. Lag ARCore observé en session, disparu après redémarrage complet -- cause non identifiée
+
+Retour utilisateur (7 août 2026), pendant une session de test couvrant plusieurs paliers via le
+panneau de diagnostic/debug (chaque changement de palier demandant un redémarrage pour s'appliquer,
+voir points 13/35) : ralentissement constaté à la fois sur l'aperçu du téléphone et côté réception
+VBridger, disparu après un redémarrage complet de l'app.
+
+Deux hypothèses écartées par les retours de l'utilisateur :
+- **Throttling thermique réel (point 34)** : écarté -- aucune icône de chauffe visible, téléphone
+  froid au toucher.
+- **Coût par frame de la détection d'anomalie de calibrage (point 19)** : écarté par le raisonnement
+  -- un surcoût fixe par frame resterait identique après redémarrage, il ne disparaîtrait pas.
+
+Hypothèse restante, non confirmée : accumulation d'état côté session ARCore/thread GL
+(`ArCoreHeadPoseTracker`) sur plusieurs cycles pause/reprise (`ON_START`/`ON_STOP`) dans le même
+process, si certains des "redémarrages" effectués pendant la session de test n'étaient pas de vrais
+kills du process (retour depuis les tâches récentes sans balayage, relances via Android Studio en
+mode debug) -- disparaît alors avec un vrai kill complet du process. Relecture du code de cycle de
+vie (`ArCoreHeadPoseTracker.start()/stop()`, l'observer `ON_START`/`ON_STOP` de
+`MainViewModel.initializeTracking()`) : rien d'anormal trouvé à la lecture statique (pas de
+double-enregistrement d'observer, `resume()`/`pause()` répété sur la même session est un usage
+normal et documenté côté ARCore) -- si dégradation il y a, elle est plus fine qu'un bug de code
+visible sans device.
+
+Statut : pas de correctif tenté à l'aveugle. Prochaine étape si ça se reproduit : capture logcat
+continue pendant le lag (même méthode que les crashs diagnostiqués au point 13), pour voir si ARCore
+ou le driver GL logge un warning au moment où ça ralentit, plutôt que deviner davantage.
 
 ## Automatisation
 
