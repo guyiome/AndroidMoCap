@@ -1195,22 +1195,34 @@ sans log ni callback, et `MainViewModel.connectVmcTarget()` affichait "connecté
 juste après construction. Corrigé (commit `42a82f6`) : nouvelle propriété `isConnected`, vérifiée par
 l'appelant avant de mettre à jour l'UI ; log ajouté côté `VmcOscSender`.
 
-**Reste en backlog, non traité cette passe** (priorité mineure à moyenne, aucun n'est un bug
-utilisateur silencieux comme le point ci-dessus) :
-- `VmcOscSender.updateTarget()` : code mort, jamais appelé depuis le premier commit.
+**Quatre correctifs triviaux traités séparément** (commit `7dfaf46`, sur demande explicite après
+avoir distingué les correctifs vraiment triviaux -- 1 fichier, quelques lignes, zéro risque -- de
+ceux qui méritent plus de soin) :
+- ✅ `VmcOscSender.updateTarget()` : code mort supprimé, `host`/`port` redevenus `val`.
+- ✅ `CameraController.stop()` : remet `imageAnalysis`/`previewUseCase` à `null`.
+- ✅ `FaceLandmarkerHelper.computeEyeGazeDegrees()` : `Map` construite une fois plutôt que 8 scans
+  linéaires par frame.
+- ✅ `MainScreen.kt` : tri de `selectedBlendshapeNames` mémorisé (`remember`), plus refait à chaque
+  frame.
+
+**Reste en backlog, non traité** (priorité mineure à moyenne, jugés soit dispersés sur plusieurs
+fichiers pour un gain cosmétique, soit pas réellement "légers" à corriger proprement -- voir le
+raisonnement détaillé donné à l'utilisateur avant ce commit) :
 - `ConnectionSettingsScreen.kt` : le champ IP peut rester figé sur la valeur par défaut si l'écran
   se compose avant la première émission DataStore (fenêtre de course étroite).
 - `MainHud.kt`/`MainViewModel.kt` : la durée du compte à rebours de calibrage (`5`) est dupliquée
   sans source commune entre les deux fichiers.
-- Couleurs `Color(0xFF...)` dupliquées (5-6 fois chacune) au lieu de réutiliser `MaterialTheme.colorScheme`.
-- `CameraController.stop()` ne remet pas `imageAnalysis`/`previewUseCase` à `null` (dormant, un seul
-  appelant aujourd'hui).
-- Optimisations mineures non prioritaires : `computeEyeGazeDegrees()` (8 scans linéaires/frame),
-  `meanAbsoluteBlendshapeDelta` (une `HashMap` par frame), `LandmarkProjection.toScreenPoint` (`Pair`
-  boxé × 478 points/frame), `RotationMath.multiply`/`transpose` (allocation par appel sur le chemin
-  de calibration), tri redondant de `selectedBlendshapeNames` dans `MainScreen.kt` à chaque frame.
+- Couleurs `Color(0xFF...)` dupliquées (5-6 fois chacune) au lieu de réutiliser `MaterialTheme.colorScheme`
+  -- touche 5-6 fichiers pour un gain purement cosmétique/maintenance.
+- `meanAbsoluteBlendshapeDelta` (une `HashMap` par frame) : un vrai correctif casserait le caractère
+  "fonction pure sans état" choisi délibérément cette session pour rester testable -- laissé tel quel.
+- `LandmarkProjection.toScreenPoint` (`Pair` boxé × 478 points/frame) : changerait la signature d'une
+  fonction publique déjà testée (`LandmarkProjectionTest.kt`) et son unique appelant.
+- `RotationMath.multiply`/`transpose` (allocation par appel sur le chemin de calibration) :
+  toucherait le fichier de maths le plus testé du projet, demanderait de nouvelles variantes
+  "in-place" sans casser les tests existants.
 
-`./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL` pour les deux commits.
+`./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL` pour les trois commits.
 
 ### 37. Lag ARCore observé en session, disparu après redémarrage complet -- cause non identifiée
 
