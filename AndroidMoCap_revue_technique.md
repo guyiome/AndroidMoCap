@@ -74,7 +74,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 37 | Lag ARCore en session, disparu après redémarrage complet | Signalé le 7 août 2026, cause non identifiée -- throttling thermique et coût de la détection d'anomalie écartés par le raisonnement, prochaine étape : capture logcat si reproduit |
 | 38 | VMC crashait systématiquement sur Android 11/API 30 (`NoSuchMethodError` javaosc-core) | **✅ corrigé et validé de bout en bout sur device le 8 août 2026** (plus de crash, connecteur VMC Blender reconnaît les paquets, contenu confirmé correct via Protokol -- noms et valeurs de blendshapes cohérents) -- voir section dédiée plus bas |
 | 39 | VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin | **✅ Validé de bout en bout sur device le 8 août 2026** (WebSocket/nv-websocket-client + kotlinx.serialization -- OkHttp abandonné, incompatible avec le serveur `websocket-sharp` de VTube Studio) -- connexion, popup d'autorisation, création des paramètres, réception confirmés fonctionnels, voir section dédiée plus bas |
-| 40 | Indicateur visuel "connexion en cours" sur l'écran principal | Backlog, idée ouverte le 8 août 2026, aucun code écrit -- voir section dédiée plus bas |
+| 40 | Indicateur visuel "connexion en cours" sur l'écran principal | **✅ implémenté le 8 août 2026** (teinte ambre pendant une connexion VTube Studio en cours, `MainHud.kt`) -- bug corrigé au passage (l'icône ne passait jamais au vert pour VTube Studio), voir section dédiée plus bas |
 | 41 | Traduction des blendshapes ARKit pour éviter le remapping manuel (VRM/Blender, VTube Studio) | Backlog, faisabilité étudiée le 8 août 2026 -- Blender/VRM déjà bon (convention "Perfect Sync"), VTube Studio jugé viable avec les formules VBridger (`AdvancedARKitSettings`) comme point de départ, OVR non exploré, voir section dédiée plus bas |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
@@ -1317,7 +1317,7 @@ Statut : backlog, aucun code écrit. Taille estimée comparable à un nouveau pe
 fonction pure de traduction par paramètre par défaut visé, testable en JVM comme le reste du
 protocole VTube Studio) plutôt qu'une modification triviale.
 
-### 40. Indicateur visuel "connexion en cours" sur l'écran principal -- backlog, idée ouverte le 8 août 2026
+### 40. Indicateur visuel "connexion en cours" sur l'écran principal -- ✅ implémenté le 8 août 2026
 
 Proposé par l'utilisateur pendant le test du point 39 : l'écran principal (bouton de connexion
 unique du HUD) ne distingue aujourd'hui que connecté/non connecté -- pas d'état intermédiaire
@@ -1326,10 +1326,27 @@ popup d'autorisation, création des paramètres, voir `VTubeStudioConnectionStat
 orange et/ou clignotement du bouton de connexion pendant les états intermédiaires, cohérent avec le
 patron déjà établi pour le bouton de calibrage (teinte rouge en cas d'anomalie, point 19).
 
-Statut : aucun code écrit, idée notée telle quelle. `MainUiState.vtsConnectionState` (déjà exposé)
-suffit à dériver l'état "en cours" côté `MainHud.kt` sans changement de modèle -- juste une question
-d'affichage à concevoir (quelle teinte exacte, clignotement ou statique, uniquement pour VTube
-Studio ou aussi la ligne de statut VMC/iFacialMocap).
+**Implémenté** (`MainHud.kt`) : teinte ambre (`0xFFFFB74D`, même couleur que l'avertissement
+thermique déjà présent dans ce bandeau -- cohérence visuelle plutôt qu'une nouvelle couleur) tant
+que `vtsConnectionState` n'est ni `Disconnected`, ni `ParametersRegistered`, ni `Failed`. Teinte
+statique, pas de clignotement -- aucun précédent de clignotement ailleurs dans ce bandeau
+(calibrage, thermique), rester cohérent plutôt qu'introduire un nouveau langage visuel pour ce
+seul cas ; ajustable plus tard si jugé insuffisamment visible en usage réel. Un appui pendant cet
+état annule la tentative (`MainViewModel.toggleActiveConnection` le fait déjà, aucun changement
+nécessaire côté ViewModel). Description d'accessibilité dédiée
+(`cd_connecting_tap_cancel`) plutôt que de réutiliser celle de "non connecté".
+
+**Bug corrigé au passage, trouvé en implémentant ce point** : `isConnected` dans `MainHud.kt` ne
+tenait compte que de `vmcEnabled`/`iFacialMocapConnectedTo` -- une connexion VTube Studio
+pleinement établie (`ParametersRegistered`) ne faisait jamais passer l'icône au vert, elle restait
+indéfiniment sur "non connecté". Sans ce correctif, ajouter la teinte "en cours" aurait laissé
+l'icône dans un état incohérent une fois la connexion réellement établie.
+
+Scope volontairement limité à VTube Studio pour cette passe (seul protocole avec un vrai cycle
+asynchrone à plusieurs étapes) -- **extension possible non traitée** : iFacialMocap a un état
+symétrique non distingué aujourd'hui (`iFacialMocapListening == true` mais
+`iFacialMocapConnectedTo == null` -- en écoute, VBridger pas encore connecté), actuellement affiché
+identique à "non connecté" alors que la même logique de teinte s'y appliquerait directement.
 
 ### 39. VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin -- ✅ validée de bout en bout sur device
 

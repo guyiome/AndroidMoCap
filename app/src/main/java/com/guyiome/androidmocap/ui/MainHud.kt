@@ -27,13 +27,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.guyiome.androidmocap.R
+import com.guyiome.androidmocap.network.VTubeStudioConnectionState
+import com.guyiome.androidmocap.settings.ConnectionType
 
 /**
  * Bandeau d'icônes minimal affiché en permanence sur l'écran caméra -- les 4 indicateurs/boutons
  * (visage détecté, connexion, réglages, mise à zéro) regroupés en un seul bloc en bas, sans
- * texte. Le bouton de connexion se base sur le type choisi dans [SettingsScreen] (VMC ou
- * iFacialMocap). Chaque icône pivote sur elle-même selon [iconRotationDegrees] pour rester
- * lisible quel que soit l'angle auquel le téléphone est tenu/posé.
+ * texte. Le bouton de connexion se base sur le type choisi dans [SettingsScreen] (VMC, iFacialMocap
+ * ou VTube Studio -- ce dernier a un cycle de connexion en plusieurs étapes asynchrones, teinté en
+ * ambre pendant qu'il progresse plutôt que de rester indiscernable d'un simple "non connecté",
+ * revue technique point 40). Chaque icône pivote sur elle-même selon [iconRotationDegrees] pour
+ * rester lisible quel que soit l'angle auquel le téléphone est tenu/posé.
  *
  * [faceDetected] est reçu séparément de [uiState] (issu de [MainViewModel.trackingFrame], mis à
  * jour à chaque frame) plutôt qu'inclus dedans -- ça garde [uiState] stable pour Compose, qui peut
@@ -49,7 +53,18 @@ fun MainHud(
     onToggleConnection: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    val isConnected = uiState.vmcEnabled || uiState.iFacialMocapConnectedTo != null
+    // VTube Studio (contrairement à VMC/iFacialMocap) a un cycle de connexion en plusieurs étapes
+    // asynchrones (voir VTubeStudioConnectionState, revue technique point 39/40) -- ParametersRegistered
+    // seul compte comme "connecté" ; tout état intermédiaire (ni Disconnected ni Failed) compte comme
+    // "en cours", affiché avec une teinte distincte plutôt que de rester indiscernable d'un simple
+    // "non connecté" comme avant ce point.
+    val vtsState = uiState.vtsConnectionState
+    val isVtsConnecting = uiState.connectionType == ConnectionType.VTUBE_STUDIO &&
+        vtsState != VTubeStudioConnectionState.Disconnected &&
+        vtsState != VTubeStudioConnectionState.ParametersRegistered &&
+        vtsState !is VTubeStudioConnectionState.Failed
+    val isConnected = uiState.vmcEnabled || uiState.iFacialMocapConnectedTo != null ||
+        vtsState == VTubeStudioConnectionState.ParametersRegistered
     val countdown = uiState.calibrationCountdownSeconds
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -85,15 +100,22 @@ fun MainHud(
             Spacer(Modifier.width(18.dp))
 
             // Connexion -- appuyer connecte/déconnecte selon le type choisi dans les réglages.
+            // Teinte ambre pendant une connexion VTube Studio en cours (même couleur que
+            // l'avertissement thermique ci-dessus, cohérence visuelle) -- un appui pendant cet état
+            // annule la tentative (MainViewModel.toggleActiveConnection s'en charge déjà).
             IconButton(onClick = onToggleConnection, modifier = Modifier.size(28.dp)) {
                 Icon(
                     imageVector = if (isConnected) Icons.Filled.Link else Icons.Filled.LinkOff,
-                    contentDescription = if (isConnected) {
-                        stringResource(R.string.cd_connected_tap_disconnect)
-                    } else {
-                        stringResource(R.string.cd_disconnected_tap_connect)
+                    contentDescription = when {
+                        isVtsConnecting -> stringResource(R.string.cd_connecting_tap_cancel)
+                        isConnected -> stringResource(R.string.cd_connected_tap_disconnect)
+                        else -> stringResource(R.string.cd_disconnected_tap_connect)
                     },
-                    tint = if (isConnected) Color(0xFF9FE7B0) else Color.White,
+                    tint = when {
+                        isVtsConnecting -> Color(0xFFFFB74D)
+                        isConnected -> Color(0xFF9FE7B0)
+                        else -> Color.White
+                    },
                     modifier = Modifier.rotate(-iconRotationDegrees),
                 )
             }

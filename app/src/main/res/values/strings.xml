@@ -32,6 +32,7 @@
     <string name="cd_face_detected">Face detected</string>
     <string name="cd_connected_tap_disconnect">Connected -- tap to disconnect</string>
     <string name="cd_disconnected_tap_connect">Not connected -- tap to connect</string>
+    <string name="cd_connecting_tap_cancel">Connecting… -- tap to cancel</string>
     <string name="cd_calibrate">Recenter</string>
     <string name="cd_calibrate_anomaly_detected">Recenter (pose drift detected)</string>
     <string name="settings_title">Settings</string>
