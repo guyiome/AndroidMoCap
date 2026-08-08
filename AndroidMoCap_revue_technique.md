@@ -71,6 +71,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 34 | Throttling thermique dynamique (débit réduit en cas de chauffe) | **✅ implémenté et vérifié sur device (via mock) le 7 août 2026**, voir section dédiée plus bas -- capteur thermique réel non exercé (appareil de test ne chauffe pas assez), câblage bout en bout confirmé |
 | 35 | Panneau de mocks de debug caché (thermique, ARCore, délégué GPU) | **✅ implémenté et vérifié sur device le 7 août 2026**, voir section dédiée plus bas -- les trois mocks confirmés fonctionnels |
 | 37 | Lag ARCore en session, disparu après redémarrage complet | Signalé le 7 août 2026, cause non identifiée -- throttling thermique et coût de la détection d'anomalie écartés par le raisonnement, prochaine étape : capture logcat si reproduit |
+| 38 | VMC crashait systématiquement sur Android 11/API 30 (`NoSuchMethodError` javaosc-core) | **✅ corrigé le 8 août 2026, bug critique** -- `OSCPortOut` remplacé par un envoi direct, voir section dédiée plus bas -- confirmation device (avec récepteur ouvert) en attente |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -1251,6 +1252,63 @@ visible sans device.
 Statut : pas de correctif tenté à l'aveugle. Prochaine étape si ça se reproduit : capture logcat
 continue pendant le lag (même méthode que les crashs diagnostiqués au point 13), pour voir si ARCore
 ou le driver GL logge un warning au moment où ça ralentit, plutôt que deviner davantage.
+
+### 38. VMC crashait systématiquement sur Android 11/API 30 -- ✅ corrigé, bug critique
+
+Retour utilisateur (8 août 2026) : changement d'IP VMC + "Envoyer" fait planter l'app, même sans
+récepteur ouvert et avec une IP saisie au hasard. Diagnostiqué au départ dans le cadre du point 14
+(champ IP figé, cosmétique) -- capture logcat révélant un bug bien plus grave, requalifié en
+priorité absolue à la demande de l'utilisateur.
+
+**Stack trace (logcat, 8 août 2026, 12:05:32)** :
+```
+FATAL EXCEPTION: DefaultDispatcher-worker-2
+java.lang.NoSuchMethodError: No virtual method getDefinedPackage(...)Ljava/lang/Package;
+  in class Ljava/lang/ClassLoader;
+	at com.illposed.osc.LibraryInfo.<clinit>(LibraryInfo.java:46)
+	at com.illposed.osc.LibraryInfo.hasStandardProtocolFamily(LibraryInfo.java:283)
+	at com.illposed.osc.transport.udp.UDPTransport.<init>(UDPTransport.java:61)
+	at com.illposed.osc.transport.OSCPortOut.<init>
+	at com.guyiome.androidmocap.network.VmcOscSender.connect(VmcOscSender.kt:81)
+```
+
+**Cause, vérifiée sur les sources exactes de javaosc-core 0.9** (`javaosc-core-0.9-sources.jar`,
+extrait depuis le cache Gradle -- pas la branche `master` de GitHub, qui peut différer de la version
+réellement utilisée) : le bloc d'initialisation statique de `LibraryInfo` appelle
+`ClassLoader.getDefinedPackage(String)` (API Java 9+) pour construire une liste de "packages sans
+intérêt" à des fins d'affichage (`createLibrarySummary()`, jamais utilisé par cette app) -- absente
+du runtime ART sur Android 11 / API 30 (confirmé, `getprop ro.build.version.sdk` = 30 sur
+l'appareil de test). Une fois cette classe en échec d'initialisation, la sémantique JVM standard la
+marque en erreur pour tout le reste du process -- **pas un cas limite lié à l'IP saisie, une
+régression totale** : toute tentative de connexion VMC plantait, quelle que soit l'adresse. C'est un
+`Error`, pas une `Exception` : le `catch (e: Exception)` du point 2 (commit `42a82f6`, la veille) ne
+pouvait de toute façon pas l'attraper -- corriger le point 2 avait amélioré le diagnostic (log ajouté)
+mais ne pouvait pas empêcher ce crash précis.
+
+**javaosc-core 0.9 est déjà la dernière version disponible** (vérifié) -- pas de simple mise à jour
+de dépendance possible.
+
+**Correctif** : `VmcOscSender` n'utilise plus `OSCPortOut`/`OSCPort` (dont la construction instancie
+`UDPTransport`, qui référence `LibraryInfo`). Vérifié par recherche exhaustive dans les sources 0.9 :
+seuls `LibraryInfo.java` et `UDPTransport.java` référencent `LibraryInfo` dans toute la bibliothèque
+-- la partie encodage du protocole (`OSCSerializerAndParserBuilder`/`OSCSerializer`/
+`BufferBytesReceiver`) en est totalement indépendante. `VmcOscSender` reproduit maintenant
+exactement ce que fait `OSCDatagramChannel.send()` en interne (construire un `OSCSerializer` via le
+builder, écrire le paquet dans un buffer, en extraire les octets), mais avec un `DatagramSocket`
+classique à la place d'`UDPTransport`/`DatagramChannel` -- même sémantique "non connecté", adresse
+distante précisée à chaque envoi (déjà le comportement d'origine, `OSCPort.connect()` n'était jamais
+appelé).
+
+**Nouveau test de bout en bout** (`VmcOscSenderTest`, la sérialisation extraite en fonction pure
+testable `serializeToBytes`) : construit un bundle, le sérialise via le nouveau chemin, le reparse
+avec `OSCParser` (indépendant du bug, vérifié) et compare le contenu -- preuve en JVM que le
+contournement produit réellement des octets valides, pas seulement qu'il compile.
+
+`./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL`. **Résidu non vérifiable depuis ce
+sandbox** : le comportement réel d'ART sur device (un test JVM ne simule pas les particularités
+d'ART), mais le nouveau code ne référence plus du tout `LibraryInfo`/`UDPTransport`/`OSCPort` --
+vérifié par recherche exhaustive dans le code source, pas par supposition. À confirmer par un vrai
+test VMC sur device (avec un récepteur VTube Studio/Blender/Unity ouvert cette fois).
 
 ## Automatisation
 
