@@ -71,7 +71,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 34 | Throttling thermique dynamique (débit réduit en cas de chauffe) | **✅ implémenté et vérifié sur device (via mock) le 7 août 2026**, voir section dédiée plus bas -- capteur thermique réel non exercé (appareil de test ne chauffe pas assez), câblage bout en bout confirmé |
 | 35 | Panneau de mocks de debug caché (thermique, ARCore, délégué GPU) | **✅ implémenté et vérifié sur device le 7 août 2026**, voir section dédiée plus bas -- les trois mocks confirmés fonctionnels |
 | 37 | Lag ARCore en session, disparu après redémarrage complet | Signalé le 7 août 2026, cause non identifiée -- throttling thermique et coût de la détection d'anomalie écartés par le raisonnement, prochaine étape : capture logcat si reproduit |
-| 38 | VMC crashait systématiquement sur Android 11/API 30 (`NoSuchMethodError` javaosc-core) | **✅ corrigé et confirmé sur device le 8 août 2026** (plus de crash) -- voir section dédiée plus bas ; reste à confirmer l'envoi VMC de bout en bout avec un récepteur qui reçoit réellement du VMC (voir point 39) |
+| 38 | VMC crashait systématiquement sur Android 11/API 30 (`NoSuchMethodError` javaosc-core) | **✅ corrigé et confirmé sur device le 8 août 2026** (plus de crash, connecteur VMC Blender reconnaît les paquets) -- voir section dédiée plus bas ; confirmation visuelle des valeurs de blendshapes encore en attente (pas de mesh configuré côté Blender) |
 | 39 | VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin | **Implémenté le 8 août 2026** (WebSocket/OkHttp + kotlinx.serialization, machine à état testée), voir section dédiée plus bas -- ⚠️ connectivité LAN du serveur VTube Studio non vérifiable depuis ce sandbox, à tester en premier sur device |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
@@ -1401,10 +1401,15 @@ normalement. ⚠️ Mais aucune donnée visible côté VTube Studio une fois con
 point 39) : ce n'est pas un residu du bug corrigé ici, mais une hypothèse de conception erronée du
 projet -- VTube Studio ne reçoit vraisemblablement pas le protocole VMC/OSC en entrée du tout (sa
 doc officielle des réglages ne mentionne aucune réception VMC, seulement l'envoi *vers* VSeeFace, et
-l'utilisateur ne trouve aucune option correspondante dans l'app). Le correctif de ce point reste
-validé pour ce qu'il corrige (le crash) ; reste à tester avec un récepteur qui reçoit réellement du
-VMC (Blender, addon VMC officiel) pour confirmer l'envoi de bout en bout indépendamment de VTube
-Studio.
+l'utilisateur ne trouve aucune option correspondante dans l'app).
+
+**Confirmation Blender (8 août 2026)** : le connecteur VMC de Blender affiche "connecté" -- premier
+récepteur tiers indépendant (pas notre propre test JVM round-trip) qui reconnaît les paquets envoyés
+comme des bundles VMC/OSC valides. Confirme le correctif ET le format des paquets. Pas encore de
+confirmation visuelle des valeurs de blendshapes elles-mêmes (aucun mesh/shape keys configuré côté
+Blender pour l'instant, donc rien à animer même si les données sont correctes) -- piste suggérée :
+un moniteur OSC générique comme Protokol (hexler.net/protokol), pointé sur le même port, afficherait
+en direct les messages `/VMC/Ext/Blend/Val` reçus (nom + valeur), sans besoin de monter un avatar.
 
 ## Automatisation
 
