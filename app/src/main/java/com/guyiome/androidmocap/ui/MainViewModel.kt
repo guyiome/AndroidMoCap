@@ -16,6 +16,8 @@ import com.guyiome.androidmocap.camera.CameraController
 import com.guyiome.androidmocap.capabilities.DeviceCapabilities
 import com.guyiome.androidmocap.capabilities.DeviceCapabilityDetector
 import com.guyiome.androidmocap.network.IFacialMocapSender
+import com.guyiome.androidmocap.network.VTubeStudioConnectionState
+import com.guyiome.androidmocap.network.VTubeStudioSender
 import com.guyiome.androidmocap.network.VmcOscSender
 import com.guyiome.androidmocap.network.getLocalIpAddress
 import com.guyiome.androidmocap.sensors.DeviceOrientationTracker
@@ -82,6 +84,14 @@ data class MainUiState(
     // l'écran principal (et l'IP VMC mémorisée, utilisée quand ce type est VMC).
     val connectionType: ConnectionType? = null,
     val savedVmcHost: String = "",
+    // VTube Studio (API Plugin, point 39) : intégration directe alternative à VMC, que VTube
+    // Studio ne reçoit vraisemblablement pas nativement en entrée (voir revue technique).
+    // Contrairement à VMC (UDP, immédiat), la connexion passe par plusieurs étapes asynchrones
+    // (socket, popup d'autorisation utilisateur, création des paramètres) avant d'être utilisable
+    // -- voir VTubeStudioConnectionState pour le détail de ces étapes.
+    val vtsTargetLabel: String = "",
+    val vtsConnectionState: VTubeStudioConnectionState = VTubeStudioConnectionState.Disconnected,
+    val savedVtsHost: String = "",
     // Calibration : pose de tête courante prise comme "zéro" pour compenser un téléphone
     // légèrement décalé/tourné par rapport au visage (contrainte physique de positionnement).
     val isCalibrated: Boolean = false,
@@ -202,6 +212,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var arCoreHeadPoseTracker: ArCoreHeadPoseTracker? = null
     private var vmcSender: VmcOscSender? = null
     private var iFacialMocapSender: IFacialMocapSender? = null
+    private var vtubeStudioSender: VTubeStudioSender? = null
+    // Jeton d'authentification VTube Studio courant (voir ConnectionSettingsStore.vtsAuthToken) --
+    // gardé en mémoire ici plutôt que dans MainUiState (jamais affiché à l'utilisateur), pour être
+    // transmis au prochain VTubeStudioSender construit sans redemander le popup d'autorisation.
+    @Volatile private var savedVtsAuthToken: String? = null
     private var deviceOrientationTracker: DeviceOrientationTracker? = null
     private val connectionSettingsStore = ConnectionSettingsStore(application)
     private val appSettingsStore = AppSettingsStore(application)
@@ -260,6 +275,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             connectionSettingsStore.vmcHost.collect { host ->
                 _uiState.update { it.copy(savedVmcHost = host ?: "") }
             }
+        }
+        viewModelScope.launch {
+            connectionSettingsStore.vtsHost.collect { host ->
+                _uiState.update { it.copy(savedVtsHost = host ?: "") }
+            }
+        }
+        viewModelScope.launch {
+            connectionSettingsStore.vtsAuthToken.collect { token -> savedVtsAuthToken = token }
         }
         viewModelScope.launch {
             appSettingsStore.lowBatteryThresholdPercent.collect { percent ->
@@ -601,6 +624,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         vmcSender?.send(calibrated)
         iFacialMocapSender?.send(calibrated)
+        vtubeStudioSender?.send(calibrated)
     }
 
     /**
@@ -813,6 +837,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             ConnectionType.IFACIALMOCAP -> {
                 if (_uiState.value.iFacialMocapListening) stopIFacialMocapListening() else startIFacialMocapListening()
             }
+            ConnectionType.VTUBE_STUDIO -> {
+                val state = _uiState.value.vtsConnectionState
+                if (state != VTubeStudioConnectionState.Disconnected && state !is VTubeStudioConnectionState.Failed) {
+                    disconnectVtsTarget()
+                } else {
+                    val host = _uiState.value.savedVtsHost
+                    if (host.isBlank()) {
+                        val message = getApplication<Application>().getString(R.string.error_vts_ip_missing)
+                        _uiState.update { it.copy(errorMessage = message) }
+                    } else {
+                        connectVtsTarget(host)
+                    }
+                }
+            }
             null -> {
                 val message = getApplication<Application>().getString(R.string.error_no_connection_type)
                 _uiState.update { it.copy(errorMessage = message) }
@@ -857,6 +895,49 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(vmcEnabled = false, vmcTargetLabel = "") }
     }
 
+    // --- VTube Studio : intégration directe via l'API Plugin (point 39) ---
+
+    /**
+     * Configure la cible VTube Studio (IP du PC + port de son API Plugin, 8001 par défaut) et lance
+     * la connexion. Asynchrone en plusieurs étapes (voir [MainUiState.vtsConnectionState], mis à
+     * jour au fil de la connexion via le callback [VTubeStudioSender] plutôt que d'un coup comme
+     * [connectVmcTarget] -- VMC n'a pas de poignée de main, VTube Studio si (socket, popup
+     * d'autorisation utilisateur, création des paramètres).
+     */
+    fun connectVtsTarget(hostText: String, port: Int = VTubeStudioSender.DEFAULT_PORT) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val address = InetAddress.getByName(hostText)
+                vtubeStudioSender?.close()
+                vtubeStudioSender = VTubeStudioSender(
+                    host = address,
+                    port = port,
+                    storedAuthToken = savedVtsAuthToken,
+                    onStateChanged = { state -> _uiState.update { it.copy(vtsConnectionState = state) } },
+                    onNewAuthToken = { token ->
+                        // Callback appelé depuis un thread interne à OkHttp -- écrire dans
+                        // ConnectionSettingsStore (DataStore) est déjà sûr depuis n'importe quel
+                        // thread, pas besoin de revenir sur Dispatchers.IO explicitement ici, mais
+                        // on le fait quand même pour rester cohérent avec le reste de ce fichier.
+                        savedVtsAuthToken = token
+                        viewModelScope.launch(Dispatchers.IO) { connectionSettingsStore.setVtsAuthToken(token) }
+                    },
+                )
+                _uiState.update { it.copy(vtsTargetLabel = "$hostText:$port", errorMessage = null) }
+                connectionSettingsStore.setVtsHost(hostText)
+            } catch (e: Exception) {
+                val message = getApplication<Application>().getString(R.string.error_vts_invalid_address, hostText)
+                _uiState.update { it.copy(errorMessage = message) }
+            }
+        }
+    }
+
+    fun disconnectVtsTarget() {
+        vtubeStudioSender?.close()
+        vtubeStudioSender = null
+        _uiState.update { it.copy(vtsTargetLabel = "", vtsConnectionState = VTubeStudioConnectionState.Disconnected) }
+    }
+
     // --- iFacialMocap / MeowFace : lecture native par VBridger (et VTube Studio, VSeeFace...) ---
 
     /** Se met à l'écoute du handshake iFacialMocap sur le port 49983 -- c'est le PC qui initie. */
@@ -881,6 +962,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         faceLandmarkerHelper?.close()
         vmcSender?.close()
         iFacialMocapSender?.stopListening()
+        vtubeStudioSender?.close()
         deviceOrientationTracker?.stop()
         calibrationCountdownJob?.cancel()
         powerSaveTimerJob?.cancel()

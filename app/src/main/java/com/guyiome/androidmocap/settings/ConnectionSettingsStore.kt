@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.map
 enum class ConnectionType {
     VMC,
     IFACIALMOCAP,
+    VTUBE_STUDIO,
 }
 
 private val Context.connectionSettingsDataStore by preferencesDataStore(name = "connection_settings")
@@ -25,6 +26,11 @@ class ConnectionSettingsStore(private val context: Context) {
     private object Keys {
         val CONNECTION_TYPE = stringPreferencesKey("connection_type")
         val VMC_HOST = stringPreferencesKey("vmc_host")
+        val VTS_HOST = stringPreferencesKey("vts_host")
+
+        // Jeton d'authentification VTube Studio (point 39) -- délivré une fois par popup
+        // d'autorisation utilisateur, réutilisable tant qu'il n'est pas révoqué côté VTube Studio.
+        val VTS_AUTH_TOKEN = stringPreferencesKey("vts_auth_token")
     }
 
     val connectionType: Flow<ConnectionType?> = context.connectionSettingsDataStore.data.map { prefs ->
@@ -33,11 +39,24 @@ class ConnectionSettingsStore(private val context: Context) {
 
     val vmcHost: Flow<String?> = context.connectionSettingsDataStore.data.map { prefs -> prefs[Keys.VMC_HOST] }
 
+    val vtsHost: Flow<String?> = context.connectionSettingsDataStore.data.map { prefs -> prefs[Keys.VTS_HOST] }
+
+    val vtsAuthToken: Flow<String?> =
+        context.connectionSettingsDataStore.data.map { prefs -> prefs[Keys.VTS_AUTH_TOKEN] }
+
     suspend fun setConnectionType(type: ConnectionType) {
         context.connectionSettingsDataStore.edit { prefs -> prefs[Keys.CONNECTION_TYPE] = type.name }
     }
 
     suspend fun setVmcHost(host: String) {
         context.connectionSettingsDataStore.edit { prefs -> prefs[Keys.VMC_HOST] = host }
+    }
+
+    suspend fun setVtsHost(host: String) {
+        context.connectionSettingsDataStore.edit { prefs -> prefs[Keys.VTS_HOST] = host }
+    }
+
+    suspend fun setVtsAuthToken(token: String) {
+        context.connectionSettingsDataStore.edit { prefs -> prefs[Keys.VTS_AUTH_TOKEN] = token }
     }
 }
