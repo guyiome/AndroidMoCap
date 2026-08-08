@@ -34,9 +34,26 @@ private const val API_VERSION = "1.0"
 internal const val PLUGIN_NAME = "AndroidMoCap"
 internal const val PLUGIN_DEVELOPER = "AndroidMoCap"
 
-/** `ignoreUnknownKeys` : l'API VTube Studio peut ajouter des champs (ex. `timestamp`) qu'on ignore. */
+/**
+ * `ignoreUnknownKeys` : l'API VTube Studio peut ajouter des champs (ex. `timestamp`) qu'on ignore.
+ *
+ * `encodeDefaults = true` -- **critique** : sans ce réglage, kotlinx.serialization omet du JSON
+ * tout champ dont la valeur égale sa valeur par défaut dans la classe Kotlin. Or `apiName`,
+ * `apiVersion`, `pluginName`, `pluginDeveloper` ont tous une valeur par défaut qui est justement
+ * celle envoyée en pratique -- sans `encodeDefaults`, ces champs disparaissaient purement et
+ * simplement du JSON envoyé (confirmé par logcat sur device, 8 août 2026 : `"data":{}` au lieu de
+ * `{"pluginName":"AndroidMoCap","pluginDeveloper":"AndroidMoCap"}`), rendant VTube Studio incapable
+ * d'identifier le plugin -- aucune erreur renvoyée, juste un silence total côté serveur.
+ *
+ * ⚠️ Piège pour la suite : le round-trip encode→décode ne détecte PAS ce genre de bug tout seul --
+ * le décodage réapplique les mêmes valeurs par défaut pour les champs absents, donc les deux bugs
+ * (encodage qui omet, décodage qui comble) s'annulent silencieusement à l'intérieur de ce projet.
+ * Seul un vrai récepteur externe (ou une assertion sur le texte JSON brut, voir
+ * `VTubeStudioProtocolTest`) peut révéler la différence.
+ */
 internal val vtsJson = Json {
     ignoreUnknownKeys = true
+    encodeDefaults = true
 }
 
 @Serializable

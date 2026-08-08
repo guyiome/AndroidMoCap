@@ -30,6 +30,23 @@ class VTubeStudioProtocolTest {
     }
 
     @Test
+    fun `buildAuthTokenRequestJson serialise vraiment les champs, pas juste au decodage`() {
+        // Régression du 8 août 2026 (device) : sans encodeDefaults=true, kotlinx.serialization
+        // omet du JSON tout champ dont la valeur égale son défaut Kotlin -- ici TOUS les champs
+        // (apiName/apiVersion/pluginName/pluginDeveloper valent tous leur défaut en pratique), le
+        // JSON envoyé à VTube Studio devenait `{"requestID":"...","messageType":"...","data":{}}`.
+        // Un simple round-trip (voir le test précédent) ne détecte PAS ce bug : le décodage
+        // réapplique les mêmes valeurs par défaut pour les champs absents, masquant le problème.
+        // Seule une assertion sur le texte JSON brut, comme ici, le révèle.
+        val json = buildAuthTokenRequestJson("req-1")
+
+        assertTrue("apiName manquant du JSON brut : $json", json.contains("\"apiName\":\"VTubeStudioPublicAPI\""))
+        assertTrue("apiVersion manquant du JSON brut : $json", json.contains("\"apiVersion\":\"1.0\""))
+        assertTrue("pluginName manquant du JSON brut : $json", json.contains("\"pluginName\":\"$PLUGIN_NAME\""))
+        assertTrue("pluginDeveloper manquant du JSON brut : $json", json.contains("\"pluginDeveloper\":\"$PLUGIN_DEVELOPER\""))
+    }
+
+    @Test
     fun `buildAuthRequestJson embarque le token fourni`() {
         val envelope = parseEnvelope(buildAuthRequestJson("req-2", "mon-token"))
 
