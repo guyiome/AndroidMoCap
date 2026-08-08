@@ -71,7 +71,8 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 34 | Throttling thermique dynamique (débit réduit en cas de chauffe) | **✅ implémenté et vérifié sur device (via mock) le 7 août 2026**, voir section dédiée plus bas -- capteur thermique réel non exercé (appareil de test ne chauffe pas assez), câblage bout en bout confirmé |
 | 35 | Panneau de mocks de debug caché (thermique, ARCore, délégué GPU) | **✅ implémenté et vérifié sur device le 7 août 2026**, voir section dédiée plus bas -- les trois mocks confirmés fonctionnels |
 | 37 | Lag ARCore en session, disparu après redémarrage complet | Signalé le 7 août 2026, cause non identifiée -- throttling thermique et coût de la détection d'anomalie écartés par le raisonnement, prochaine étape : capture logcat si reproduit |
-| 38 | VMC crashait systématiquement sur Android 11/API 30 (`NoSuchMethodError` javaosc-core) | **✅ corrigé le 8 août 2026, bug critique** -- `OSCPortOut` remplacé par un envoi direct, voir section dédiée plus bas -- confirmation device (avec récepteur ouvert) en attente |
+| 38 | VMC crashait systématiquement sur Android 11/API 30 (`NoSuchMethodError` javaosc-core) | **✅ corrigé et confirmé sur device le 8 août 2026** (plus de crash) -- voir section dédiée plus bas ; reste à confirmer l'envoi VMC de bout en bout avec un récepteur qui reçoit réellement du VMC (voir point 39) |
+| 39 | VTube Studio ne reçoit probablement pas VMC/OSC -- piste d'intégration directe via son API Plugin | Backlog, piste jugée viable (WebSocket port 8001, doc officielle vérifiée), conception à faire, voir section dédiée plus bas |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -1253,6 +1254,55 @@ Statut : pas de correctif tenté à l'aveugle. Prochaine étape si ça se reprod
 continue pendant le lag (même méthode que les crashs diagnostiqués au point 13), pour voir si ARCore
 ou le driver GL logge un warning au moment où ça ralentit, plutôt que deviner davantage.
 
+### 39. VTube Studio ne reçoit probablement pas VMC/OSC -- piste d'intégration directe via son API Plugin
+
+Suite à la confirmation device du correctif du point 38 (plus de crash), l'utilisateur signale
+n'avoir aucun retour visible côté VTube Studio, et ne pas trouver où paramétrer la réception VMC
+dans l'app.
+
+**Investigation (8 août 2026)**, croisée plutôt que devinée :
+- La doc officielle des réglages VTube Studio (`github.com/DenchiSoft/VTubeStudio/wiki/VTube-Studio-Settings`)
+  ne mentionne aucune option de réception VMC/OSC -- la seule mention VMC concerne l'envoi *sortant*
+  vers VSeeFace (sens inverse de ce dont cette app a besoin).
+- Confirmé par l'utilisateur en direct dans l'app : aucune option liée à VMC/OSC/réception de
+  tracking externe trouvée dans les réglages VTube Studio.
+- Recherche plus large : l'intégration tierce de VTube Studio passe par sa propre **API Plugin**
+  (WebSocket JSON, port 8001 par défaut), pas par VMC/OSC générique -- VNyan/VSeeFace sont les
+  logiciels habituellement cités comme récepteurs VMC natifs, pas VTube Studio.
+
+**Conclusion provisoire** : l'hypothèse de conception du projet ("VMC/OSC -- destiné à VTube
+Studio, Blender, Unity", `AndroidMoCap_spec_fonctionnelle.md`, `README.md`) est probablement fausse
+pour la partie VTube Studio spécifiquement. Le correctif du point 38 reste valide pour ce qu'il
+corrige (le crash) ; à confirmer que l'envoi VMC fonctionne bien de bout en bout avec un vrai
+récepteur VMC (Blender, addon officiel) avant de statuer définitivement sur Blender/Unity.
+
+**Piste alternative proposée par l'utilisateur** : VBridger (déjà supporté par cette app via
+`IFacialMocapSender`/UDP) est détecté par VTube Studio comme un plugin (connexion locale sur le
+port 8001) et lui transmet ses données -- suggère que l'API Plugin officielle de VTube Studio est
+la bonne voie pour une intégration *directe*, plutôt que VMC.
+
+**Faisabilité technique vérifiée sur la doc officielle** (`github.com/DenchiSoft/VTubeStudio`), pas
+supposée :
+- WebSocket JSON, `ws://localhost:8001` par défaut (port configurable côté VTube Studio).
+- Auth : `AuthenticationTokenRequest` (nom du plugin/dev, icône optionnelle) -> popup d'autorisation
+  affiché à l'utilisateur dans VTube Studio -> `authenticationToken` (jusqu'à 64 caractères ASCII)
+  réutilisable pour les sessions suivantes, jusqu'à révocation manuelle par l'utilisateur. À
+  persister côté app (DataStore, même patron que l'IP VMC).
+- Données : `ParameterCreationRequest` (une fois, par paramètre : nom 4-32 alphanumériques, min/max,
+  valeur par défaut) puis `InjectParameterDataRequest` en boucle (tableau `parameterValues` avec
+  `id`/`value`). Contrainte : renvoyer au moins 1×/seconde sous peine de reset -- aucun problème,
+  l'app envoie à 20-60 Hz.
+- **Question de conception non résolue** : contrairement à VMC (noms de blendshapes ARKit reconnus
+  automatiquement par un avatar VRM), les paramètres de l'API VTube Studio sont propres à chaque
+  modèle Live2D -- des paramètres personnalisés créés via l'API devraient être mappés manuellement
+  une fois par l'utilisateur dans son modèle. Probablement le même mécanisme qu'utilise VBridger,
+  à confirmer avant de concevoir le mapping ARKit -> paramètres VTube Studio.
+
+**Statut** : backlog, piste jugée viable mais non conçue en détail -- nouveau type d'émetteur
+(WebSocket, cycle d'auth avec jeton persisté, création de paramètres, mapping utilisateur), taille
+comparable à la fusion ARCore. Nécessite un vrai passage en mode plan avant tout code, et un test
+device avec VTube Studio + un modèle Live2D configuré (hors de portée de ce sandbox).
+
 ### 38. VMC crashait systématiquement sur Android 11/API 30 -- ✅ corrigé, bug critique
 
 Retour utilisateur (8 août 2026) : changement d'IP VMC + "Envoyer" fait planter l'app, même sans
@@ -1307,8 +1357,17 @@ contournement produit réellement des octets valides, pas seulement qu'il compil
 `./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL`. **Résidu non vérifiable depuis ce
 sandbox** : le comportement réel d'ART sur device (un test JVM ne simule pas les particularités
 d'ART), mais le nouveau code ne référence plus du tout `LibraryInfo`/`UDPTransport`/`OSCPort` --
-vérifié par recherche exhaustive dans le code source, pas par supposition. À confirmer par un vrai
-test VMC sur device (avec un récepteur VTube Studio/Blender/Unity ouvert cette fois).
+vérifié par recherche exhaustive dans le code source, pas par supposition.
+
+**Confirmation device (8 août 2026)** : ✅ plus de crash, changement d'IP + "Envoyer" fonctionnent
+normalement. ⚠️ Mais aucune donnée visible côté VTube Studio une fois connecté. Investigué (voir
+point 39) : ce n'est pas un residu du bug corrigé ici, mais une hypothèse de conception erronée du
+projet -- VTube Studio ne reçoit vraisemblablement pas le protocole VMC/OSC en entrée du tout (sa
+doc officielle des réglages ne mentionne aucune réception VMC, seulement l'envoi *vers* VSeeFace, et
+l'utilisateur ne trouve aucune option correspondante dans l'app). Le correctif de ce point reste
+validé pour ce qu'il corrige (le crash) ; reste à tester avec un récepteur qui reçoit réellement du
+VMC (Blender, addon VMC officiel) pour confirmer l'envoi de bout en bout indépendamment de VTube
+Studio.
 
 ## Automatisation
 
