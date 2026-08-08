@@ -73,6 +73,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 37 | Lag ARCore en session, disparu après redémarrage complet | Signalé le 7 août 2026, cause non identifiée -- throttling thermique et coût de la détection d'anomalie écartés par le raisonnement, prochaine étape : capture logcat si reproduit |
 | 38 | VMC crashait systématiquement sur Android 11/API 30 (`NoSuchMethodError` javaosc-core) | **✅ corrigé et validé de bout en bout sur device le 8 août 2026** (plus de crash, connecteur VMC Blender reconnaît les paquets, contenu confirmé correct via Protokol -- noms et valeurs de blendshapes cohérents) -- voir section dédiée plus bas |
 | 39 | VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin | **✅ Validé de bout en bout sur device le 8 août 2026** (WebSocket/nv-websocket-client + kotlinx.serialization -- OkHttp abandonné, incompatible avec le serveur `websocket-sharp` de VTube Studio) -- connexion, popup d'autorisation, création des paramètres, réception confirmés fonctionnels, voir section dédiée plus bas |
+| 40 | Indicateur visuel "connexion en cours" sur l'écran principal | Backlog, idée ouverte le 8 août 2026, aucun code écrit -- voir section dédiée plus bas |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -1253,6 +1254,20 @@ visible sans device.
 Statut : pas de correctif tenté à l'aveugle. Prochaine étape si ça se reproduit : capture logcat
 continue pendant le lag (même méthode que les crashs diagnostiqués au point 13), pour voir si ARCore
 ou le driver GL logge un warning au moment où ça ralentit, plutôt que deviner davantage.
+
+### 40. Indicateur visuel "connexion en cours" sur l'écran principal -- backlog, idée ouverte le 8 août 2026
+
+Proposé par l'utilisateur pendant le test du point 39 : l'écran principal (bouton de connexion
+unique du HUD) ne distingue aujourd'hui que connecté/non connecté -- pas d'état intermédiaire
+visible pendant qu'une connexion VTube Studio progresse (plusieurs étapes asynchrones : socket,
+popup d'autorisation, création des paramètres, voir `VTubeStudioConnectionState`). Idée : teinte
+orange et/ou clignotement du bouton de connexion pendant les états intermédiaires, cohérent avec le
+patron déjà établi pour le bouton de calibrage (teinte rouge en cas d'anomalie, point 19).
+
+Statut : aucun code écrit, idée notée telle quelle. `MainUiState.vtsConnectionState` (déjà exposé)
+suffit à dériver l'état "en cours" côté `MainHud.kt` sans changement de modèle -- juste une question
+d'affichage à concevoir (quelle teinte exacte, clignotement ou statique, uniquement pour VTube
+Studio ou aussi la ligne de statut VMC/iFacialMocap).
 
 ### 39. VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin -- ✅ validée de bout en bout sur device
 
