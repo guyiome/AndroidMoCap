@@ -31,6 +31,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.guyiome.androidmocap.R
+import com.guyiome.androidmocap.network.VTubeStudioConnectionState
+import com.guyiome.androidmocap.network.VTubeStudioSender
 import com.guyiome.androidmocap.settings.ConnectionType
 
 /**
@@ -49,8 +51,12 @@ fun ConnectionSettingsScreen(
     onDisconnectVmc: () -> Unit,
     onStartIFacialMocap: () -> Unit,
     onStopIFacialMocap: () -> Unit,
+    onConnectVts: (String, Int) -> Unit,
+    onDisconnectVts: () -> Unit,
 ) {
     var vmcHostInput by remember { mutableStateOf(uiState.savedVmcHost.ifBlank { "192.168.1.100" }) }
+    var vtsHostInput by remember { mutableStateOf(uiState.savedVtsHost.ifBlank { "192.168.1.100" }) }
+    var vtsPortInput by remember { mutableStateOf(VTubeStudioSender.DEFAULT_PORT.toString()) }
 
     BackHandler(onBack = onClose)
     Box(
@@ -93,6 +99,12 @@ fun ConnectionSettingsScreen(
                     selected = uiState.connectionType == ConnectionType.IFACIALMOCAP,
                     onClick = { onSelectConnectionType(ConnectionType.IFACIALMOCAP) },
                     label = { Text(stringResource(R.string.connection_type_udp_vbridger)) },
+                )
+                Spacer(Modifier.width(8.dp))
+                FilterChip(
+                    selected = uiState.connectionType == ConnectionType.VTUBE_STUDIO,
+                    onClick = { onSelectConnectionType(ConnectionType.VTUBE_STUDIO) },
+                    label = { Text(stringResource(R.string.connection_type_vts)) },
                 )
             }
 
@@ -158,6 +170,64 @@ fun ConnectionSettingsScreen(
                     }
                 }
 
+                ConnectionType.VTUBE_STUDIO -> {
+                    val state = uiState.vtsConnectionState
+                    val isBusy = state != VTubeStudioConnectionState.Disconnected && state !is VTubeStudioConnectionState.Failed
+
+                    Spacer(Modifier.height(24.dp))
+                    Text(
+                        stringResource(R.string.connection_vts_section_title),
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                        OutlinedTextField(
+                            value = vtsHostInput,
+                            onValueChange = { vtsHostInput = it },
+                            label = { Text(stringResource(R.string.connection_vts_ip_label)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        OutlinedTextField(
+                            value = vtsPortInput,
+                            onValueChange = { vtsPortInput = it },
+                            label = { Text(stringResource(R.string.connection_vts_port_label)) },
+                            singleLine = true,
+                            modifier = Modifier.width(96.dp),
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    if (isBusy) {
+                        Button(onClick = onDisconnectVts) { Text(stringResource(R.string.action_stop)) }
+                    } else {
+                        Button(
+                            onClick = {
+                                val port = vtsPortInput.toIntOrNull() ?: VTubeStudioSender.DEFAULT_PORT
+                                onConnectVts(vtsHostInput, port)
+                            },
+                        ) { Text(stringResource(R.string.action_send)) }
+                    }
+                    Text(
+                        vtsStatusText(state),
+                        color = when {
+                            state == VTubeStudioConnectionState.ParametersRegistered -> Color(0xFF9FE7B0)
+                            state is VTubeStudioConnectionState.Failed -> Color(0xFFFF8080)
+                            else -> Color.White.copy(alpha = 0.8f)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    if (state == VTubeStudioConnectionState.ParametersRegistered) {
+                        Text(
+                            stringResource(R.string.connection_vts_mapping_hint),
+                            color = Color.White.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
+
                 null -> {
                     Spacer(Modifier.height(24.dp))
                     Text(
@@ -169,4 +239,19 @@ fun ConnectionSettingsScreen(
             }
         }
     }
+}
+
+/**
+ * Texte de statut affiché pendant la connexion VTube Studio -- plusieurs étapes asynchrones (voir
+ * [VTubeStudioConnectionState]), contrairement à VMC qui n'a que connecté/non connecté.
+ */
+@Composable
+private fun vtsStatusText(state: VTubeStudioConnectionState): String = when (state) {
+    VTubeStudioConnectionState.Disconnected -> stringResource(R.string.connection_vts_status_disconnected)
+    VTubeStudioConnectionState.Connecting -> stringResource(R.string.connection_vts_status_connecting)
+    VTubeStudioConnectionState.AwaitingUserApproval -> stringResource(R.string.connection_vts_status_awaiting_approval)
+    VTubeStudioConnectionState.Authenticating -> stringResource(R.string.connection_vts_status_authenticating)
+    VTubeStudioConnectionState.Authenticated -> stringResource(R.string.connection_vts_status_registering_params)
+    VTubeStudioConnectionState.ParametersRegistered -> stringResource(R.string.connection_vts_status_connected)
+    is VTubeStudioConnectionState.Failed -> stringResource(R.string.error_vts_connection_failed, state.reason)
 }

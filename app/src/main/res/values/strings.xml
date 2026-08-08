@@ -46,7 +46,8 @@
     <string name="connection_type_label">Connection type (main screen button)</string>
     <string name="connection_type_vmc">VMC</string>
     <string name="connection_type_udp_vbridger">UDP / VBridger</string>
-    <string name="connection_vmc_section_title">VMC (VTube Studio / Blender / Unity)</string>
+    <string name="connection_type_vts">VTube Studio</string>
+    <string name="connection_vmc_section_title">VMC (Blender / Unity)</string>
     <string name="connection_vmc_ip_label">PC IP address</string>
     <string name="action_send">Send</string>
     <string name="connection_vmc_active_status">Sending VMC data to %1$s</string>
@@ -57,6 +58,18 @@
     <string name="connection_udp_waiting_handshake">waiting for VBridger handshake…</string>
     <string name="connection_udp_status">UDP connection: %1$s</string>
     <string name="connection_choose_type_hint">Choose a connection type above to see its settings.</string>
+
+    <!-- VTube Studio (Plugin API, direct connection, point 39) -->
+    <string name="connection_vts_section_title">VTube Studio (Plugin API)</string>
+    <string name="connection_vts_ip_label">PC IP address</string>
+    <string name="connection_vts_port_label">Port</string>
+    <string name="connection_vts_status_disconnected">Not connected</string>
+    <string name="connection_vts_status_connecting">Connecting…</string>
+    <string name="connection_vts_status_awaiting_approval">Waiting for approval in VTube Studio…</string>
+    <string name="connection_vts_status_authenticating">Authenticating…</string>
+    <string name="connection_vts_status_registering_params">Registering blendshape parameters…</string>
+    <string name="connection_vts_status_connected">Connected to %1$s</string>
+    <string name="connection_vts_mapping_hint">Remember to map the new parameters to your Live2D model in VTube Studio\'s parameter editor -- they won\'t move anything until you do.</string>
 
     <!-- Diagnostics screen -->
     <string name="diagnostics_title">Diagnostics</string>
@@ -118,6 +131,8 @@
     <string name="settings_vmc_not_connected_subtitle">VMC selected, not connected yet</string>
     <string name="settings_udp_listening_subtitle">UDP / VBridger listening</string>
     <string name="settings_udp_not_listening_subtitle">UDP / VBridger selected, not listening yet</string>
+    <string name="settings_vts_connected_subtitle">VTube Studio connected to %1$s</string>
+    <string name="settings_vts_not_connected_subtitle">VTube Studio selected, not connected yet</string>
     <string name="settings_no_connection_type_subtitle">No type selected</string>
     <string name="settings_display_subtitle">Displayed blendshapes, mesh overlay, power save, battery threshold</string>
     <string name="settings_experimental_subtitle">None for now</string>
@@ -127,6 +142,9 @@
     <string name="error_no_connection_type">Choose a connection type in settings.</string>
     <string name="error_vmc_invalid_address">Invalid or unreachable IP address: %1$s</string>
     <string name="error_vmc_connection_failed">Could not open a connection to %1$s</string>
+    <string name="error_vts_ip_missing">Enter a VTube Studio IP address in settings first.</string>
+    <string name="error_vts_invalid_address">Invalid or unreachable IP address: %1$s</string>
+    <string name="error_vts_connection_failed">VTube Studio connection failed: %1$s</string>
     <string name="local_ip_unavailable">unavailable</string>
 
     <!-- Camera errors (CameraController, non-@Composable) -->

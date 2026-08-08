@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.guyiome.androidmocap.R
+import com.guyiome.androidmocap.network.VTubeStudioConnectionState
 import com.guyiome.androidmocap.settings.ConnectionType
 
 /**
@@ -128,6 +129,11 @@ private fun connectionSubtitle(uiState: MainUiState): String = when (uiState.con
         stringResource(R.string.settings_udp_listening_subtitle)
     } else {
         stringResource(R.string.settings_udp_not_listening_subtitle)
+    }
+    ConnectionType.VTUBE_STUDIO -> if (uiState.vtsConnectionState == VTubeStudioConnectionState.ParametersRegistered) {
+        stringResource(R.string.settings_vts_connected_subtitle, uiState.vtsTargetLabel)
+    } else {
+        stringResource(R.string.settings_vts_not_connected_subtitle)
     }
     null -> stringResource(R.string.settings_no_connection_type_subtitle)
 }

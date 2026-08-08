@@ -295,6 +295,8 @@ fun MainScreen(
                     onDisconnectVmc = { viewModel.disconnectVmcTarget() },
                     onStartIFacialMocap = { viewModel.startIFacialMocapListening() },
                     onStopIFacialMocap = { viewModel.stopIFacialMocapListening() },
+                    onConnectVts = { host, port -> viewModel.connectVtsTarget(host, port) },
+                    onDisconnectVts = { viewModel.disconnectVtsTarget() },
                 )
             }
 
