@@ -74,6 +74,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 38 | VMC crashait systématiquement sur Android 11/API 30 (`NoSuchMethodError` javaosc-core) | **✅ corrigé et validé de bout en bout sur device le 8 août 2026** (plus de crash, connecteur VMC Blender reconnaît les paquets, contenu confirmé correct via Protokol -- noms et valeurs de blendshapes cohérents) -- voir section dédiée plus bas |
 | 39 | VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin | **✅ Validé de bout en bout sur device le 8 août 2026** (WebSocket/nv-websocket-client + kotlinx.serialization -- OkHttp abandonné, incompatible avec le serveur `websocket-sharp` de VTube Studio) -- connexion, popup d'autorisation, création des paramètres, réception confirmés fonctionnels, voir section dédiée plus bas |
 | 40 | Indicateur visuel "connexion en cours" sur l'écran principal | Backlog, idée ouverte le 8 août 2026, aucun code écrit -- voir section dédiée plus bas |
+| 41 | Traduction des blendshapes ARKit pour éviter le remapping manuel (VRM/Blender, VTube Studio) | Backlog, faisabilité étudiée le 8 août 2026 -- Blender/VRM déjà bon (convention "Perfect Sync"), VTube Studio jugé viable avec les formules VBridger (`AdvancedARKitSettings`) comme point de départ, OVR non exploré, voir section dédiée plus bas |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -1254,6 +1255,66 @@ visible sans device.
 Statut : pas de correctif tenté à l'aveugle. Prochaine étape si ça se reproduit : capture logcat
 continue pendant le lag (même méthode que les crashs diagnostiqués au point 13), pour voir si ARCore
 ou le driver GL logge un warning au moment où ça ralentit, plutôt que deviner davantage.
+
+### 41. Traduction des blendshapes ARKit pour éviter le remapping manuel (VRM/Blender, VTube Studio) -- backlog, faisabilité étudiée le 8 août 2026
+
+Question posée après validation du point 39 : peut-on traduire les 52 blendshapes ARKit pour
+correspondre exactement à ce qu'attendent différents récepteurs, plutôt que de compter sur un
+remapping manuel côté utilisateur ?
+
+**VBridger** : déjà bon (protocole iFacialMocap déjà adapté, voir `IFacialMocapSender`).
+
+**Blender/VRM en VMC** : très probablement déjà bon *sans rien changer côté app*. Les 52 noms ARKit
+bruts qu'on envoie déjà correspondent exactement à la convention communautaire **"Perfect Sync"**
+(terme standardisé depuis 2020 : "un modèle VRM qui possède les 52 blend shape clips nommés comme
+ARKit") -- si le modèle cible a été préparé en Perfect Sync (pratique courante, outils un-clic
+existants type `blender-vrm-perfect-sync` pour l'ajouter à un modèle VRoid), ça fonctionne déjà.
+Si le modèle n'a pas Perfect Sync, c'est une préparation d'avatar (hors app), pas un problème de
+protocole -- rien à construire ici.
+
+**VTube Studio (paramètres par défaut, pour éviter le mapping manuel dans son éditeur)** : piste
+jugée viable mais non triviale. Vérifié sur la doc officielle : `InjectParameterDataRequest`
+accepte explicitement d'écrire dans les paramètres **par défaut** de VTube Studio (`FaceAngleX/Y/Z`,
+`FacePositionX/Y/Z`, `MouthSmile`, `EyeOpenLeft/Right`...), pas seulement dans des paramètres
+personnalisés créés par un plugin -- la majorité des modèles Live2D existants sont déjà riggés pour
+ces noms-là (convention du tracking webcam natif de VTube Studio). Un plugin tiers existant
+(`VTube-IFacial-Link`, même pont ARKit -> VTube Studio que ce qu'on fait) envoie les deux jeux de
+paramètres simultanément -- les paramètres par défaut (réaction immédiate, zéro mapping, sur un
+modèle standard) ET les 52 paramètres ARKit personnalisés (finesse complète, sur un modèle Perfect
+Sync) -- probablement la bonne approche à reprendre.
+
+**Le point dur, résolu par une trouvaille de l'utilisateur** : contrairement à VMC/VRM, la
+traduction vers les paramètres par défaut de VTube Studio n'est pas un simple renommage -- ses
+~15 paramètres grossiers ne correspondent pas un-à-un aux 52 blendshapes ARKit fins (`MouthSmile`
+n'est aucun blendshape ARKit précis, c'est une combinaison). VBridger expose déjà ces formules,
+testées et éprouvées, dans son propre panneau **`AdvancedARKitSettings`** (accessible directement
+dans son UI). Exemple relevé et décodé (labels UI en français, VBridger tournant en localisation FR
+-- `boucheFroncements` = `mouthFrown`, `bouchePlisser` = `mouthPucker`, `boucheSourire` =
+`mouthSmile`, `boucheFossette` = `mouthDimple`) :
+
+```
+MouthSmile = (2 - (mouthFrownLeft + mouthFrownRight + mouthPucker)
+                 + (mouthSmileLeft + mouthSmileRight + (mouthDimpleLeft + mouthDimpleRight) / 2)) / 4
+```
+
+Vérifiée par calcul : à zéro sur tous les blendshapes (visage neutre), la formule donne bien 0,50,
+la valeur affichée en direct dans VBridger pour ce cas -- décodage confirmé correct. `MouthSmile`
+porte d'ailleurs le même nom que le paramètre par défaut de VTube Studio, probablement pas un
+hasard (convention partagée entre outils Live2D). Reprendre les formules VBridger (à extraire une
+par une depuis son panneau `AdvancedARKitSettings` pour chaque paramètre par défaut visé) plutôt
+que de les redécouvrir/calibrer à l'œil serait le point de départ pour cette fonctionnalité --
+évite l'écueil identifié initialement (aucune formule officiellement documentée par VTube Studio
+lui-même).
+
+**OVR (visèmes Oculus/Meta)** : question distincte, pas approfondie -- format beaucoup plus
+restreint (~15 visèmes phonétiques, pas les 52 blendshapes ARKit), utilisé surtout pour des
+pipelines VRChat/Unity+OVRLipSync. Aucune piste de correspondance trouvée pour l'instant (à la
+différence de Perfect Sync et des formules VBridger ci-dessus) -- à clarifier avec l'utilisateur
+(quel récepteur final visé) avant toute recherche plus poussée.
+
+Statut : backlog, aucun code écrit. Taille estimée comparable à un nouveau petit sous-système (une
+fonction pure de traduction par paramètre par défaut visé, testable en JVM comme le reste du
+protocole VTube Studio) plutôt qu'une modification triviale.
 
 ### 40. Indicateur visuel "connexion en cours" sur l'écran principal -- backlog, idée ouverte le 8 août 2026
 
