@@ -74,7 +74,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 37 | Lag ARCore en session, disparu après redémarrage complet | Signalé le 7 août 2026, cause non identifiée -- throttling thermique et coût de la détection d'anomalie écartés par le raisonnement, prochaine étape : capture logcat si reproduit |
 | 38 | VMC crashait systématiquement sur Android 11/API 30 (`NoSuchMethodError` javaosc-core) | **✅ corrigé et validé de bout en bout sur device le 8 août 2026** (plus de crash, connecteur VMC Blender reconnaît les paquets, contenu confirmé correct via Protokol -- noms et valeurs de blendshapes cohérents) -- voir section dédiée plus bas |
 | 39 | VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin | **✅ Validé de bout en bout sur device le 8 août 2026** (WebSocket/nv-websocket-client + kotlinx.serialization -- OkHttp abandonné, incompatible avec le serveur `websocket-sharp` de VTube Studio) -- connexion, popup d'autorisation, création des paramètres, réception confirmés fonctionnels, voir section dédiée plus bas |
-| 40 | Indicateur visuel "connexion en cours" sur l'écran principal | **✅ implémenté le 8 août 2026 pour les trois types de connexion** (VMC, iFacialMocap, VTube Studio -- teinte ambre pendant qu'une connexion progresse, `MainHud.kt`) -- bug corrigé au passage (l'icône ne passait jamais au vert pour VTube Studio), voir section dédiée plus bas |
+| 40 | Indicateur visuel "connexion en cours" sur l'écran principal | **✅ confirmé fonctionnel sur device le 8 août 2026** pour iFacialMocap et VTube Studio (VMC non observable en pratique -- fenêtre trop brève, comportement attendu, pas un bug) -- bug corrigé au passage (l'icône ne passait jamais au vert pour VTube Studio), voir section dédiée plus bas |
 | 41 | Traduction des blendshapes ARKit pour éviter le remapping manuel (VRM/Blender, VTube Studio) | Backlog, faisabilité étudiée le 8 août 2026 -- Blender/VRM déjà bon (convention "Perfect Sync"), VTube Studio jugé viable avec les formules VBridger (`AdvancedARKitSettings`) comme point de départ, OVR non exploré, voir section dédiée plus bas |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
@@ -1317,7 +1317,7 @@ Statut : backlog, aucun code écrit. Taille estimée comparable à un nouveau pe
 fonction pure de traduction par paramètre par défaut visé, testable en JVM comme le reste du
 protocole VTube Studio) plutôt qu'une modification triviale.
 
-### 40. Indicateur visuel "connexion en cours" sur l'écran principal -- ✅ implémenté le 8 août 2026
+### 40. Indicateur visuel "connexion en cours" sur l'écran principal -- ✅ confirmé fonctionnel sur device le 8 août 2026
 
 Proposé par l'utilisateur pendant le test du point 39 : l'écran principal (bouton de connexion
 unique du HUD) ne distingue aujourd'hui que connecté/non connecté -- pas d'état intermédiaire
@@ -1361,6 +1361,11 @@ l'icône dans un état incohérent une fois la connexion réellement établie.
 mentionnaient encore VMC comme destiné à "VTube Studio / Blender / Unity" (kdoc de
 `connectVmcTarget`, commentaire de section, doc du champ `vmcEnabled`) -- corrigés en "Blender /
 Unity", cohérent avec la conclusion du point 39.
+
+**✅ Confirmé sur device (8 août 2026)** : iFacialMocap et VTube Studio fonctionnels, teinte ambre
+bien visible pendant l'attente. VMC non observable en pratique -- confirme l'hypothèse posée
+pendant l'implémentation (fenêtre trop brève, résolution d'IP sans vrai lookup réseau) plutôt
+qu'un bug ; comportement attendu, pas d'action à prendre.
 
 ### 39. VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin -- ✅ validée de bout en bout sur device
 
