@@ -66,7 +66,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 29 | Validation des traductions FR/EN par locuteurs natifs | Backlog, voir point 23 -- **deux passes de self-review faites** (6 août, commit `1b0030a`, 86 clés ; 7 août, clés des points 32-35, incohérence de style corrigée entre les puces ARCore/GPU et thermique), mais aucune relecture par un locuteur natif à ce jour, ni en français ni en anglais |
 | 30 | Sélecteur de langue dans l'app pour Android 11/12 | Backlog, voir point 23 -- pas d'équivalent au sélecteur système Android 13+ sur ces versions, demanderait `androidx.appcompat` + `AppCompatDelegate` |
 | 31 | CI cassée depuis le premier run (`gradlew` sans bit exécutable), puis silencieusement bloquée depuis | **✅ entièrement résolu le 7 août 2026** (commit `df640a4` pour `gradlew` ; cause du blocage silencieux trouvée le même jour -- budget Actions à 0 $, "Stop usage" actif -- corrigée et vérifiée par un run CI réussi), voir section dédiée plus bas |
-| 32 | Panneau de blendshapes du HUD : tongueOut disparaissait, noms masqués par le bandeau système | **✅ corrigés le 7 août 2026**, vérification visuelle device en attente pour le second, voir section dédiée plus bas |
+| 32 | Panneau de blendshapes du HUD : tongueOut disparaissait, noms masqués par le bandeau système | **✅ corrigés et vérifiés sur device le 7 août 2026**, voir section dédiée plus bas |
 | 33 | Proposer l'installation ARCore au lieu du repli silencieux | Backlog, priorité mineure, idée ouverte le 7 août 2026, aucun code écrit |
 | 34 | Throttling thermique dynamique (débit réduit en cas de chauffe) | **✅ implémenté et vérifié sur device (via mock) le 7 août 2026**, voir section dédiée plus bas -- capteur thermique réel non exercé (appareil de test ne chauffe pas assez), câblage bout en bout confirmé |
 | 35 | Panneau de mocks de debug caché (thermique, ARCore, délégué GPU) | **✅ implémenté et vérifié sur device le 7 août 2026**, voir section dédiée plus bas -- les trois mocks confirmés fonctionnels |
@@ -991,7 +991,7 @@ Deux annotations mineures relevées sur ce run, sans rapport avec ce point, not�
 par GitHub), et `setup-java@v4` est lui-même déprécié au profit de `v5` -- simples mises à jour de
 versions d'actions dans `ci.yml`, aucune urgence.
 
-### 32. Panneau de blendshapes du HUD : deux bugs remontés par test device -- ✅ corrigés, vérification visuelle en attente
+### 32. Panneau de blendshapes du HUD : deux bugs remontés par test device -- ✅ corrigés et vérifiés sur device
 
 Test en temps réel de l'utilisateur (7 août 2026), deux captures d'écran à l'appui. Première lecture
 erronée de ma part (une des captures avait été prise pour un souci de rotation système, à tort -- voir
@@ -1028,10 +1028,12 @@ ce qui fait déborder la rotation vers l'intérieur de l'écran plutôt que vers
 `MainScreen` ajoute `windowInsetsPadding(WindowInsets.safeDrawing)` autour du panneau, en marge de
 sécurité pour le résidu de débordement (calcul géométrique, pas mesuré sur device).
 
-`./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL`. **Aucun device dans ce sandbox** --
-correctif (a) déterministe, sans risque ; correctif (b) raisonné géométriquement mais pas revérifié
-visuellement, à confirmer au prochain test réel (le nom complet de chaque blendshape doit rester
-entièrement lisible en tenant le téléphone à l'horizontale, dans les deux sens de rotation).
+`./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL`.
+
+**✅ Correctif (b) confirmé fonctionnel sur device (7 août 2026)** : le raisonnement géométrique
+(pivot de rotation déplacé vers le bas du bloc + marge `safeDrawing`) tient en usage réel -- les noms
+de blendshapes restent entièrement lisibles en tenant le téléphone à l'horizontale, plus de
+chevauchement avec le bandeau système. Les deux correctifs de ce point sont désormais vérifiés.
 
 ### 33. Étudier une installation ARCore proposée à l'utilisateur au lieu du repli silencieux -- backlog, priorité mineure
 
