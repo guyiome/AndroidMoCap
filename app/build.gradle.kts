@@ -3,6 +3,8 @@ plugins {
     // Depuis AGP 9.0, le support Kotlin est intégré : plus besoin (et plus compatible)
     // d'appliquer le plugin org.jetbrains.kotlin.android séparément.
     alias(libs.plugins.kotlin.compose)
+    // Requis pour les @Serializable de VTubeStudioProtocol.kt (point 39, API Plugin VTube Studio).
+    alias(libs.plugins.kotlin.serialization)
 }
 
 // Signature release : lue depuis des variables d'environnement, jamais depuis un fichier commité.
@@ -115,8 +117,16 @@ dependencies {
     implementation(libs.google.ar.core)
     implementation(libs.mediapipe.tasks.vision)
 
-    // Diffusion réseau : protocole VMC (OSC over UDP) vers VTube Studio / Blender / Unity
+    // Diffusion réseau : protocole VMC (OSC over UDP), destiné à Blender / Unity (voir point 39 --
+    // VTube Studio ne le reçoit vraisemblablement pas nativement)
     implementation(libs.javaosc.core)
+
+    // Diffusion réseau : intégration directe VTube Studio via son API Plugin (WebSocket JSON,
+    // point 39) -- OkHttp pour le client WebSocket, kotlinx.serialization pour l'encodage JSON des
+    // requêtes/réponses de l'API (préféré à org.json : reste testable en JVM pur, voir
+    // AndroidMoCap_tests_unitaires.md).
+    implementation(libs.okhttp)
+    implementation(libs.kotlinx.serialization.json)
 
     // Réglages persistés (AppSettingsStore, ConnectionSettingsStore) : mode éco, overlay du mesh,
     // seuil batterie, palier forcé, mocks de debug, sélection de blendshapes (optionnelle), type de
