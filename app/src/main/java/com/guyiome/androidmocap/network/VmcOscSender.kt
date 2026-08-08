@@ -27,8 +27,8 @@ import java.util.concurrent.Executors
  * MediaPipe ni l'UI.
  */
 class VmcOscSender(
-    private var host: InetAddress,
-    private var port: Int = DEFAULT_PORT,
+    private val host: InetAddress,
+    private val port: Int = DEFAULT_PORT,
 ) {
     companion object {
         private const val TAG = "VmcOscSender"
@@ -82,16 +82,6 @@ class VmcOscSender(
         } catch (e: Exception) {
             Log.w(TAG, "Impossible d'ouvrir le port UDP local pour la cible VMC $host:$port", e)
             null
-        }
-    }
-
-    /** Change la cible (IP/port du PC qui fait tourner VTube Studio / Blender / Unity), ex. depuis l'écran de réglages. */
-    fun updateTarget(newHost: InetAddress, newPort: Int = DEFAULT_PORT) {
-        sendExecutor.execute {
-            oscPortOut?.close()
-            host = newHost
-            port = newPort
-            connect()
         }
     }
 

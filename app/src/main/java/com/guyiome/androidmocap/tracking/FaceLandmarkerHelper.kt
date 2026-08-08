@@ -57,9 +57,15 @@ class FaceLandmarkerHelper(
          *
          * Convention : yaw positif = regard vers la gauche du sujet, pitch positif = regard vers le haut.
          * Angle max arbitraire (30°) à ajuster selon le rendu observé.
+         *
+         * Les 8 scores nécessaires sont cherchés une fois via une `Map` construite en tête de
+         * fonction (relecture globale du 7 août 2026, point 18) plutôt que par 8 scans linéaires
+         * successifs de [blendshapes] (`firstOrNull`, jusqu'à ~52 entrées chacun) -- même valeurs
+         * lues, coût O(1) par lookup au lieu de O(n).
          */
         internal fun computeEyeGazeDegrees(blendshapes: List<BlendshapeScore>): Pair<FloatArray, FloatArray> {
-            fun score(name: String) = blendshapes.firstOrNull { it.name == name }?.score ?: 0f
+            val scoresByName = blendshapes.associate { it.name to it.score }
+            fun score(name: String) = scoresByName[name] ?: 0f
             val maxAngle = 30f
 
             val leftPitch = (score("eyeLookUpLeft") - score("eyeLookDownLeft")) * maxAngle

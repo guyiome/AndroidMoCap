@@ -250,6 +250,13 @@ class CameraController(
     fun stop() {
         cameraProvider?.unbindAll()
         cameraExecutor.shutdown()
+        // Remis à null (relecture globale du 7 août 2026, point 17) : sans ça, bindImageAnalysis()/
+        // bindPreview() no-opaient silencieusement sur ces références encore non-null si start()
+        // était un jour rappelé sur cette même instance après stop() -- dormant aujourd'hui (seul
+        // appelant : MainViewModel.onCleared(), jamais suivi d'un nouveau start()), mais un piège
+        // latent pour tout futur appelant qui réutiliserait l'instance.
+        imageAnalysis = null
+        previewUseCase = null
         synchronized(poolLock) {
             freeBitmaps.clear()
             inFlightBitmaps.clear()
