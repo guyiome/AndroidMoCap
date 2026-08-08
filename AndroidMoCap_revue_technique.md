@@ -70,6 +70,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 33 | Proposer l'installation ARCore au lieu du repli silencieux | Backlog, priorité mineure, idée ouverte le 7 août 2026, aucun code écrit |
 | 34 | Throttling thermique dynamique (débit réduit en cas de chauffe) | **✅ implémenté et vérifié sur device (via mock) le 7 août 2026**, voir section dédiée plus bas -- capteur thermique réel non exercé (appareil de test ne chauffe pas assez), câblage bout en bout confirmé |
 | 35 | Panneau de mocks de debug caché (thermique, ARCore, délégué GPU) | **✅ implémenté et vérifié sur device le 7 août 2026**, voir section dédiée plus bas -- les trois mocks confirmés fonctionnels |
+| 36 | Relecture globale (code mort, optimisations, incohérences) | **✅ traité le 7 août 2026** -- doc désynchronisée corrigée, silence de `VmcOscSender.connect()` corrigé, 4 correctifs triviaux traités, voir section dédiée plus bas pour ce qui reste volontairement en backlog |
 | 37 | Lag ARCore en session, disparu après redémarrage complet | Signalé le 7 août 2026, cause non identifiée -- throttling thermique et coût de la détection d'anomalie écartés par le raisonnement, prochaine étape : capture logcat si reproduit |
 | 38 | VMC crashait systématiquement sur Android 11/API 30 (`NoSuchMethodError` javaosc-core) | **✅ corrigé et validé de bout en bout sur device le 8 août 2026** (plus de crash, connecteur VMC Blender reconnaît les paquets, contenu confirmé correct via Protokol -- noms et valeurs de blendshapes cohérents) -- voir section dédiée plus bas |
 | 39 | VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin | **✅ Validé de bout en bout sur device le 8 août 2026** (WebSocket/nv-websocket-client + kotlinx.serialization -- OkHttp abandonné, incompatible avec le serveur `websocket-sharp` de VTube Studio) -- connexion, popup d'autorisation, création des paramètres, réception confirmés fonctionnels, voir section dédiée plus bas |
@@ -149,7 +150,7 @@ attaché. Procédure complète (génération de la clé, secrets à créer) dans
 "Distribution". `versionCode`/`versionName` passés à `2`/`0.2.0`. Le point 8 (minify/R8) reste
 volontairement désactivé -- voir sa note mise à jour ci-dessus.
 
-### 13. Fusion ARCore (palier `OPTIMAL`, phase 2) -- ✅ intégrée sur `main`, vérification device en attente
+### 13. Fusion ARCore (palier `OPTIMAL`, phase 2) -- ✅ intégrée sur `main`, confirmée fonctionnelle sur device
 
 En creusant ce que "brancher ARCore" impliquerait concrètement, un point bloquant est apparu, qui
 explique en partie pourquoi ce n'était encore qu'un commentaire dans le code : **ARCore Augmented

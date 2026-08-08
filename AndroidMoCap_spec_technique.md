@@ -4,7 +4,7 @@
 d'historique de décisions. Pour le raisonnement derrière chaque choix, les alternatives écartées et
 les évolutions en cours de réflexion, voir `AndroidMoCap_revue_technique.md`. Pour le périmètre
 fonctionnel côté utilisateur, voir `AndroidMoCap_spec_fonctionnelle.md`. Dernière mise à jour :
-6 août 2026.*
+8 août 2026.*
 
 ## 1. Vue d'ensemble
 
@@ -24,8 +24,9 @@ app/src/main/java/com/guyiome/androidmocap/
 ```
 
 Stack : Kotlin 2.4.10, AGP 9.x, Jetpack Compose, CameraX, MediaPipe Tasks Vision 1.0.0 (Face Landmarker),
-ARCore (Augmented Faces, palier `OPTIMAL` seulement, non actif dans `main`), JavaOSC (protocole
-VMC), AndroidX DataStore (Preferences).
+ARCore (Augmented Faces, palier `OPTIMAL` seulement, intégrée sur `main` et confirmée fonctionnelle
+sur device), JavaOSC (protocole VMC), nv-websocket-client + kotlinx.serialization (API Plugin VTube
+Studio), AndroidX DataStore (Preferences).
 
 `minSdk = 30` (Android 11, couvre ~87 % du parc actif), `compileSdk = targetSdk = 37` (imposé par
 les dépendances AndroidX récentes).
@@ -64,8 +65,8 @@ classe de performance officielle Android si disponible, nombre de cœurs, RAM to
 
 - **`COMPATIBLE`** -- appareils d'entrée de gamme, débit cible le plus bas, délégué CPU.
 - **`STANDARD`** -- profil intermédiaire.
-- **`OPTIMAL`** -- appareils haut de gamme avec support ARCore, débit le plus élevé, prévu pour
-  utiliser la pose de tête ARCore (`useArCorePose`) -- non actif dans `main` à ce jour, voir §4.
+- **`OPTIMAL`** -- appareils haut de gamme avec support ARCore, débit le plus élevé, utilise la pose
+  de tête ARCore (`useArCorePose`) -- intégré et confirmé fonctionnel sur device, voir §4.
 
 Le débit cible (`targetFps`) par palier est appliqué dans `CameraController.processFrame()` : les
 frames en trop sont ignorées avant toute allocation/rotation, avant même d'atteindre MediaPipe --
@@ -87,17 +88,25 @@ permet de forcer trois comportements difficiles à déclencher naturellement sur
 throttling thermique (en direct), ARCore indisponible et délégué GPU indisponible (ces deux derniers
 au prochain lancement, même contrainte que `tierOverride` -- voir §6). Voir revue technique, point 35.
 
-## 4. Fusion ARCore (palier `OPTIMAL`) -- intégrée sur `main`, non testée sur device
+## 4. Fusion ARCore (palier `OPTIMAL`) -- intégrée sur `main`, confirmée fonctionnelle sur device
 
 Intégrée directement sur `main` le 6 août 2026 (réimplémentée à neuf plutôt que fusionnée depuis
 `feature/arcore-fusion`, devenue trop divergente -- voir revue technique, point 13, pour le
-raisonnement complet), **compile et teste en JVM, non testée sur device**. Contrainte technique
-identifiée : ARCore Augmented Faces gère lui-même l'accès caméra en interne et ne peut pas coexister
-avec `ImageAnalysis` de CameraX sur la même caméra frontale (un seul client Camera2 actif à la
-fois). Solution retenue : pour ce palier uniquement, `Session` (ARCore) pilote la caméra via
-`ArCoreHeadPoseTracker`, les frames sont récupérées via `Frame.acquireCameraImage()` et converties
-en `MPImage` (`MediaImageBuilder`) pour continuer à nourrir MediaPipe côté blendshapes ; la pose de
-tête utilise `AugmentedFace.centerPose` (récupérée via un callback dédié dans `MainViewModel`, thread
+raisonnement complet). **Confirmée fonctionnelle sur device** le jour même (tracking correctement
+orienté, latence perçue nettement améliorée) après une série de correctifs réels trouvés en test
+(crash de format d'image, `Display geometry`, rotation, déport du traitement sur thread dédié) --
+voir revue technique, point 3/13, pour le détail complet et les points mineurs encore ouverts
+(vérification `ArCoreApk` synchrone au démarrage, pas de pool de bitmaps pour le chemin ARCore).
+
+Contrainte technique identifiée : ARCore Augmented Faces gère lui-même l'accès caméra en interne et
+ne peut pas coexister avec `ImageAnalysis` de CameraX sur la même caméra frontale (un seul client
+Camera2 actif à la fois). Solution retenue : pour ce palier uniquement, `Session` (ARCore) pilote la
+caméra via `ArCoreHeadPoseTracker`, les frames sont récupérées via `Frame.acquireCameraImage()`
+(toujours en YUV_420_888 côté ARCore, aucune option RGBA) puis converties manuellement en `Bitmap`
+ARGB_8888 (`yuv420ToBitmap()`) avant `BitmapImageBuilder` -- pas `MediaImageBuilder` directement,
+qui exige du RGBA et faisait planter l'app au premier lancement réel (voir revue technique, point
+3/13) -- pour continuer à nourrir MediaPipe côté blendshapes ; la pose de tête utilise
+`AugmentedFace.centerPose` (récupérée via un callback dédié dans `MainViewModel`, thread
 GL) à la place de `facialTransformationMatrixes()`. Repli automatique et silencieux vers
 CameraX+`CameraController` (comme le palier `STANDARD`) si Augmented Faces s'avère indisponible à
 l'usage, décidé synchrone dès `MainViewModel.initializeTracking()`. Pas d'aperçu caméra live pour ce
@@ -106,9 +115,12 @@ cas -- voir `ui/MeshOverlayVisibility.kt`) -- choix assumé, conçu pour ne pas 
 "rendu live" (backlog, revue technique point 13).
 
 Classes dédiées : `ArCoreHeadPoseTracker`, `ArCoreFaceSelector` (sélection du visage principal si
-plusieurs détectés, fonction pure testée en JVM : `pickPrimary`). Risques connus non résolus sans
-device (rotation/miroir de l'image caméra ARCore non gérée, vérification `ArCoreApk` synchrone au
-démarrage) : détaillés dans le kdoc d'`ArCoreHeadPoseTracker.kt` et la revue technique, point 13.
+plusieurs détectés, fonction pure testée en JVM : `pickPrimary`). Rotation de l'image caméra
+confirmée corrigée sur device (le miroir, lui, n'a jamais été un problème réel -- volontairement
+jamais appliqué à l'image envoyée à MediaPipe, seulement à l'affichage, même convention que
+`CameraController`). Risque restant, non résolu : `DeviceCapabilityDetector.detect()` lit
+`ArCoreApk.checkAvailability().isSupported` de façon synchrone au démarrage -- détaillé dans le
+kdoc d'`ArCoreHeadPoseTracker.kt` et la revue technique, point 3/13.
 
 ## 5. Protocoles réseau
 
@@ -264,8 +276,8 @@ Licence : PolyForm Shield 1.0.0 (voir `LICENSE`), CLA en place pour les contribu
 Liste vivante tenue dans `AndroidMoCap_revue_technique.md`, pas dupliquée ici. Points ouverts
 principaux au moment de la rédaction : minify désactivé (point 8), vérification de mise à jour non
 implémentée (point 14), comportement non défini sur grand écran/tablette (point 20). La
-localisation de l'UI (point 23) est traitée -- voir §12. La fusion ARCore (point 13) est intégrée
-sur `main` mais non testée sur device -- voir §4. Le throttling thermique dynamique (point 3/13, 34)
+localisation de l'UI (point 23) est traitée -- voir §12. La fusion ARCore (point 3/13) est intégrée
+sur `main` et confirmée fonctionnelle sur device -- voir §4. Le throttling thermique dynamique (point 34)
 est branché et vérifié sur device via mock (point 35) -- le capteur thermique réel reste non exercé,
 l'appareil de test ne chauffant pas suffisamment en usage normal, voir §3.
 
