@@ -4,7 +4,7 @@
 de décisions. Pour le raisonnement derrière chaque choix et les évolutions en cours de réflexion,
 voir `AndroidMoCap_revue_technique.md` (qui garde ce rôle de journal + backlog). Pour l'architecture
 et les choix d'implémentation, voir `AndroidMoCap_spec_technique.md`. Dernière mise à jour :
-7 août 2026.*
+8 août 2026.*
 
 ## 1. Présentation générale
 
@@ -74,8 +74,11 @@ fonctionnel sur device, tous paliers testés (point 19 de la revue technique).
 Deux protocoles de sortie, mutuellement exclusifs (un seul actif à la fois, choix dans les
 réglages) :
 
-- **VMC/OSC** -- destiné à VTube Studio, Blender, Unity. L'app envoie les données vers une IP/port
-  PC saisis manuellement dans les réglages.
+- **VMC/OSC** -- destiné à Blender, Unity (pas VTube Studio, qui ne reçoit vraisemblablement pas ce
+  protocole en entrée -- voir revue technique point 39 ; une intégration directe VTube Studio via
+  son API Plugin propriétaire existe séparément, encore en cours de validation sur device). L'app
+  envoie les données vers une IP/port PC saisis manuellement dans les réglages. Confirmé fonctionnel
+  sur device, contenu des paquets vérifié (point 38 de la revue technique).
 - **Protocole compatible iFacialMocap/UDP** -- destiné à VBridger. Affiché "UDP / VBridger" dans
   l'interface (le nom "iFacialMocap" reste en mention secondaire pour rester trouvable par qui
   cherche ce terme précis, mais l'app ne se connecte pas à cette application tierce, elle implémente
@@ -176,7 +179,8 @@ d'attention) reste dans la revue technique :
   élémentaire (sourire, clignement, ouverture de mâchoire...), au format standardisé ARKit (52
   coefficients).
 - **VMC (Virtual Motion Capture)** : protocole réseau basé sur OSC, standard de facto pour
-  transmettre des données de mocap à des logiciels VTuber (VTube Studio, Blender, Unity).
+  transmettre des données de mocap à des logiciels VTuber (Blender, Unity, VSeeFace... -- pas VTube
+  Studio, qui utilise sa propre API Plugin, voir §3.3 et revue technique point 39).
 - **Palier de tracking** : niveau de pipeline choisi automatiquement selon les capacités de
   l'appareil (`COMPATIBLE` < `STANDARD` < `OPTIMAL`), déterminant le délégué (CPU/GPU), le débit
   cible et la source de pose de tête utilisée.

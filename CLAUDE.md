@@ -6,8 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 AndroidMoCap turns an Android phone into a standalone facial motion-capture tracker for VTubing:
 front camera → MediaPipe Face Landmarker (52 ARKit blendshapes + gaze/head pose) → streamed live
-over the local network to VTube Studio/Blender/Unity (VMC/OSC) or VBridger (iFacialMocap-compatible
-UDP protocol). No cloud, no third-party app dependency, single-developer personal project.
+over the local network to Blender/Unity (VMC/OSC, confirmed end-to-end on device — see revue
+technique point 38), VBridger (iFacialMocap-compatible UDP protocol), or directly to VTube Studio
+via its own Plugin API (WebSocket/JSON, not VMC — see point 39, implemented but not yet confirmed
+end-to-end on device). No cloud, no third-party app dependency, single-developer personal project.
 
 Read `README.md` first for features, prerequisites and the PC-side connection setup. For anything
 beyond a quick orientation, three living docs are the source of truth and take precedence over
@@ -116,15 +118,21 @@ are still unknown, e.g. before the first frame). This must stay in sync with wha
 overlay silently drifts from the face on any device whose camera aspect ratio differs from its screen
 (see revue technique point 27 for the device bug this fixed).
 
-**Network senders.** Two mutually-exclusive, protocol-level-independent senders, both driven off the
-same `FaceTrackingResult`: `network/VmcOscSender.kt` batches an entire frame's blendshapes into a
-single `OSCBundle` (`buildBundle()`, pure, tested — one UDP packet per frame, not per blendshape) for
-VTube Studio/Blender/Unity; `network/IFacialMocapSender.kt` implements the iFacialMocap wire protocol
-for VBridger (`buildMessage()`, pure, tested), listening passively for the PC software to connect in
-rather than dialing out. UI-facing naming was deliberately decoupled from this internal naming (chip
-reads "UDP / VBridger", not "iFacialMocap") to avoid implying a connection to the third-party app —
-don't propagate that rename into the protocol-level identifiers (`ConnectionType.IFACIALMOCAP`, class
-name, handshake constants), which are intentionally left as-is.
+**Network senders.** Three mutually-exclusive senders, all driven off the same `FaceTrackingResult`:
+`network/VmcOscSender.kt` batches an entire frame's blendshapes into a single `OSCBundle`
+(`buildBundle()`, pure, tested — one UDP packet per frame, not per blendshape) for Blender/Unity —
+**not VTube Studio**, which doesn't receive VMC/OSC as input (see revue technique point 39);
+confirmed end-to-end on device including packet content, not just connectivity (point 38).
+`network/IFacialMocapSender.kt` implements the iFacialMocap wire protocol for VBridger
+(`buildMessage()`, pure, tested), listening passively for the PC software to connect in rather than
+dialing out. `network/VTubeStudioSender.kt` talks directly to VTube Studio's own Plugin API
+(WebSocket/JSON, port 8001 by default) instead of VMC — protocol encoding (`VTubeStudioProtocol.kt`)
+and the connection state machine (`VTubeStudioConnectionState.kt`) are pure and tested; the socket
+itself isn't (point 39, LAN reachability confirmed, full connect/auth/parameter-mapping flow not yet
+tested with the app on device). UI-facing naming for iFacialMocap was deliberately decoupled from
+its internal naming (chip reads "UDP / VBridger", not "iFacialMocap") to avoid implying a connection
+to the third-party app — don't propagate that rename into the protocol-level identifiers
+(`ConnectionType.IFACIALMOCAP`, class name, handshake constants), which are intentionally left as-is.
 
 **Settings persistence.** `settings/AppSettingsStore.kt` and `settings/ConnectionSettingsStore.kt`
 wrap Jetpack DataStore Preferences. Blendshape selection persistence across sessions is opt-in
