@@ -122,10 +122,12 @@ dependencies {
     implementation(libs.javaosc.core)
 
     // Diffusion réseau : intégration directe VTube Studio via son API Plugin (WebSocket JSON,
-    // point 39) -- OkHttp pour le client WebSocket, kotlinx.serialization pour l'encodage JSON des
-    // requêtes/réponses de l'API (préféré à org.json : reste testable en JVM pur, voir
-    // AndroidMoCap_tests_unitaires.md).
-    implementation(libs.okhttp)
+    // point 39) -- nv-websocket-client pour le client WebSocket (OkHttp essayé en premier, retiré :
+    // propose systématiquement l'extension permessage-deflate sans réglage public pour la
+    // désactiver, incompatible avec le serveur VTube Studio -- voir le commentaire dans
+    // gradle/libs.versions.toml), kotlinx.serialization pour l'encodage JSON des requêtes/réponses
+    // de l'API (préféré à org.json : reste testable en JVM pur, voir AndroidMoCap_tests_unitaires.md).
+    implementation(libs.nv.websocket.client)
     implementation(libs.kotlinx.serialization.json)
 
     // Réglages persistés (AppSettingsStore, ConnectionSettingsStore) : mode éco, overlay du mesh,

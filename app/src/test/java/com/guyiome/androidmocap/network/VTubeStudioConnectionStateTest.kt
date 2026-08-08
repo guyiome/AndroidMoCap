@@ -84,9 +84,25 @@ class VTubeStudioConnectionStateTest {
     }
 
     @Test
-    fun `ParameterCreationFailed depuis Authenticated va vers Failed`() {
-        val result = next(VTubeStudioConnectionState.Authenticated, VTubeStudioConnectionEvent.ParameterCreationFailed("Refusé"))
-        assertEquals(VTubeStudioConnectionState.Failed("Refusé"), result)
+    fun `un APIError individuel pendant la creation de parametres ne fait plus echouer la connexion`() {
+        // Une collision de nom avec un autre plugin (ex. VBridger, mêmes noms ARKit) ne doit plus
+        // faire échouer toute la connexion -- géré en amont dans VTubeStudioSender (le paramètre en
+        // échec est simplement compté comme "traité"), donc plus d'événement dédié ici : aucun
+        // événement de ce type ne fait sortir Authenticated sauf ParametersReady.
+        assertEquals(
+            VTubeStudioConnectionState.Authenticated,
+            next(VTubeStudioConnectionState.Authenticated, VTubeStudioConnectionEvent.AuthTokenDenied("Refusé")),
+        )
+    }
+
+    @Test
+    fun `StoredTokenRejected depuis Authenticating va vers AwaitingUserApproval`() {
+        // Jeton stocké révoqué côté VTube Studio -- on retente avec un nouveau popup plutôt que
+        // d'abandonner la connexion (voir VTubeStudioSender).
+        assertEquals(
+            VTubeStudioConnectionState.AwaitingUserApproval,
+            next(VTubeStudioConnectionState.Authenticating, VTubeStudioConnectionEvent.StoredTokenRejected),
+        )
     }
 
     @Test

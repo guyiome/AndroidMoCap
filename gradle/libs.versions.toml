@@ -11,7 +11,7 @@ arcore = "1.54.0"
 mediapipeTasksVision = "1.0.0"
 javaosc = "0.9"
 datastorePreferences = "1.1.7"
-okhttp = "4.12.0"
+nvWebsocketClient = "2.14"
 kotlinxSerializationJson = "1.9.0"
 
 [libraries]
@@ -43,7 +43,18 @@ javaosc-core = { group = "com.illposed.osc", name = "javaosc-core", version.ref 
 # Diffusion réseau : client WebSocket pour l'API Plugin de VTube Studio (point 39) -- envoi direct,
 # alternative à VMC qui n'est vraisemblablement pas reçu nativement par VTube Studio (voir revue
 # technique). JSON de la même API via kotlinx.serialization.
-okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+#
+# nv-websocket-client plutôt qu'OkHttp (essayé en premier, retiré le 8 août 2026) : OkHttp propose
+# systématiquement l'extension WebSocket permessage-deflate, sans réglage public pour la désactiver
+# (même un intercepteur réseau retirant l'en-tête Sec-WebSocket-Extensions échoue -- OkHttp l'ajoute
+# à un niveau plus bas, hors de portée des intercepteurs). Le serveur VTube Studio
+# ("Server: websocket-sharp/1.0") a une implémentation buguée de cette extension avec
+# no_context_takeover (incompatibilité documentée, github.com/sta/websocket-sharp/issues/666) :
+# la connexion s'ouvrait normalement, la requête partait, mais aucune réponse n'était jamais
+# lisible côté app -- confirmé sur device par plusieurs allers-retours de diagnostic (voir revue
+# technique, point 39). nv-websocket-client ne propose permessage-deflate que si on l'active
+# explicitement (`addExtension`) -- jamais par défaut, contrairement à OkHttp.
+nv-websocket-client = { group = "com.neovisionaries", name = "nv-websocket-client", version.ref = "nvWebsocketClient" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 
 # Persistance des réglages de calibrage

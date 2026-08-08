@@ -20,6 +20,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +54,7 @@ fun ConnectionSettingsScreen(
     onStopIFacialMocap: () -> Unit,
     onConnectVts: (String, Int) -> Unit,
     onDisconnectVts: () -> Unit,
+    onForgetVtsToken: () -> Unit,
 ) {
     var vmcHostInput by remember { mutableStateOf(uiState.savedVmcHost.ifBlank { "192.168.1.100" }) }
     var vtsHostInput by remember { mutableStateOf(uiState.savedVtsHost.ifBlank { "192.168.1.100" }) }
@@ -209,7 +211,7 @@ fun ConnectionSettingsScreen(
                         ) { Text(stringResource(R.string.action_send)) }
                     }
                     Text(
-                        vtsStatusText(state),
+                        vtsStatusText(state, uiState.vtsTargetLabel),
                         color = when {
                             state == VTubeStudioConnectionState.ParametersRegistered -> Color(0xFF9FE7B0)
                             state is VTubeStudioConnectionState.Failed -> Color(0xFFFF8080)
@@ -225,6 +227,13 @@ fun ConnectionSettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(top = 4.dp),
                         )
+                    }
+                    // Pas affiché pendant une connexion en cours (isBusy) -- oublier le jeton en
+                    // plein milieu d'une tentative n'a pas de sens, seulement avant/après.
+                    if (!isBusy) {
+                        TextButton(onClick = onForgetVtsToken, modifier = Modifier.padding(top = 4.dp)) {
+                            Text(stringResource(R.string.connection_vts_forget_token))
+                        }
                     }
                 }
 
@@ -246,12 +255,15 @@ fun ConnectionSettingsScreen(
  * [VTubeStudioConnectionState]), contrairement à VMC qui n'a que connecté/non connecté.
  */
 @Composable
-private fun vtsStatusText(state: VTubeStudioConnectionState): String = when (state) {
+private fun vtsStatusText(state: VTubeStudioConnectionState, targetLabel: String): String = when (state) {
     VTubeStudioConnectionState.Disconnected -> stringResource(R.string.connection_vts_status_disconnected)
     VTubeStudioConnectionState.Connecting -> stringResource(R.string.connection_vts_status_connecting)
     VTubeStudioConnectionState.AwaitingUserApproval -> stringResource(R.string.connection_vts_status_awaiting_approval)
     VTubeStudioConnectionState.Authenticating -> stringResource(R.string.connection_vts_status_authenticating)
     VTubeStudioConnectionState.Authenticated -> stringResource(R.string.connection_vts_status_registering_params)
-    VTubeStudioConnectionState.ParametersRegistered -> stringResource(R.string.connection_vts_status_connected)
+    // Régression du 8 août 2026 : oubliée à l'origine, l'argument %1$s de cette chaîne (l'IP:port
+    // cible) restait affiché tel quel plutôt que remplacé -- stringResource() ne détecte pas un
+    // placeholder non fourni, il faut explicitement passer chaque argument attendu par la chaîne.
+    VTubeStudioConnectionState.ParametersRegistered -> stringResource(R.string.connection_vts_status_connected, targetLabel)
     is VTubeStudioConnectionState.Failed -> stringResource(R.string.error_vts_connection_failed, state.reason)
 }

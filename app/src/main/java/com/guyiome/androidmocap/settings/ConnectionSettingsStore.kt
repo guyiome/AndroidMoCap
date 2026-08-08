@@ -59,4 +59,15 @@ class ConnectionSettingsStore(private val context: Context) {
     suspend fun setVtsAuthToken(token: String) {
         context.connectionSettingsDataStore.edit { prefs -> prefs[Keys.VTS_AUTH_TOKEN] = token }
     }
+
+    /**
+     * Oublie le jeton stocké -- la prochaine connexion redemande une autorisation complète (nouveau
+     * popup côté VTube Studio) plutôt qu'une ré-authentification directe. Utile si le jeton a été
+     * révoqué manuellement depuis le panneau "Plugin config/permissions" de VTube Studio (l'app
+     * retente déjà automatiquement une fois toute seule dans ce cas, voir `VTubeStudioSender` --
+     * ce réglage reste utile pour un nouveau départ explicite).
+     */
+    suspend fun clearVtsAuthToken() {
+        context.connectionSettingsDataStore.edit { prefs -> prefs.remove(Keys.VTS_AUTH_TOKEN) }
+    }
 }

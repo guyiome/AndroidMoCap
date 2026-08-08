@@ -297,6 +297,7 @@ fun MainScreen(
                     onStopIFacialMocap = { viewModel.stopIFacialMocapListening() },
                     onConnectVts = { host, port -> viewModel.connectVtsTarget(host, port) },
                     onDisconnectVts = { viewModel.disconnectVtsTarget() },
+                    onForgetVtsToken = { viewModel.forgetVtsAuthToken() },
                 )
             }
 

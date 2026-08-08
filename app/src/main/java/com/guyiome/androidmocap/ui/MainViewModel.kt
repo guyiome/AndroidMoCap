@@ -938,6 +938,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(vtsTargetLabel = "", vtsConnectionState = VTubeStudioConnectionState.Disconnected) }
     }
 
+    /**
+     * Oublie le jeton d'authentification VTube Studio stocké -- la prochaine connexion redemande
+     * une autorisation complète (nouveau popup) plutôt qu'une ré-authentification directe.
+     * `VTubeStudioSender` retente déjà automatiquement une fois tout seul si le jeton stocké est
+     * refusé (voir revue technique, point 39) ; ce bouton reste utile pour un nouveau départ
+     * explicite (ex. l'utilisateur a lui-même révoqué le plugin depuis VTube Studio et le sait).
+     */
+    fun forgetVtsAuthToken() {
+        savedVtsAuthToken = null
+        viewModelScope.launch(Dispatchers.IO) { connectionSettingsStore.clearVtsAuthToken() }
+    }
+
     // --- iFacialMocap / MeowFace : lecture native par VBridger (et VTube Studio, VSeeFace...) ---
 
     /** Se met à l'écoute du handshake iFacialMocap sur le port 49983 -- c'est le PC qui initie. */

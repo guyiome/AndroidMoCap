@@ -2,11 +2,11 @@ package com.guyiome.androidmocap.network
 
 import android.util.Log
 import com.guyiome.androidmocap.tracking.FaceTrackingResult
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
-import okhttp3.WebSocket
-import okhttp3.WebSocketListener
+import com.neovisionaries.ws.client.WebSocket
+import com.neovisionaries.ws.client.WebSocketAdapter
+import com.neovisionaries.ws.client.WebSocketException
+import com.neovisionaries.ws.client.WebSocketFactory
+import com.neovisionaries.ws.client.WebSocketFrame
 import java.net.InetAddress
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -16,19 +16,25 @@ import java.util.concurrent.atomic.AtomicInteger
  * que VTube Studio ne reçoit vraisemblablement pas nativement (voir revue technique). Protocole
  * encodé/décodé par [VTubeStudioProtocol] (pur, testé), cycle de connexion piloté par
  * [nextVTubeStudioConnectionState] (pur, testé) -- cette classe est la seule pièce non testable en
- * JVM : elle enveloppe un vrai [WebSocket] OkHttp et traduit ses événements en appels à `next()`.
+ * JVM : elle enveloppe un vrai [WebSocket] et traduit ses événements en appels à `next()`.
  *
- * ⚠️ Non vérifié sur device (voir revue technique, point 39) : en particulier, si le serveur
- * WebSocket de VTube Studio écoute au-delà de `127.0.0.1` -- indispensable puisque contrairement à
- * VMC/iFacialMocap le téléphone est ici un client WebSocket classique visant l'IP du PC, pas un
- * simple envoi UDP. Si ce n'est pas le cas, aucune correction côté app ne peut compenser.
+ * **Client WebSocket : nv-websocket-client, pas OkHttp** (revue technique, point 39 -- essai/erreur
+ * sur device le 8 août 2026, pas une préférence a priori). OkHttp propose systématiquement
+ * l'extension `permessage-deflate` sur ses WebSocket, sans réglage public pour la désactiver -- même
+ * un intercepteur réseau retirant l'en-tête `Sec-WebSocket-Extensions` de la requête ne change rien,
+ * confirmé sur device : OkHttp l'ajoute à un niveau plus bas que la chaîne d'intercepteurs. Le
+ * serveur VTube Studio (`Server: websocket-sharp/1.0`) a une implémentation buguée/incomplète de
+ * cette extension avec `no_context_takeover` -- incompatibilité documentée
+ * (github.com/sta/websocket-sharp/issues/666) : la connexion s'ouvrait normalement (poignée de main
+ * réussie, négociation `permessage-deflate` acceptée par le serveur), la requête
+ * `AuthenticationTokenRequest` partait bien, mais aucune réponse n'était jamais lisible côté app --
+ * confirmé indépendamment de notre code via un testeur WebSocket générique et la console JS d'un
+ * navigateur (qui, eux, ne proposent pas cette extension et reçoivent leur réponse normalement
+ * contre le même serveur). nv-websocket-client ne propose `permessage-deflate` que si on l'active
+ * explicitement (`addExtension`) -- jamais par défaut.
  *
- * `WebSocket.send()` est documenté non bloquant côté OkHttp (mise en file interne, thread d'écriture
- * dédié) -- contrairement aux deux émetteurs UDP de ce projet, pas besoin ici d'un
- * `ExecutorService` dédié pour éviter de bloquer l'appelant (thread d'inférence MediaPipe).
- *
- * Les callbacks [WebSocketListener] (donc [onStateChanged]/[onNewAuthToken]) sont invoqués depuis
- * un thread interne à OkHttp, jamais le thread appelant -- même situation que
+ * Les callbacks [WebSocketAdapter] (donc [onStateChanged]/[onNewAuthToken]) sont invoqués depuis un
+ * thread interne à nv-websocket-client, jamais le thread appelant -- même situation que
  * [IFacialMocapSender.onStatusChanged], déjà utilisé par `MainViewModel` en toute sécurité
  * (`MutableStateFlow.update` est thread-safe).
  *
@@ -54,9 +60,15 @@ class VTubeStudioSender(
         const val DEFAULT_PORT = 8001
     }
 
-    // Un OkHttpClient dédié par instance (donc par connexion) -- son pool de threads est fermé dans
-    // close(), symétrique à la construction/fermeture d'une instance de VmcOscSender/IFacialMocapSender.
-    private val client = OkHttpClient()
+    // PAS de pingInterval/setPingInterval : testé sur device le 8 août 2026, le serveur VTube
+    // Studio ne répond à aucun ping WebSocket ("sent ping but didn't receive pong") -- avec un
+    // ping périodique activé (essayé côté OkHttp avant la bascule vers cette bibliothèque), la
+    // connexion était donc systématiquement coupée au bout de l'intervalle configuré, quoi qu'il
+    // arrive. Si un vrai besoin de keep-alive se confirme (connexion coupée en silence pendant
+    // l'attente du popup d'autorisation), la piste à explorer est un keep-alive applicatif (ex.
+    // renvoyer un message léger de l'API VTube Studio elle-même) plutôt que le ping/pong du
+    // protocole WebSocket, que ce serveur ignore.
+    private val factory = WebSocketFactory()
     private var webSocket: WebSocket? = null
 
     @Volatile private var authToken: String? = storedAuthToken
@@ -72,6 +84,14 @@ class VTubeStudioSender(
     private val pendingParameterCreationResponses = AtomicInteger(0)
     private val requestCounter = AtomicInteger(0)
 
+    // Jeton stocké refusé par VTube Studio (ex. révoqué depuis son panneau "Plugin config/
+    // permissions") -- confirmé sur device le 8 août 2026 : ré-authentification directe échouant
+    // avec "token is invalid or has been revoked". usedStoredToken distingue ce cas d'un vrai échec
+    // d'authentification (jeton flambant neuf refusé, situation différente, pas de retry auto
+    // possible) ; retriedAfterInvalidToken évite une boucle si le nouveau jeton échoue aussi.
+    @Volatile private var usedStoredToken = false
+    private val retriedAfterInvalidToken = AtomicBoolean(false)
+
     init {
         connect()
     }
@@ -80,8 +100,27 @@ class VTubeStudioSender(
 
     private fun connect() {
         connectionState = nextVTubeStudioConnectionState(connectionState, VTubeStudioConnectionEvent.Connect)
-        val request = Request.Builder().url("ws://${host.hostAddress}:$port").build()
-        webSocket = client.newWebSocket(request, Listener())
+        val url = "ws://${host.hostAddress}:$port"
+        Log.d(TAG, "Connexion vers $url")
+        try {
+            webSocket = factory.createSocket(url).apply {
+                addListener(Listener())
+                connectAsynchronously()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Impossible de préparer la connexion WebSocket vers $url", e)
+            applyEvent(VTubeStudioConnectionEvent.SocketFailed(e.message ?: "Connexion impossible"))
+        }
+    }
+
+    /**
+     * `WebSocket.sendText()` ne signale pas d'échec synchrone (mise en file interne, pas de valeur
+     * de retour exploitable côté succès/échec) -- logué tel quel, un vrai échec d'envoi remonterait
+     * via [WebSocketAdapter.onError] plutôt qu'ici.
+     */
+    private fun sendLogged(socket: WebSocket, description: String, text: String) {
+        socket.sendText(text)
+        Log.d(TAG, "Envoi $description : $text")
     }
 
     /**
@@ -97,11 +136,16 @@ class VTubeStudioSender(
                 if (parametersRequested.getAndSet(true)) return
                 val names = result.blendshapes.map { it.name }
                 pendingParameterCreationResponses.set(names.size)
-                buildParameterCreationRequestsJson(nextRequestId("params"), names).forEach { socket.send(it) }
+                Log.d(TAG, "Envoi de ${names.size} ParameterCreationRequest")
+                buildParameterCreationRequestsJson(nextRequestId("params"), names)
+                    .forEach { sendLogged(socket, "ParameterCreationRequest", it) }
             }
             VTubeStudioConnectionState.ParametersRegistered -> {
+                // Pas de sendLogged() ici volontairement (20-60 Hz) -- inonderait logcat pour un
+                // envoi en régime établi, contrairement à la phase de connexion (ouverture, auth,
+                // création des paramètres) qui ne survient qu'une fois et vaut la peine d'être tracée.
                 if (!result.faceDetected || result.blendshapes.isEmpty()) return
-                socket.send(buildInjectParameterDataRequestJson(nextRequestId("inject"), result.blendshapes))
+                socket.sendText(buildInjectParameterDataRequestJson(nextRequestId("inject"), result.blendshapes))
             }
             else -> Unit
         }
@@ -109,27 +153,39 @@ class VTubeStudioSender(
 
     fun close() {
         applyEvent(VTubeStudioConnectionEvent.Disconnect)
-        webSocket?.close(1000, "Fermé par l'app")
+        webSocket?.disconnect()
         webSocket = null
-        client.dispatcher.executorService.shutdown()
     }
 
     private fun applyEvent(event: VTubeStudioConnectionEvent) {
+        val previous = connectionState
         connectionState = nextVTubeStudioConnectionState(connectionState, event)
+        Log.d(TAG, "État : $previous --($event)--> $connectionState")
     }
 
-    private inner class Listener : WebSocketListener() {
-        override fun onOpen(webSocket: WebSocket, response: Response) {
+    /** Décompte une réponse de création de paramètre, succès ou échec confondus -- voir l'appel côté "APIError". */
+    private fun countDownParameterCreation() {
+        if (pendingParameterCreationResponses.decrementAndGet() <= 0) {
+            applyEvent(VTubeStudioConnectionEvent.ParametersReady)
+        }
+    }
+
+    private inner class Listener : WebSocketAdapter() {
+        override fun onConnected(webSocket: WebSocket, headers: Map<String, List<String>>) {
             val token = authToken
+            usedStoredToken = token != null
+            Log.d(TAG, "Socket ouvert, jeton stocké = $usedStoredToken")
+            Log.d(TAG, "En-têtes de la poignée de main : $headers")
             applyEvent(VTubeStudioConnectionEvent.SocketOpened(hasStoredToken = token != null))
             if (token != null) {
-                webSocket.send(buildAuthRequestJson(nextRequestId("auth"), token))
+                sendLogged(webSocket, "AuthenticationRequest", buildAuthRequestJson(nextRequestId("auth"), token))
             } else {
-                webSocket.send(buildAuthTokenRequestJson(nextRequestId("token")))
+                sendLogged(webSocket, "AuthenticationTokenRequest", buildAuthTokenRequestJson(nextRequestId("token")))
             }
         }
 
-        override fun onMessage(webSocket: WebSocket, text: String) {
+        override fun onTextMessage(webSocket: WebSocket, text: String) {
+            Log.d(TAG, "Message reçu : $text")
             val envelope = try {
                 parseEnvelope(text)
             } catch (e: Exception) {
@@ -143,21 +199,26 @@ class VTubeStudioSender(
                     authToken = token
                     onNewAuthToken(token)
                     applyEvent(VTubeStudioConnectionEvent.AuthTokenApproved(token))
-                    webSocket.send(buildAuthRequestJson(nextRequestId("auth"), token))
+                    sendLogged(webSocket, "AuthenticationRequest", buildAuthRequestJson(nextRequestId("auth"), token))
                 }
                 "AuthenticationResponse" -> {
                     val auth = parseAuthResponse(envelope)
-                    if (auth?.authenticated == true) {
-                        applyEvent(VTubeStudioConnectionEvent.Authenticated)
-                    } else {
-                        applyEvent(VTubeStudioConnectionEvent.AuthenticationFailed(auth?.reason ?: "Authentification refusée"))
+                    when {
+                        auth?.authenticated == true -> applyEvent(VTubeStudioConnectionEvent.Authenticated)
+                        // Jeton stocké refusé (ex. révoqué côté VTube Studio) : on retente une fois
+                        // avec un nouveau popup d'autorisation plutôt que d'abandonner -- voir
+                        // usedStoredToken/retriedAfterInvalidToken. Un jeton flambant neuf refusé
+                        // (donc usedStoredToken == false) tombe dans le else, pas de retry possible.
+                        usedStoredToken && !retriedAfterInvalidToken.getAndSet(true) -> {
+                            Log.w(TAG, "Jeton stocké refusé (${auth?.reason}), nouvelle demande d'autorisation")
+                            authToken = null
+                            applyEvent(VTubeStudioConnectionEvent.StoredTokenRejected)
+                            sendLogged(webSocket, "AuthenticationTokenRequest", buildAuthTokenRequestJson(nextRequestId("token")))
+                        }
+                        else -> applyEvent(VTubeStudioConnectionEvent.AuthenticationFailed(auth?.reason ?: "Authentification refusée"))
                     }
                 }
-                "ParameterCreationResponse" -> {
-                    if (pendingParameterCreationResponses.decrementAndGet() <= 0) {
-                        applyEvent(VTubeStudioConnectionEvent.ParametersReady)
-                    }
-                }
+                "ParameterCreationResponse" -> countDownParameterCreation()
                 "APIError" -> {
                     val reason = parseApiError(envelope)?.message ?: "Erreur VTube Studio inconnue"
                     when (connectionState) {
@@ -165,8 +226,17 @@ class VTubeStudioSender(
                             applyEvent(VTubeStudioConnectionEvent.AuthTokenDenied(reason))
                         VTubeStudioConnectionState.Authenticating ->
                             applyEvent(VTubeStudioConnectionEvent.AuthenticationFailed(reason))
-                        VTubeStudioConnectionState.Authenticated ->
-                            applyEvent(VTubeStudioConnectionEvent.ParameterCreationFailed(reason))
+                        VTubeStudioConnectionState.Authenticated -> {
+                            // Collision de nom avec un autre plugin déjà connecté (ex. VBridger,
+                            // mêmes noms ARKit) le plus souvent -- confirmé sur device le 8 août
+                            // 2026 (errorID 352, "Another plugin has already created a custom
+                            // parameter..."). Ne fait plus échouer toute la connexion : seul ce
+                            // paramètre est perdu (ne sera jamais injecté), les autres continuent
+                            // normalement. Compté comme "traité" au même titre qu'un succès pour ne
+                            // pas bloquer indéfiniment en attente de sa réponse.
+                            Log.w(TAG, "Création de paramètre refusée, ignorée : $reason")
+                            countDownParameterCreation()
+                        }
                         else ->
                             Log.w(TAG, "Erreur VTube Studio ($reason) reçue hors séquence, état courant $connectionState")
                     }
@@ -175,13 +245,24 @@ class VTubeStudioSender(
             }
         }
 
-        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-            Log.w(TAG, "Connexion WebSocket VTube Studio perdue ($host:$port)", t)
-            applyEvent(VTubeStudioConnectionEvent.SocketFailed(t.message ?: "Connexion perdue"))
+        override fun onDisconnected(
+            webSocket: WebSocket,
+            serverCloseFrame: WebSocketFrame?,
+            clientCloseFrame: WebSocketFrame?,
+            closedByServer: Boolean,
+        ) {
+            Log.d(TAG, "Socket fermé (par ${if (closedByServer) "le serveur" else "l'app"})")
+            applyEvent(VTubeStudioConnectionEvent.Disconnect)
         }
 
-        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-            applyEvent(VTubeStudioConnectionEvent.Disconnect)
+        override fun onError(webSocket: WebSocket, cause: WebSocketException) {
+            Log.w(TAG, "Erreur WebSocket VTube Studio ($host:$port)", cause)
+            applyEvent(VTubeStudioConnectionEvent.SocketFailed(cause.message ?: "Erreur de connexion"))
+        }
+
+        override fun onConnectError(webSocket: WebSocket, exception: WebSocketException) {
+            Log.w(TAG, "Échec de connexion WebSocket VTube Studio ($host:$port)", exception)
+            applyEvent(VTubeStudioConnectionEvent.SocketFailed(exception.message ?: "Connexion échouée"))
         }
     }
 }

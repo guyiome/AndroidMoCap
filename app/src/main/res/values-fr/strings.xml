@@ -68,6 +68,7 @@
     <string name="connection_vts_status_registering_params">Enregistrement des paramètres de blendshapes…</string>
     <string name="connection_vts_status_connected">Connecté à %1$s</string>
     <string name="connection_vts_mapping_hint">Pense à mapper les nouveaux paramètres à ton modèle Live2D dans l\'éditeur de paramètres de VTube Studio -- sans ça, rien ne bougera.</string>
+    <string name="connection_vts_forget_token">Oublier le jeton stocké</string>
 
     <!-- Écran Diagnostics -->
     <string name="diagnostics_title">Diagnostics</string>

@@ -46,10 +46,22 @@ internal sealed interface VTubeStudioConnectionEvent {
     data class SocketOpened(val hasStoredToken: Boolean) : VTubeStudioConnectionEvent
     data class AuthTokenApproved(val token: String) : VTubeStudioConnectionEvent
     data class AuthTokenDenied(val reason: String) : VTubeStudioConnectionEvent
+
+    /**
+     * Le jeton stocké utilisé pour une ré-authentification directe a été refusé par VTube Studio
+     * (ex. révoqué depuis le panneau "Plugin config/permissions") -- distinct d'un vrai échec
+     * d'authentification : on retente avec un nouveau jeton (nouveau popup) plutôt que d'abandonner
+     * la connexion, voir `VTubeStudioSender`.
+     */
+    data object StoredTokenRejected : VTubeStudioConnectionEvent
     data object Authenticated : VTubeStudioConnectionEvent
     data class AuthenticationFailed(val reason: String) : VTubeStudioConnectionEvent
+
+    /**
+     * Un paramètre a été créé (ou son échec géré -- voir `VTubeStudioSender`, une collision de nom
+     * avec un autre plugin ne fait plus échouer toute la connexion, seul ce paramètre est perdu).
+     */
     data object ParametersReady : VTubeStudioConnectionEvent
-    data class ParameterCreationFailed(val reason: String) : VTubeStudioConnectionEvent
 
     /** Fermeture/erreur du socket lui-même, valide depuis n'importe quel état. */
     data class SocketFailed(val reason: String) : VTubeStudioConnectionEvent
@@ -87,13 +99,13 @@ internal fun nextVTubeStudioConnectionState(
 
         VTubeStudioConnectionState.Authenticating -> when (event) {
             VTubeStudioConnectionEvent.Authenticated -> VTubeStudioConnectionState.Authenticated
+            VTubeStudioConnectionEvent.StoredTokenRejected -> VTubeStudioConnectionState.AwaitingUserApproval
             is VTubeStudioConnectionEvent.AuthenticationFailed -> VTubeStudioConnectionState.Failed(event.reason)
             else -> state
         }
 
         VTubeStudioConnectionState.Authenticated -> when (event) {
             VTubeStudioConnectionEvent.ParametersReady -> VTubeStudioConnectionState.ParametersRegistered
-            is VTubeStudioConnectionEvent.ParameterCreationFailed -> VTubeStudioConnectionState.Failed(event.reason)
             else -> state
         }
 

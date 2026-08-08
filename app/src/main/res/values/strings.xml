@@ -70,6 +70,7 @@
     <string name="connection_vts_status_registering_params">Registering blendshape parameters…</string>
     <string name="connection_vts_status_connected">Connected to %1$s</string>
     <string name="connection_vts_mapping_hint">Remember to map the new parameters to your Live2D model in VTube Studio\'s parameter editor -- they won\'t move anything until you do.</string>
+    <string name="connection_vts_forget_token">Forget stored token</string>
 
     <!-- Diagnostics screen -->
     <string name="diagnostics_title">Diagnostics</string>
