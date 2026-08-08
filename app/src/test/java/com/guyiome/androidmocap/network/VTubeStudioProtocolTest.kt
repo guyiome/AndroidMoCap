@@ -11,7 +11,7 @@ import org.junit.Test
 /**
  * Couvre l'encodage/décodage JSON pur de [VTubeStudioProtocol] -- entièrement en JVM, sans socket
  * ni device, même esprit que `VmcOscSenderTest`/`IFacialMocapSenderTest`. Ne couvre pas
- * [VTubeStudioSender] (socket OkHttp réel, non testable ici) ni le vrai comportement du serveur
+ * [VTubeStudioSender] (socket WebSocket réel, non testable ici) ni le vrai comportement du serveur
  * VTube Studio (ex. gestion réelle d'un paramètre déjà créé par un autre plugin).
  */
 class VTubeStudioProtocolTest {

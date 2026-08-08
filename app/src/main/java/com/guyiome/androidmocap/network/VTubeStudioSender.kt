@@ -92,6 +92,15 @@ class VTubeStudioSender(
     @Volatile private var usedStoredToken = false
     private val retriedAfterInvalidToken = AtomicBoolean(false)
 
+    // true dès close() -- une instance fermée ne doit plus jamais notifier onStateChanged, même si
+    // nv-websocket-client déclenche encore un callback asynchrone après coup (ex. onDisconnected
+    // arrivant après qu'une NOUVELLE instance a déjà été construite pour une reconnexion, voir
+    // MainViewModel.connectVtsTarget -- sans cette garde, le callback tardif de l'ancienne instance
+    // écraserait l'état affiché de la nouvelle connexion, les deux partageant le même callback côté
+    // MainViewModel). Même patron que IFacialMocapSender.running (AtomicBoolean, garde contre un
+    // callback/travail en cours après l'arrêt demandé).
+    @Volatile private var closed = false
+
     init {
         connect()
     }
@@ -152,6 +161,7 @@ class VTubeStudioSender(
     }
 
     fun close() {
+        closed = true
         applyEvent(VTubeStudioConnectionEvent.Disconnect)
         webSocket?.disconnect()
         webSocket = null
@@ -172,6 +182,7 @@ class VTubeStudioSender(
 
     private inner class Listener : WebSocketAdapter() {
         override fun onConnected(webSocket: WebSocket, headers: Map<String, List<String>>) {
+            if (closed) return
             val token = authToken
             usedStoredToken = token != null
             Log.d(TAG, "Socket ouvert, jeton stocké = $usedStoredToken")
@@ -185,6 +196,7 @@ class VTubeStudioSender(
         }
 
         override fun onTextMessage(webSocket: WebSocket, text: String) {
+            if (closed) return
             Log.d(TAG, "Message reçu : $text")
             val envelope = try {
                 parseEnvelope(text)
@@ -251,16 +263,19 @@ class VTubeStudioSender(
             clientCloseFrame: WebSocketFrame?,
             closedByServer: Boolean,
         ) {
+            if (closed) return
             Log.d(TAG, "Socket fermé (par ${if (closedByServer) "le serveur" else "l'app"})")
             applyEvent(VTubeStudioConnectionEvent.Disconnect)
         }
 
         override fun onError(webSocket: WebSocket, cause: WebSocketException) {
+            if (closed) return
             Log.w(TAG, "Erreur WebSocket VTube Studio ($host:$port)", cause)
             applyEvent(VTubeStudioConnectionEvent.SocketFailed(cause.message ?: "Erreur de connexion"))
         }
 
         override fun onConnectError(webSocket: WebSocket, exception: WebSocketException) {
+            if (closed) return
             Log.w(TAG, "Échec de connexion WebSocket VTube Studio ($host:$port)", exception)
             applyEvent(VTubeStudioConnectionEvent.SocketFailed(exception.message ?: "Connexion échouée"))
         }

@@ -915,10 +915,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     storedAuthToken = savedVtsAuthToken,
                     onStateChanged = { state -> _uiState.update { it.copy(vtsConnectionState = state) } },
                     onNewAuthToken = { token ->
-                        // Callback appelé depuis un thread interne à OkHttp -- écrire dans
-                        // ConnectionSettingsStore (DataStore) est déjà sûr depuis n'importe quel
-                        // thread, pas besoin de revenir sur Dispatchers.IO explicitement ici, mais
-                        // on le fait quand même pour rester cohérent avec le reste de ce fichier.
+                        // Callback appelé depuis un thread interne à nv-websocket-client -- écrire
+                        // dans ConnectionSettingsStore (DataStore) est déjà sûr depuis n'importe
+                        // quel thread, pas besoin de revenir sur Dispatchers.IO explicitement ici,
+                        // mais on le fait quand même pour rester cohérent avec le reste de ce fichier.
                         savedVtsAuthToken = token
                         viewModelScope.launch(Dispatchers.IO) { connectionSettingsStore.setVtsAuthToken(token) }
                     },
