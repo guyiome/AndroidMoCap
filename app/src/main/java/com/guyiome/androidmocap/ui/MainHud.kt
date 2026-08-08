@@ -34,10 +34,12 @@ import com.guyiome.androidmocap.settings.ConnectionType
  * Bandeau d'icônes minimal affiché en permanence sur l'écran caméra -- les 4 indicateurs/boutons
  * (visage détecté, connexion, réglages, mise à zéro) regroupés en un seul bloc en bas, sans
  * texte. Le bouton de connexion se base sur le type choisi dans [SettingsScreen] (VMC, iFacialMocap
- * ou VTube Studio -- ce dernier a un cycle de connexion en plusieurs étapes asynchrones, teinté en
- * ambre pendant qu'il progresse plutôt que de rester indiscernable d'un simple "non connecté",
- * revue technique point 40). Chaque icône pivote sur elle-même selon [iconRotationDegrees] pour
- * rester lisible quel que soit l'angle auquel le téléphone est tenu/posé.
+ * ou VTube Studio) et se teinte en ambre pendant qu'une connexion progresse, quel que soit le type
+ * (résolution DNS pour VMC, en écoute mais VBridger pas encore connecté pour iFacialMocap, cycle
+ * d'authentification/création de paramètres pour VTube Studio) -- plutôt que de rester indiscernable
+ * d'un simple "non connecté" comme avant le point 40 de la revue technique. Chaque icône pivote sur
+ * elle-même selon [iconRotationDegrees] pour rester lisible quel que soit l'angle auquel le
+ * téléphone est tenu/posé.
  *
  * [faceDetected] est reçu séparément de [uiState] (issu de [MainViewModel.trackingFrame], mis à
  * jour à chaque frame) plutôt qu'inclus dedans -- ça garde [uiState] stable pour Compose, qui peut
@@ -53,16 +55,22 @@ fun MainHud(
     onToggleConnection: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    // VTube Studio (contrairement à VMC/iFacialMocap) a un cycle de connexion en plusieurs étapes
-    // asynchrones (voir VTubeStudioConnectionState, revue technique point 39/40) -- ParametersRegistered
-    // seul compte comme "connecté" ; tout état intermédiaire (ni Disconnected ni Failed) compte comme
-    // "en cours", affiché avec une teinte distincte plutôt que de rester indiscernable d'un simple
-    // "non connecté" comme avant ce point.
+    // "En cours" par type (revue technique, point 40) :
+    // - VMC : résolution DNS/construction du socket (connectVmcTarget) -- généralement bref, mais
+    //   affiché pour rester cohérent avec les deux autres types.
+    // - iFacialMocap : en écoute mais VBridger pas encore connecté (l'app attend passivement le
+    //   handshake -- voir IFacialMocapSender).
+    // - VTube Studio : cycle de connexion en plusieurs étapes asynchrones (voir
+    //   VTubeStudioConnectionState) -- ParametersRegistered seul compte comme "connecté", tout état
+    //   intermédiaire (ni Disconnected ni Failed) compte comme "en cours".
+    // Toutes les trois étaient auparavant indiscernables d'un simple "non connecté".
     val vtsState = uiState.vtsConnectionState
     val isVtsConnecting = uiState.connectionType == ConnectionType.VTUBE_STUDIO &&
         vtsState != VTubeStudioConnectionState.Disconnected &&
         vtsState != VTubeStudioConnectionState.ParametersRegistered &&
         vtsState !is VTubeStudioConnectionState.Failed
+    val isIFacialMocapWaiting = uiState.iFacialMocapListening && uiState.iFacialMocapConnectedTo == null
+    val isConnecting = uiState.vmcConnecting || isIFacialMocapWaiting || isVtsConnecting
     val isConnected = uiState.vmcEnabled || uiState.iFacialMocapConnectedTo != null ||
         vtsState == VTubeStudioConnectionState.ParametersRegistered
     val countdown = uiState.calibrationCountdownSeconds
@@ -100,19 +108,22 @@ fun MainHud(
             Spacer(Modifier.width(18.dp))
 
             // Connexion -- appuyer connecte/déconnecte selon le type choisi dans les réglages.
-            // Teinte ambre pendant une connexion VTube Studio en cours (même couleur que
-            // l'avertissement thermique ci-dessus, cohérence visuelle) -- un appui pendant cet état
-            // annule la tentative (MainViewModel.toggleActiveConnection s'en charge déjà).
+            // Teinte ambre pendant qu'une connexion progresse, quel que soit le type (même couleur
+            // que l'avertissement thermique ci-dessus, cohérence visuelle). Un appui dans cet état
+            // annule la tentative pour iFacialMocap/VTube Studio (MainViewModel.toggleActiveConnection
+            // s'en charge déjà) ; pour VMC, la fenêtre "en cours" est si brève (pas de vrai lookup
+            // réseau pour une IP) qu'un appui pendant celle-ci ne fait dans les faits que relancer
+            // une connexion déjà sur le point d'aboutir -- sans conséquence en pratique.
             IconButton(onClick = onToggleConnection, modifier = Modifier.size(28.dp)) {
                 Icon(
                     imageVector = if (isConnected) Icons.Filled.Link else Icons.Filled.LinkOff,
                     contentDescription = when {
-                        isVtsConnecting -> stringResource(R.string.cd_connecting_tap_cancel)
+                        isConnecting -> stringResource(R.string.cd_connecting_tap_cancel)
                         isConnected -> stringResource(R.string.cd_connected_tap_disconnect)
                         else -> stringResource(R.string.cd_disconnected_tap_connect)
                     },
                     tint = when {
-                        isVtsConnecting -> Color(0xFFFFB74D)
+                        isConnecting -> Color(0xFFFFB74D)
                         isConnected -> Color(0xFF9FE7B0)
                         else -> Color.White
                     },

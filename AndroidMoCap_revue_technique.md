@@ -74,7 +74,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 37 | Lag ARCore en session, disparu après redémarrage complet | Signalé le 7 août 2026, cause non identifiée -- throttling thermique et coût de la détection d'anomalie écartés par le raisonnement, prochaine étape : capture logcat si reproduit |
 | 38 | VMC crashait systématiquement sur Android 11/API 30 (`NoSuchMethodError` javaosc-core) | **✅ corrigé et validé de bout en bout sur device le 8 août 2026** (plus de crash, connecteur VMC Blender reconnaît les paquets, contenu confirmé correct via Protokol -- noms et valeurs de blendshapes cohérents) -- voir section dédiée plus bas |
 | 39 | VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin | **✅ Validé de bout en bout sur device le 8 août 2026** (WebSocket/nv-websocket-client + kotlinx.serialization -- OkHttp abandonné, incompatible avec le serveur `websocket-sharp` de VTube Studio) -- connexion, popup d'autorisation, création des paramètres, réception confirmés fonctionnels, voir section dédiée plus bas |
-| 40 | Indicateur visuel "connexion en cours" sur l'écran principal | **✅ implémenté le 8 août 2026** (teinte ambre pendant une connexion VTube Studio en cours, `MainHud.kt`) -- bug corrigé au passage (l'icône ne passait jamais au vert pour VTube Studio), voir section dédiée plus bas |
+| 40 | Indicateur visuel "connexion en cours" sur l'écran principal | **✅ implémenté le 8 août 2026 pour les trois types de connexion** (VMC, iFacialMocap, VTube Studio -- teinte ambre pendant qu'une connexion progresse, `MainHud.kt`) -- bug corrigé au passage (l'icône ne passait jamais au vert pour VTube Studio), voir section dédiée plus bas |
 | 41 | Traduction des blendshapes ARKit pour éviter le remapping manuel (VRM/Blender, VTube Studio) | Backlog, faisabilité étudiée le 8 août 2026 -- Blender/VRM déjà bon (convention "Perfect Sync"), VTube Studio jugé viable avec les formules VBridger (`AdvancedARKitSettings`) comme point de départ, OVR non exploré, voir section dédiée plus bas |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
@@ -1342,11 +1342,25 @@ pleinement établie (`ParametersRegistered`) ne faisait jamais passer l'icône a
 indéfiniment sur "non connecté". Sans ce correctif, ajouter la teinte "en cours" aurait laissé
 l'icône dans un état incohérent une fois la connexion réellement établie.
 
-Scope volontairement limité à VTube Studio pour cette passe (seul protocole avec un vrai cycle
-asynchrone à plusieurs étapes) -- **extension possible non traitée** : iFacialMocap a un état
-symétrique non distingué aujourd'hui (`iFacialMocapListening == true` mais
-`iFacialMocapConnectedTo == null` -- en écoute, VBridger pas encore connecté), actuellement affiché
-identique à "non connecté" alors que la même logique de teinte s'y appliquerait directement.
+**Étendu aux trois types de connexion sur demande explicite (même jour)** :
+- **iFacialMocap** : `iFacialMocapListening == true` mais `iFacialMocapConnectedTo == null` (en
+  écoute, VBridger pas encore connecté) -- donnée déjà exposée, aucun nouveau champ nécessaire. Un
+  appui dans cet état annule réellement (`stopIFacialMocapListening()`, déjà le comportement de
+  `toggleActiveConnection`).
+- **VMC** : nouveau champ `MainUiState.vmcConnecting` (mis à `true` au début de
+  `connectVmcTarget()`, `false` dans toutes les branches de sortie -- succès, échec, exception).
+  Fenêtre généralement très brève (résolution d'une IP, pas un vrai lookup réseau) mais affichée
+  quand même pour rester cohérent entre les trois types. Nuance assumée : contrairement à
+  iFacialMocap/VTube Studio, un appui pendant cette fenêtre ne "annule" pas réellement -- `vmcEnabled`
+  est encore faux à ce moment-là, donc `toggleActiveConnection` relance une connexion plutôt que de
+  l'annuler. Sans conséquence pratique vu la brièveté de la fenêtre, documenté tel quel plutôt que
+  sur-conçu (chaînes de description dédiées par type, état d'annulation propre) pour un cas limite
+  qui n'arrivera quasiment jamais en usage réel.
+
+**Correctif de commentaires périmés au passage** : plusieurs endroits de `MainViewModel.kt`
+mentionnaient encore VMC comme destiné à "VTube Studio / Blender / Unity" (kdoc de
+`connectVmcTarget`, commentaire de section, doc du champ `vmcEnabled`) -- corrigés en "Blender /
+Unity", cohérent avec la conclusion du point 39.
 
 ### 39. VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin -- ✅ validée de bout en bout sur device
 

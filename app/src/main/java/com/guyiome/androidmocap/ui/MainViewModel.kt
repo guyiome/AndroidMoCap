@@ -73,9 +73,14 @@ data class MainUiState(
     // Choix fait dans l'écran de sélection dédié -- volontairement NON persisté (remis à zéro à
     // chaque lancement de l'app, comme demandé).
     val selectedBlendshapeNames: Set<String> = emptySet(),
-    // VMC (connexion directe : on saisit l'IP du PC cible -- VTube Studio / Blender / Unity)
+    // VMC (connexion directe : on saisit l'IP du PC cible -- Blender / Unity, pas VTube Studio,
+    // voir revue technique point 39)
     val vmcEnabled: Boolean = false,
     val vmcTargetLabel: String = "",
+    // Vrai pendant la résolution DNS/construction du socket (voir connectVmcTarget) -- généralement
+    // très bref (IP déjà résolue, pas de vrai lookup réseau) mais affiché quand même pour rester
+    // cohérent avec les deux autres types de connexion (revue technique, point 40).
+    val vmcConnecting: Boolean = false,
     // iFacialMocap / MeowFace (le PC initie -- pratique pour VBridger, pas besoin de saisir d'IP ici)
     val localIpAddress: String = "",
     val iFacialMocapListening: Boolean = false,
@@ -858,10 +863,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // --- VMC : connexion directe vers VTube Studio / Blender / Unity ---
+    // --- VMC : connexion directe vers Blender / Unity (pas VTube Studio, voir revue technique point 39) ---
 
-    /** Configure la cible VMC (IP du PC qui fait tourner VTube Studio / Blender / Unity) et l'active. */
+    /** Configure la cible VMC (IP du PC qui fait tourner Blender / Unity) et l'active. */
     fun connectVmcTarget(hostText: String, port: Int = VmcOscSender.DEFAULT_PORT) {
+        _uiState.update { it.copy(vmcConnecting = true) }
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val address = InetAddress.getByName(hostText)
@@ -873,18 +879,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // affichait "connecté" même quand rien ne pouvait être envoyé.
                 if (sender.isConnected) {
                     vmcSender = sender
-                    _uiState.update { it.copy(vmcEnabled = true, vmcTargetLabel = "$hostText:$port", errorMessage = null) }
+                    _uiState.update {
+                        it.copy(vmcEnabled = true, vmcConnecting = false, vmcTargetLabel = "$hostText:$port", errorMessage = null)
+                    }
                     // Mémorisée pour que le bouton de connexion de l'écran principal puisse s'y
                     // reconnecter directement, sans ressaisir l'IP.
                     connectionSettingsStore.setVmcHost(hostText)
                 } else {
                     vmcSender = null
                     val message = getApplication<Application>().getString(R.string.error_vmc_connection_failed, hostText)
-                    _uiState.update { it.copy(vmcEnabled = false, errorMessage = message) }
+                    _uiState.update { it.copy(vmcEnabled = false, vmcConnecting = false, errorMessage = message) }
                 }
             } catch (e: Exception) {
                 val message = getApplication<Application>().getString(R.string.error_vmc_invalid_address, hostText)
-                _uiState.update { it.copy(errorMessage = message) }
+                _uiState.update { it.copy(vmcConnecting = false, errorMessage = message) }
             }
         }
     }
@@ -892,7 +900,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun disconnectVmcTarget() {
         vmcSender?.close()
         vmcSender = null
-        _uiState.update { it.copy(vmcEnabled = false, vmcTargetLabel = "") }
+        _uiState.update { it.copy(vmcEnabled = false, vmcConnecting = false, vmcTargetLabel = "") }
     }
 
     // --- VTube Studio : intégration directe via l'API Plugin (point 39) ---
