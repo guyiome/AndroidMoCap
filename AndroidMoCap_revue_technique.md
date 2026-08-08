@@ -72,7 +72,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 35 | Panneau de mocks de debug caché (thermique, ARCore, délégué GPU) | **✅ implémenté et vérifié sur device le 7 août 2026**, voir section dédiée plus bas -- les trois mocks confirmés fonctionnels |
 | 37 | Lag ARCore en session, disparu après redémarrage complet | Signalé le 7 août 2026, cause non identifiée -- throttling thermique et coût de la détection d'anomalie écartés par le raisonnement, prochaine étape : capture logcat si reproduit |
 | 38 | VMC crashait systématiquement sur Android 11/API 30 (`NoSuchMethodError` javaosc-core) | **✅ corrigé et confirmé sur device le 8 août 2026** (plus de crash, connecteur VMC Blender reconnaît les paquets) -- voir section dédiée plus bas ; confirmation visuelle des valeurs de blendshapes encore en attente (pas de mesh configuré côté Blender) |
-| 39 | VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin | **Implémenté le 8 août 2026** (WebSocket/OkHttp + kotlinx.serialization, machine à état testée), voir section dédiée plus bas -- ⚠️ connectivité LAN du serveur VTube Studio non vérifiable depuis ce sandbox, à tester en premier sur device |
+| 39 | VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin | **Implémenté le 8 août 2026** (WebSocket/OkHttp + kotlinx.serialization, machine à état testée), voir section dédiée plus bas -- ✅ connectivité LAN du serveur VTube Studio confirmée (testeur WebSocket connecté à `192.168.1.49:8001` depuis le LAN), reste à tester le flux complet avec l'app (auth, création des paramètres, mapping Live2D) |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -1330,15 +1330,15 @@ supposée :
 - 24 nouveaux tests JVM (protocole + machine à état), `./gradlew testDebugUnitTest assembleDebug` :
   `BUILD SUCCESSFUL`.
 
-**⚠️ Risque non vérifiable depuis ce sandbox, à tester en premier sur device** : ni la doc du wiki
-VTube Studio ("Plugins") ni celle de sécurité réseau ("VNet Security") ne précisent si le serveur
-WebSocket écoute au-delà de `127.0.0.1` -- indispensable ici puisque le téléphone est un autre
-appareil du réseau local, pas un plugin tournant sur la même machine que VTube Studio (à la
-différence de la plupart des plugins existants). Si le serveur n'écoute qu'en loopback, aucune
-correction côté app ne peut compenser -- la fonctionnalité serait alors à retirer plutôt qu'à
-corriger. Reste aussi à vérifier en conditions réelles : le popup d'autorisation, la création
-effective des paramètres, et le mapping dans un vrai modèle Live2D. "Prêt pour premier test
-device, pas validé", même formulation que le reste du travail de cette session.
+**✅ Risque bloquant levé (8 août 2026)** : la doc VTube Studio ne précisant pas si le serveur
+WebSocket écoute au-delà de `127.0.0.1`, l'utilisateur a vérifié directement -- un testeur
+WebSocket générique se connecte avec succès à `192.168.1.49:8001` depuis un autre appareil du LAN.
+Le serveur accepte donc bien des connexions entrantes depuis le réseau local, pas seulement en
+loopback -- l'hypothèse de conception de ce point tient. Reste à vérifier en conditions réelles
+avec l'app elle-même (pas juste un testeur WebSocket générique) : le popup d'autorisation, la
+création effective des paramètres, et le mapping dans un vrai modèle Live2D. "Prêt pour premier
+test device avec l'app, pas encore validé de bout en bout", même formulation que le reste du
+travail de cette session.
 
 ### 38. VMC crashait systématiquement sur Android 11/API 30 -- ✅ corrigé, bug critique
 

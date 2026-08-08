@@ -141,10 +141,11 @@ kotlinx.serialization ; transport WebSocket via OkHttp (`VTubeStudioSender.kt`, 
 testable en JVM). Les paramètres créés ne sont pas automatiquement reconnus par un modèle Live2D
 existant -- l'utilisateur doit les mapper une fois dans l'éditeur de paramètres de VTube Studio.
 
-⚠️ Non vérifié sur device à ce stade (prêt pour premier test) : en particulier, si le serveur
-WebSocket de VTube Studio écoute au-delà de `127.0.0.1` -- indispensable ici puisque le téléphone
-est un autre appareil du LAN, pas un plugin tournant sur la même machine que VTube Studio. Voir
-revue technique point 39 pour le détail du risque et la méthode de vérification recommandée.
+⚠️ Non vérifié sur device avec l'app elle-même à ce stade (prêt pour premier test) : la
+connectivité LAN du serveur WebSocket est confirmée (testeur générique connecté depuis un autre
+appareil du réseau), mais le flux complet -- popup d'autorisation, création effective des
+paramètres, mapping dans un vrai modèle Live2D -- reste à tester avec l'app. Voir revue technique
+point 39.
 
 Les trois protocoles (VMC, iFacialMocap, VTube Studio) sont mutuellement exclusifs à l'exécution
 (un seul `ConnectionType` actif), choix persisté via `ConnectionSettingsStore`.
