@@ -114,11 +114,12 @@ démarrage) : détaillés dans le kdoc d'`ArCoreHeadPoseTracker.kt` et la revue 
 
 ### VMC/OSC (`VmcOscSender`)
 
-Cible : VTube Studio, Blender, Unity. Un `OSCBundle` unique par frame envoyée, regroupant un
-message `/VMC/Ext/Blend/Val` par blendshape (~52) suivi d'un `/Apply` -- un seul appel réseau par
-frame plutôt qu'un paquet UDP par blendshape (correctif appliqué, voir revue technique point 4).
-IP/port cible saisis manuellement côté app (le téléphone est l'émetteur, il doit connaître sa
-destination).
+Cible : Blender, Unity -- **pas VTube Studio** (voir revue technique point 39 : VTube Studio ne
+reçoit vraisemblablement pas le protocole VMC/OSC en entrée, contrairement à l'hypothèse initiale du
+projet). Un `OSCBundle` unique par frame envoyée, regroupant un message `/VMC/Ext/Blend/Val` par
+blendshape (~52) suivi d'un `/Apply` -- un seul appel réseau par frame plutôt qu'un paquet UDP par
+blendshape (correctif appliqué, voir revue technique point 4). IP/port cible saisis manuellement
+côté app (le téléphone est l'émetteur, il doit connaître sa destination).
 
 ### iFacialMocap/UDP (`IFacialMocapSender`)
 
@@ -126,14 +127,34 @@ Cible : VBridger. Modèle inversé : le téléphone écoute passivement et affic
 dans les réglages ; c'est VBridger qui initie la connexion vers cette IP. Aucune saisie réseau
 requise côté téléphone pour ce chemin.
 
-Les deux protocoles sont mutuellement exclusifs à l'exécution (un seul `ConnectionType` actif),
-choix persisté via `ConnectionSettingsStore`.
+### VTube Studio Plugin API (`VTubeStudioSender`) -- point 39
+
+Cible : VTube Studio, en direct, via son API Plugin propriétaire (WebSocket JSON, port 8001 par
+défaut) plutôt que VMC/OSC. Le téléphone est client WebSocket vers l'IP/port du PC (comme VMC, pas
+comme iFacialMocap). Cycle de connexion en plusieurs étapes asynchrones (`VTubeStudioConnectionState`,
+pur et testé) : ouverture du socket, authentification (jeton persisté après un premier popup
+d'autorisation utilisateur dans VTube Studio, réutilisé aux connexions suivantes), création d'un
+paramètre personnalisé par blendshape (noms ARKit, découverts dynamiquement à la première frame
+plutôt qu'une liste codée en dur), puis injection des valeurs à chaque frame
+(`InjectParameterDataRequest`). Encodage/décodage JSON pur et testé (`VTubeStudioProtocol.kt`) via
+kotlinx.serialization ; transport WebSocket via OkHttp (`VTubeStudioSender.kt`, seule pièce non
+testable en JVM). Les paramètres créés ne sont pas automatiquement reconnus par un modèle Live2D
+existant -- l'utilisateur doit les mapper une fois dans l'éditeur de paramètres de VTube Studio.
+
+⚠️ Non vérifié sur device à ce stade (prêt pour premier test) : en particulier, si le serveur
+WebSocket de VTube Studio écoute au-delà de `127.0.0.1` -- indispensable ici puisque le téléphone
+est un autre appareil du LAN, pas un plugin tournant sur la même machine que VTube Studio. Voir
+revue technique point 39 pour le détail du risque et la méthode de vérification recommandée.
+
+Les trois protocoles (VMC, iFacialMocap, VTube Studio) sont mutuellement exclusifs à l'exécution
+(un seul `ConnectionType` actif), choix persisté via `ConnectionSettingsStore`.
 
 ## 6. Persistance des réglages
 
 `AppSettingsStore` et `ConnectionSettingsStore` (DataStore Preferences) : seuil de batterie faible,
-mode économie d'énergie (activation + délai), overlay du mesh, type de connexion et cible réseau,
-et -- optionnellement -- la sélection de blendshapes affichés sur l'écran principal. Cette dernière
+mode économie d'énergie (activation + délai), overlay du mesh, type de connexion et cible réseau
+(IP VMC, IP + jeton d'authentification VTube Studio -- point 39), et -- optionnellement -- la
+sélection de blendshapes affichés sur l'écran principal. Cette dernière
 reste **non persistée par défaut** (remise à zéro à chaque lancement, comportement historique
 inchangé), mais un réglage dédié (`persistBlendshapeSelectionEnabled`) permet de la conserver d'une
 session à l'autre -- voir revue technique point 25.
@@ -186,6 +207,14 @@ impossibilité structurelle) -- distinction qui conditionne les pistes de correc
 usage de réalité augmentée classique.
 
 **JavaOSC** -- implémentation du protocole OSC utilisé pour VMC.
+
+**OkHttp** -- client WebSocket utilisé par `VTubeStudioSender` (point 39) pour l'API Plugin de
+VTube Studio.
+
+**kotlinx.serialization** -- encodage/décodage JSON pur pour le protocole de l'API Plugin VTube
+Studio (`VTubeStudioProtocol.kt`), préféré à `org.json` (déjà présent dans le SDK Android) car ce
+dernier n'est qu'un stub sous le runner de tests JVM de ce projet (pas de Robolectric configuré) --
+casserait la convention "fonctions pures testables en JVM" suivie partout ailleurs.
 
 ## 9. Tests
 

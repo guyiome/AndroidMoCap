@@ -72,7 +72,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 35 | Panneau de mocks de debug caché (thermique, ARCore, délégué GPU) | **✅ implémenté et vérifié sur device le 7 août 2026**, voir section dédiée plus bas -- les trois mocks confirmés fonctionnels |
 | 37 | Lag ARCore en session, disparu après redémarrage complet | Signalé le 7 août 2026, cause non identifiée -- throttling thermique et coût de la détection d'anomalie écartés par le raisonnement, prochaine étape : capture logcat si reproduit |
 | 38 | VMC crashait systématiquement sur Android 11/API 30 (`NoSuchMethodError` javaosc-core) | **✅ corrigé et confirmé sur device le 8 août 2026** (plus de crash) -- voir section dédiée plus bas ; reste à confirmer l'envoi VMC de bout en bout avec un récepteur qui reçoit réellement du VMC (voir point 39) |
-| 39 | VTube Studio ne reçoit probablement pas VMC/OSC -- piste d'intégration directe via son API Plugin | Backlog, piste jugée viable (WebSocket port 8001, doc officielle vérifiée), conception à faire, voir section dédiée plus bas |
+| 39 | VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin | **Implémenté le 8 août 2026** (WebSocket/OkHttp + kotlinx.serialization, machine à état testée), voir section dédiée plus bas -- ⚠️ connectivité LAN du serveur VTube Studio non vérifiable depuis ce sandbox, à tester en premier sur device |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -1254,7 +1254,7 @@ Statut : pas de correctif tenté à l'aveugle. Prochaine étape si ça se reprod
 continue pendant le lag (même méthode que les crashs diagnostiqués au point 13), pour voir si ARCore
 ou le driver GL logge un warning au moment où ça ralentit, plutôt que deviner davantage.
 
-### 39. VTube Studio ne reçoit probablement pas VMC/OSC -- piste d'intégration directe via son API Plugin
+### 39. VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin implémentée
 
 Suite à la confirmation device du correctif du point 38 (plus de crash), l'utilisateur signale
 n'avoir aucun retour visible côté VTube Studio, et ne pas trouver où paramétrer la réception VMC
@@ -1298,10 +1298,47 @@ supposée :
   une fois par l'utilisateur dans son modèle. Probablement le même mécanisme qu'utilise VBridger,
   à confirmer avant de concevoir le mapping ARKit -> paramètres VTube Studio.
 
-**Statut** : backlog, piste jugée viable mais non conçue en détail -- nouveau type d'émetteur
-(WebSocket, cycle d'auth avec jeton persisté, création de paramètres, mapping utilisateur), taille
-comparable à la fusion ARCore. Nécessite un vrai passage en mode plan avant tout code, et un test
-device avec VTube Studio + un modèle Live2D configuré (hors de portée de ce sandbox).
+**Implémenté (8 août 2026)**, après passage en mode plan (voir le plan sauvegardé) :
+
+- `network/VTubeStudioProtocol.kt` (pur, testé) : `@Serializable data class` pour chaque message de
+  l'API (auth par jeton, auth directe, création de paramètre, injection de valeurs) + fonctions
+  pures d'encodage/décodage (kotlinx.serialization) -- même esprit que
+  `VmcOscSender.buildBundle`/`IFacialMocapSender.buildMessage`. `ParameterCreationRequest` vérifié
+  idempotent pour un même plugin (recréer un paramètre déjà créé par "AndroidMoCap" réussit et
+  écrase min/max/défaut ; seul un paramètre créé par un *autre* plugin renvoie une erreur) --
+  permet d'appeler la création à chaque connexion sans logique de détection "déjà existant".
+- `network/VTubeStudioConnectionState.kt` (pur, testé) : machine à état du cycle de connexion
+  (`Disconnected` -> `Connecting` -> `AwaitingUserApproval` ou `Authenticating` selon qu'un jeton
+  est déjà stocké -> `Authenticated` -> `ParametersRegistered`, `Failed` accessible depuis
+  n'importe quelle étape) -- même famille que `CalibrationAnomalyState`/`ThermalThrottleState`.
+- `network/VTubeStudioSender.kt` (seule pièce non testable en JVM, socket OkHttp réel) : pilote la
+  machine à état en réaction aux messages entrants. Les noms de blendshapes à créer comme
+  paramètres sont découverts à la première frame reçue après authentification (pas de liste ARKit
+  codée en dur) -- décision pour rester indépendant de ce que MediaPipe fournit réellement à
+  l'exécution.
+- `ConnectionSettingsStore` : `ConnectionType.VTUBE_STUDIO`, IP et jeton d'authentification
+  persistés (même patron que `VMC_HOST`) -- le jeton évite de redemander le popup d'autorisation à
+  chaque connexion.
+- `MainViewModel`/`ConnectionSettingsScreen`/`SettingsScreen` : troisième type de connexion, IP +
+  port (8001 par défaut) éditables, ligne de statut détaillée reflétant les étapes de la connexion
+  (contrairement à VMC qui est connecté/non connecté en un seul appel UDP), rappel explicite du
+  mapping manuel des paramètres dans le modèle Live2D une fois connecté.
+- Dépendances ajoutées : OkHttp (client WebSocket, choix nettement plus établi sur Android que ne
+  l'était javaosc-core -- voir point 38) et kotlinx.serialization (JSON pur testable en JVM,
+  préféré à `org.json` qui n'est qu'un stub sous `testDebugUnitTest`, aucun Robolectric configuré
+  dans ce projet).
+- 24 nouveaux tests JVM (protocole + machine à état), `./gradlew testDebugUnitTest assembleDebug` :
+  `BUILD SUCCESSFUL`.
+
+**⚠️ Risque non vérifiable depuis ce sandbox, à tester en premier sur device** : ni la doc du wiki
+VTube Studio ("Plugins") ni celle de sécurité réseau ("VNet Security") ne précisent si le serveur
+WebSocket écoute au-delà de `127.0.0.1` -- indispensable ici puisque le téléphone est un autre
+appareil du réseau local, pas un plugin tournant sur la même machine que VTube Studio (à la
+différence de la plupart des plugins existants). Si le serveur n'écoute qu'en loopback, aucune
+correction côté app ne peut compenser -- la fonctionnalité serait alors à retirer plutôt qu'à
+corriger. Reste aussi à vérifier en conditions réelles : le popup d'autorisation, la création
+effective des paramètres, et le mapping dans un vrai modèle Live2D. "Prêt pour premier test
+device, pas validé", même formulation que le reste du travail de cette session.
 
 ### 38. VMC crashait systématiquement sur Android 11/API 30 -- ✅ corrigé, bug critique
 
