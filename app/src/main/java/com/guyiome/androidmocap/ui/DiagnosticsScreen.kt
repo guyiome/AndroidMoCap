@@ -64,6 +64,15 @@ fun DiagnosticsScreen(
     uiState: MainUiState,
     faceDetected: Boolean,
     inferenceTimeMs: Long,
+    // Diagnostic TEMPORAIRE (revue technique, point 28) : Eye Aspect Ratio calculé à partir du mesh
+    // de landmarks, affiché à côté du blendshape eyeBlink brut (à sélectionner dans le panneau de
+    // blendshapes de l'écran principal pour comparer) -- objectif : voir si EAR décroche plus
+    // proprement que le blendshape MediaPipe pendant un clignement avec lunettes. GROUP_A/GROUP_B
+    // plutôt que gauche/droite tant que la correspondance avec eyeBlinkLeft/Right n'est pas
+    // confirmée en test réel, voir EyeLandmarkIndices. À retirer ou à transformer en vraie
+    // fonctionnalité selon le résultat de ce test -- pas un réglage destiné à durer tel quel.
+    eyeAspectRatioGroupA: Float,
+    eyeAspectRatioGroupB: Float,
     onClose: () -> Unit,
     onSetTierOverride: (TrackingTier?) -> Unit,
     onSetDebugForceArCoreUnavailable: (Boolean) -> Unit,
@@ -208,6 +217,29 @@ fun DiagnosticsScreen(
                 color = Color.White,
             )
             Text(stringResource(R.string.diagnostics_inference_latency, inferenceTimeMs), color = Color.White)
+            // Diagnostic temporaire EAR (voir kdoc du paramètre ci-dessus) -- valeurs à 0,00 tant
+            // que l'overlay du mesh de tracking (Affichage & confort) n'est pas activé, seul
+            // moment où les landmarks sont extraits aujourd'hui.
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.diagnostics_ear_debug_label),
+                color = Color.White.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                stringResource(
+                    R.string.diagnostics_ear_debug_value,
+                    "%.2f".format(eyeAspectRatioGroupA),
+                    "%.2f".format(eyeAspectRatioGroupB),
+                ),
+                color = Color(0xFF7CE0FF),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                stringResource(R.string.diagnostics_ear_debug_hint),
+                color = Color.White.copy(alpha = 0.5f),
+                style = MaterialTheme.typography.bodySmall,
+            )
             // Source caméra actuelle -- utile pour vérifier sur device si le repli silencieux
             // CameraX (ArCoreHeadPoseTracker.onUnavailable) s'est déclenché malgré le palier
             // OPTIMAL choisi. Sans objet pour les autres paliers (toujours CameraX).

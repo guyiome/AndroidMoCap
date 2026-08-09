@@ -62,7 +62,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 19 | Détection d'anomalie de calibrage (bouton rouge) | **✅ implémenté et vérifié sur device le 7 août 2026** (tous paliers testés), voir section dédiée -- seuils encore non calés sur un corpus d'usage réel, piste de retours utilisateurs notée pour plus tard |
 | 20 | Orientation grand écran / tablette | Constat documenté, aucune décision de mise en œuvre |
 | 21 | Tri en sous-écrans des réglages | **Implémenté sur `main`, voir point 26** (l'index le disait encore "aucun code écrit" par erreur) |
-| 28 | Fiabilisation du clignement des yeux avec lunettes | Idée de conception ouverte le 6 août 2026, voir section dédiée plus bas -- aucun code écrit |
+| 28 | Fiabilisation du clignement des yeux avec lunettes | Toujours en discussion -- recherche EAR (Eye Aspect Ratio) faite le 9 août 2026, diagnostic temporaire ajouté et confirmé fonctionnel sur device, en attente du test réel avec/sans lunettes avant toute logique de fusion, voir section dédiée plus bas |
 | 29 | Validation des traductions FR/EN | **✅ traité le 9 août 2026**, voir point 23 -- relu et validé par l'utilisateur (129 clés, tableau dédié). Pas une relecture par un locuteur natif au sens strict (l'utilisateur n'est natif d'aucune des deux langues), jugé suffisant pour le contexte -- voir la note honnête dans la section point 23 |
 | 30 | Sélecteur de langue dans l'app pour Android 11/12 | **✅ confirmé fonctionnel sur device le 9 août 2026** (`androidx.appcompat` 1.7.1 + `AppCompatDelegate.setApplicationLocales()`), FR/EN vérifiés en direct + persistance après redémarrage complet sur l'appareil Android 11 de test -- voir section dédiée plus bas |
 | 31 | CI cassée depuis le premier run (`gradlew` sans bit exécutable), puis silencieusement bloquée depuis | **✅ entièrement résolu le 7 août 2026** (commit `df640a4` pour `gradlew` ; cause du blocage silencieux trouvée le même jour -- budget Actions à 0 $, "Stop usage" actif -- corrigée et vérifiée par un run CI réussi), voir section dédiée plus bas |
@@ -700,6 +700,64 @@ elles-mêmes affichées à l'écran) -- possible que MediaPipe compense déjà c
 évaluer, dans le même esprit de sobriété batterie que le reste du pipeline (voir spec technique
 §budget batterie). Pas de priorité assignée pour l'instant -- observation à garder en tête pour une
 future session de conception détaillée, éventuellement avec les points 15/16.
+
+**Mise à jour (9 août 2026) : recherche faite, outillage de diagnostic ajouté -- toujours en
+discussion, rien d'actif en dehors de l'écran Diagnostics.**
+
+Recherche menée pour répondre au point d'attention (a) ci-dessus : le blendshape `eyeBlink` de
+MediaPipe est un classifieur ML (texture + géométrie), documenté comme déjà le blendshape le plus
+fragile du modèle en usage général (diversité de géométrie oculaire, éclairage, angle de tête) --
+rien de spécifique aux lunettes n'est documenté officiellement, mais le mécanisme colle avec
+l'observation device : reflets sur les verres, occlusion par la monture, distorsion de réfraction
+perturbent un classifieur sensible à la texture ([GitHub issue #5329](https://github.com/google-ai-edge/mediapipe/issues/5329),
+[doc officielle face_landmarker](https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker)).
+
+**Piste retenue pour la suite : Eye Aspect Ratio (EAR)**, Soukupová & Čech 2016 -- mesure
+géométrique pure (position des paupières), pas de ML, donc a priori moins sensible aux reflets de
+verres que le classifieur MediaPipe (mais pas insensible aux lunettes pour autant : l'occlusion de
+monture ou la distorsion de réfraction peuvent aussi tromper la détection de *contour* elle-même).
+`EAR = (‖p2-p6‖+‖p3-p5‖)/(2·‖p1-p4‖)`, 6 points par œil ([papier original](https://www.semanticscholar.org/paper/Real-Time-Eye-Blink-Detection-using-Facial-Soukupov%C3%A1-Cech/4fa1ba3531219ca8c39d8749160faf1a877f2ced),
+[détail formule](https://pyimagesearch.com/2017/04/24/eye-blink-detection-opencv-python-dlib/)).
+Indices dans le mesh 478 points de MediaPipe croisés sur deux sources ([sanderdesnaijer.com/blog](https://www.sanderdesnaijer.com/blog/mediapipe-face-mesh-landmarks),
+convention communément reprise dans les implémentations EAR+MediaPipe) -- ⚠️ les tutoriels
+communautaires ne s'accordent pas tous sur la convention gauche/droite (sujet vs image) pour les
+mêmes indices, donc pas encore assumé comme correspondant à `eyeBlinkLeft`/`eyeBlinkRight` (ARKit)
+sans vérification device, voir plus bas.
+
+**Architecture discutée** : deux modes plutôt qu'un remplacement pur du blendshape MediaPipe (EAR
+seul a son propre défaut classique -- un plissement des yeux fait aussi chuter l'EAR, pas seulement
+un clignement) --
+- **Mode léger, actif sur tous les paliers y compris COMPATIBLE** : EAR comme signal correcteur du
+  blendshape (fusion, pas substitution) -- le coût du calcul EAR lui-même est négligeable (une
+  douzaine de distances), la vraie question de coût est l'extraction des landmarks, aujourd'hui
+  conditionnée à l'overlay du mesh (`FaceLandmarkerHelper.landmarksNeeded`). Pas de raison
+  identifiée d'exclure COMPATIBLE : MediaPipe calcule ces points en interne de toute façon dès que
+  les blendshapes sont demandés, l'extraction ne fait que copier un sous-ensemble.
+- **Mode lourd, expérimental** (`ExperimentalFeaturesScreen`, même famille que langue tirée/joues
+  gonflées) : calibration EAR personnalisée (accroché au flux de calibration déjà existant),
+  lissage temporel/hystérésis (le papier original utilise une fenêtre de frames, pas un seuil
+  frame-à-frame), rejet des frames aberrantes (glare = saut brutal des landmarks).
+
+**Upgrades "globales" de capture (gestion logicielle de la lumière/exposition)** évoquées en
+discussion, explicitement **gardées en tête pour éviter un double traitement ou un recalcul lourd
+plus tard, pas pour être implémentées dans ce lot** -- notées comme piste séparée : CameraX expose
+déjà `CameraControl.setExposureCompensationIndex()` et l'interop Camera2 pour le contrôle AE
+([doc officielle](https://medium.com/androiddevelopers/using-camerax-exposure-compensation-api-11fd75785bf)),
+`CameraController.kt` n'y touche pas du tout aujourd'hui. À traiter comme son propre point de
+backlog plus tard (améliorerait la capture globale, pas seulement les yeux), pas fondu dans le 28.
+
+**Diagnostic temporaire ajouté** (`tracking/EyeAspectRatio.kt`, pur et testé -- `EyeAspectRatioTest.kt`,
+5 tests) : calcule EAR pour deux groupes d'indices (`GROUP_A`/`GROUP_B`, nommés par indices plutôt
+que gauche/droite tant que la correspondance avec `eyeBlinkLeft/Right` n'est pas confirmée), affiché
+dans `DiagnosticsScreen` à côté de la latence d'inférence -- nécessite l'overlay du mesh activé
+(Affichage & confort) pour des valeurs non nulles. **✅ confirmé fonctionnel sur device** (téléphone,
+palier OPTIMAL) : valeurs réelles obtenues immédiatement, `Groupe A : 0,20 · Groupe B : 0,23`, dans
+la plage attendue pour un œil ouvert (~0,2-0,35) -- premier signe encourageant, mais ce n'est qu'un
+relevé statique (pas encore de clignement observé, ni de comparaison avec/sans lunettes). Prochaine
+étape : test réel par l'utilisateur (clignement avec et sans lunettes, en observant EAR à côté du
+blendshape `eyeBlinkLeft`/`eyeBlinkRight` brut sélectionné dans le panneau de blendshapes) avant
+toute décision de fusion. Statut : toujours en discussion, aucune logique de correction/fusion
+écrite, ce diagnostic est un outil de mesure, pas une fonctionnalité.
 
 ## Rapatriement des points 15, 16, 19, 20 (6 août 2026)
 

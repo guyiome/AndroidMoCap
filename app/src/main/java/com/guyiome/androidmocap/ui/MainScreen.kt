@@ -40,6 +40,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.guyiome.androidmocap.R
 import com.guyiome.androidmocap.sensors.BatteryMonitor
 import com.guyiome.androidmocap.sensors.IconOrientationTracker
+import com.guyiome.androidmocap.tracking.EyeLandmarkIndices
+import com.guyiome.androidmocap.tracking.eyeAspectRatioFromLandmarks
 
 /**
  * Écran unique de l'app : preview caméra pleine page + bandeau d'icônes minimal ([MainHud]) +
@@ -277,6 +279,12 @@ fun MainScreen(
                     uiState = uiState,
                     faceDetected = trackingFrame.faceDetected,
                     inferenceTimeMs = trackingFrame.inferenceTimeMs,
+                    // Diagnostic temporaire EAR (revue technique, point 28) -- voir kdoc dans
+                    // DiagnosticsScreen. Recalculé seulement quand la liste de landmarks change
+                    // réellement (elle est déjà stable/vide hors overlay du mesh activé), pas de
+                    // remember nécessaire ici : trackingFrame change de toute façon à 20-60 Hz.
+                    eyeAspectRatioGroupA = eyeAspectRatioFromLandmarks(trackingFrame.faceLandmarks, EyeLandmarkIndices.GROUP_A),
+                    eyeAspectRatioGroupB = eyeAspectRatioFromLandmarks(trackingFrame.faceLandmarks, EyeLandmarkIndices.GROUP_B),
                     onClose = { showDiagnostics = false },
                     onSetTierOverride = { tier -> viewModel.setTierOverride(tier) },
                     onSetDebugForceArCoreUnavailable = { enabled -> viewModel.setDebugForceArCoreUnavailable(enabled) },
