@@ -283,8 +283,8 @@ fun MainScreen(
                     // DiagnosticsScreen. Recalculé seulement quand la liste de landmarks change
                     // réellement (elle est déjà stable/vide hors overlay du mesh activé), pas de
                     // remember nécessaire ici : trackingFrame change de toute façon à 20-60 Hz.
-                    eyeAspectRatioGroupA = eyeAspectRatioFromLandmarks(trackingFrame.faceLandmarks, EyeLandmarkIndices.GROUP_A),
-                    eyeAspectRatioGroupB = eyeAspectRatioFromLandmarks(trackingFrame.faceLandmarks, EyeLandmarkIndices.GROUP_B),
+                    eyeAspectRatioGroupA = eyeAspectRatioFromLandmarks(trackingFrame.faceLandmarks, EyeLandmarkIndices.RIGHT_EYE),
+                    eyeAspectRatioGroupB = eyeAspectRatioFromLandmarks(trackingFrame.faceLandmarks, EyeLandmarkIndices.LEFT_EYE),
                     onClose = { showDiagnostics = false },
                     onSetTierOverride = { tier -> viewModel.setTierOverride(tier) },
                     onSetDebugForceArCoreUnavailable = { enabled -> viewModel.setDebugForceArCoreUnavailable(enabled) },

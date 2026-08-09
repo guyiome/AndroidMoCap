@@ -39,21 +39,20 @@ private fun distance(a: Pair<Float, Float>, b: Pair<Float, Float>): Float {
 
 /**
  * Indices des 6 points utilisés par [eyeAspectRatio] dans le mesh 478 points de MediaPipe Face
- * Landmarker. Vérifiés croisés sur deux sources indépendantes (blog sanderdesnaijer.com/blog/
- * mediapipe-face-mesh-landmarks + les indices communément repris dans les implémentations EAR sur
- * MediaPipe), mais **pas encore vérifiés sur ce projet contre nos propres blendshapes
- * `eyeBlinkLeft`/`eyeBlinkRight` (convention ARKit)** -- objet précis du diagnostic temporaire
- * ajouté à `DiagnosticsScreen` (voir revue technique, point 28) : nommés `GROUP_A`/`GROUP_B` par
- * indices plutôt que `LEFT`/`RIGHT` tant que cette correspondance n'a pas été confirmée en test réel
- * (les tutoriels communautaires ne s'accordent pas tous sur la convention gauche/droite -- sujet vs
- * image -- pour les mêmes indices, pas une supposition à laisser passer sans vérification).
+ * Landmarker. Vérifiés croisés sur deux sources indépendantes au départ (blog sanderdesnaijer.com/
+ * blog/mediapipe-face-mesh-landmarks + les indices communément repris dans les implémentations EAR
+ * sur MediaPipe), puis **la correspondance gauche/droite confirmée par test réel sur device le
+ * 9 août 2026** (revue technique, point 28) : clins d'œil isolés (gauche seul, droit seul, avec et
+ * sans lunettes) recoupés avec les blendshapes `eyeBlinkLeft`/`eyeBlinkRight` bruts sur plusieurs
+ * segments indépendants, jamais contredit -- l'indice 263/362 correspond à l'œil gauche, 33/133 à
+ * l'œil droit.
  */
 internal object EyeLandmarkIndices {
-    /** Groupe d'indices autour des coins de mesh 33/133. */
-    val GROUP_A = EyeIndices(cornerNear = 33, cornerFar = 133, upperNear = 160, upperFar = 158, lowerNear = 144, lowerFar = 153)
+    /** Indices autour des coins de mesh 33/133 -- œil droit (confirmé, voir kdoc ci-dessus). */
+    val RIGHT_EYE = EyeIndices(cornerNear = 33, cornerFar = 133, upperNear = 160, upperFar = 158, lowerNear = 144, lowerFar = 153)
 
-    /** Groupe d'indices autour des coins de mesh 263/362. */
-    val GROUP_B = EyeIndices(cornerNear = 263, cornerFar = 362, upperNear = 387, upperFar = 385, lowerNear = 373, lowerFar = 380)
+    /** Indices autour des coins de mesh 263/362 -- œil gauche (confirmé, voir kdoc ci-dessus). */
+    val LEFT_EYE = EyeIndices(cornerNear = 263, cornerFar = 362, upperNear = 387, upperFar = 385, lowerNear = 373, lowerFar = 380)
 }
 
 internal data class EyeIndices(

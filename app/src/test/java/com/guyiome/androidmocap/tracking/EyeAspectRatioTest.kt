@@ -55,20 +55,20 @@ class EyeAspectRatioTest {
         // Liste de landmarks factice (200 points à l'origine), avec les 6 points du groupe A
         // placés à leurs indices réels -- reproduit la géométrie "œil ouvert" du premier test.
         val landmarks = MutableList(200) { 0f to 0f }
-        landmarks[EyeLandmarkIndices.GROUP_A.cornerNear] = 0f to 0.5f
-        landmarks[EyeLandmarkIndices.GROUP_A.cornerFar] = 1f to 0.5f
-        landmarks[EyeLandmarkIndices.GROUP_A.upperNear] = 0.25f to 0.35f
-        landmarks[EyeLandmarkIndices.GROUP_A.lowerNear] = 0.25f to 0.65f
-        landmarks[EyeLandmarkIndices.GROUP_A.upperFar] = 0.75f to 0.4f
-        landmarks[EyeLandmarkIndices.GROUP_A.lowerFar] = 0.75f to 0.6f
+        landmarks[EyeLandmarkIndices.RIGHT_EYE.cornerNear] = 0f to 0.5f
+        landmarks[EyeLandmarkIndices.RIGHT_EYE.cornerFar] = 1f to 0.5f
+        landmarks[EyeLandmarkIndices.RIGHT_EYE.upperNear] = 0.25f to 0.35f
+        landmarks[EyeLandmarkIndices.RIGHT_EYE.lowerNear] = 0.25f to 0.65f
+        landmarks[EyeLandmarkIndices.RIGHT_EYE.upperFar] = 0.75f to 0.4f
+        landmarks[EyeLandmarkIndices.RIGHT_EYE.lowerFar] = 0.75f to 0.6f
 
-        val ear = eyeAspectRatioFromLandmarks(landmarks, EyeLandmarkIndices.GROUP_A)
+        val ear = eyeAspectRatioFromLandmarks(landmarks, EyeLandmarkIndices.RIGHT_EYE)
         assertEquals(0.25f, ear, delta)
     }
 
     @Test
     fun `eyeAspectRatioFromLandmarks renvoie zero si la liste est trop courte`() {
-        assertEquals(0f, eyeAspectRatioFromLandmarks(emptyList(), EyeLandmarkIndices.GROUP_A), delta)
-        assertEquals(0f, eyeAspectRatioFromLandmarks(List(10) { 0f to 0f }, EyeLandmarkIndices.GROUP_B), delta)
+        assertEquals(0f, eyeAspectRatioFromLandmarks(emptyList(), EyeLandmarkIndices.RIGHT_EYE), delta)
+        assertEquals(0f, eyeAspectRatioFromLandmarks(List(10) { 0f to 0f }, EyeLandmarkIndices.LEFT_EYE), delta)
     }
 }

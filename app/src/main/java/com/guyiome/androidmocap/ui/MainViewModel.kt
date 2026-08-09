@@ -33,9 +33,8 @@ import com.guyiome.androidmocap.settings.DEFAULT_POWER_SAVE_DELAY_SECONDS
 import com.guyiome.androidmocap.tracking.ArCoreHeadPoseTracker
 import com.guyiome.androidmocap.tracking.BlendshapeScore
 import com.guyiome.androidmocap.tracking.CalibrationAnomalyState
-import com.guyiome.androidmocap.tracking.EyeLandmarkIndices
 import com.guyiome.androidmocap.tracking.FaceLandmarkerHelper
-import com.guyiome.androidmocap.tracking.eyeAspectRatioFromLandmarks
+import com.guyiome.androidmocap.tracking.correctEyeBlinkScores
 import com.guyiome.androidmocap.tracking.FaceTrackingResult
 import com.guyiome.androidmocap.tracking.REST_VARIANCE_THRESHOLD
 import com.guyiome.androidmocap.tracking.RotationMath
@@ -342,11 +341,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             appSettingsStore.faceMeshOverlayEnabled.collect { enabled ->
+                // Ne pilote plus que l'affichage visuel de l'overlay (computeMeshOverlayVisible) --
+                // les landmarks sont extraits en permanence depuis le point 28 (correction eyeBlink
+                // par EAR), plus seulement quand ce réglage est actif.
                 _uiState.update { it.copy(faceMeshOverlayEnabled = enabled) }
-                // faceLandmarkerHelper peut ne pas encore exister à ce stade (permission caméra
-                // pas encore accordée) -- initializeTracking() réapplique l'état courant une fois
-                // prêt, même logique que pour setPreviewEnabled côté caméra.
-                faceLandmarkerHelper?.setLandmarksNeeded(enabled)
             }
         }
         viewModelScope.launch {
@@ -443,9 +441,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             onError = ::handleError,
         )
         helper.setup()
-        // Réapplique l'état courant du réglage (chargé depuis les préférences, potentiellement
-        // avant que le helper n'existe -- voir le collecteur dans init).
-        helper.setLandmarksNeeded(_uiState.value.faceMeshOverlayEnabled)
         faceLandmarkerHelper = helper
 
         _uiState.update { it.copy(activeDelegateIsGpu = helper.activeDelegateIsGpu) }
@@ -624,6 +619,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         val calibrated = result.copy(headEulerDegrees = calibratedEuler)
 
+        // Correction eyeBlinkLeft/Right par EAR (revue technique, point 28) : le blendshape brut
+        // fuit d'un œil vers l'autre pendant un clin d'œil isolé (mesuré sur device -- pas
+        // supposé), l'EAR (géométrique, indépendant du classifieur ML) fuit beaucoup moins dans
+        // les mêmes conditions -- utilisé ici pour atténuer les fuites plutôt que remplacer le
+        // blendshape. Appliquée après la détection d'anomalie de calibrage ci-dessous (qui reste
+        // sur les scores bruts, sans rapport avec cette correction) mais avant tout ce qui
+        // consomme les blendshapes en aval (affichage, envoi réseau).
+        val corrected = calibrated.copy(
+            blendshapes = correctEyeBlinkScores(calibrated.blendshapes, calibrated.faceLandmarks),
+        )
+
         // Détection d'anomalie de calibrage (voir tracking/CalibrationAnomaly.kt, revue technique
         // point 19) -- gardée derrière isCalibrated : avant le tout premier calibrage, "proche de
         // zéro" n'a pas de sens et ferait remonter de faux positifs. previousBlendshapesForAnomaly
@@ -646,30 +652,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         _trackingFrame.update {
             it.copy(
-                faceDetected = calibrated.faceDetected,
-                allBlendshapes = calibrated.blendshapes,
-                inferenceTimeMs = calibrated.inferenceTimeMs,
-                faceLandmarks = calibrated.faceLandmarks,
-                imageWidthPx = calibrated.imageWidthPx,
-                imageHeightPx = calibrated.imageHeightPx,
+                faceDetected = corrected.faceDetected,
+                allBlendshapes = corrected.blendshapes,
+                inferenceTimeMs = corrected.inferenceTimeMs,
+                faceLandmarks = corrected.faceLandmarks,
+                imageWidthPx = corrected.imageWidthPx,
+                imageHeightPx = corrected.imageHeightPx,
             )
         }
-        vmcSender?.send(calibrated)
-        iFacialMocapSender?.send(calibrated)
-        vtubeStudioSender?.send(calibrated)
+        vmcSender?.send(corrected)
+        iFacialMocapSender?.send(corrected)
+        vtubeStudioSender?.send(corrected)
 
-        // Diagnostic temporaire EAR (voir la constante EAR_DIAGNOSTIC_LOGGING ci-dessus) -- rien à
-        // loguer tant que les landmarks ne sont pas extraits (overlay du mesh désactivé, ou palier
-        // OPTIMAL/ARCore avant le tout premier frame ARCore).
+        // Diagnostic temporaire EAR (voir la constante EAR_DIAGNOSTIC_LOGGING ci-dessus) -- brut ET
+        // corrigé côte à côte pour vérifier sur device que la correction atténue bien les fuites
+        // sans toucher aux vraies fermetures. Rien à loguer tant que les landmarks ne sont pas
+        // extraits (aucune frame traitée pour l'instant).
         if (EAR_DIAGNOSTIC_LOGGING && calibrated.faceLandmarks.isNotEmpty()) {
-            val earGroupA = eyeAspectRatioFromLandmarks(calibrated.faceLandmarks, EyeLandmarkIndices.GROUP_A)
-            val earGroupB = eyeAspectRatioFromLandmarks(calibrated.faceLandmarks, EyeLandmarkIndices.GROUP_B)
-            val blinkLeft = calibrated.blendshapes.firstOrNull { it.name == "eyeBlinkLeft" }?.score ?: 0f
-            val blinkRight = calibrated.blendshapes.firstOrNull { it.name == "eyeBlinkRight" }?.score ?: 0f
+            val blinkLeftRaw = calibrated.blendshapes.firstOrNull { it.name == "eyeBlinkLeft" }?.score ?: 0f
+            val blinkRightRaw = calibrated.blendshapes.firstOrNull { it.name == "eyeBlinkRight" }?.score ?: 0f
+            val blinkLeftCorrected = corrected.blendshapes.firstOrNull { it.name == "eyeBlinkLeft" }?.score ?: 0f
+            val blinkRightCorrected = corrected.blendshapes.firstOrNull { it.name == "eyeBlinkRight" }?.score ?: 0f
             Log.d(
                 EAR_DIAG_TAG,
-                "EAR A=%.3f B=%.3f | blendshape eyeBlinkLeft=%.3f eyeBlinkRight=%.3f".format(
-                    earGroupA, earGroupB, blinkLeft, blinkRight,
+                "eyeBlinkLeft brut=%.3f corrige=%.3f | eyeBlinkRight brut=%.3f corrige=%.3f".format(
+                    blinkLeftRaw, blinkLeftCorrected, blinkRightRaw, blinkRightCorrected,
                 ),
             )
         }
