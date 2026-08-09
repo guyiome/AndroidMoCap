@@ -4,8 +4,14 @@
          Thème du système (fenêtre Android), utilisé avant même que Compose ne prenne le relais,
          pendant l'écran de démarrage et le temps de chargement de MediaPipe. Fond sombre pour
          éviter le flash blanc agressif au lancement, cohérent avec AndroidMoCapTheme (Theme.kt).
+
+         Parent Theme.AppCompat (plus android:Theme.Material) depuis le point 30 (sélecteur de
+         langue en-app) : AppCompatActivity.onCreate() exige un thème descendant de Theme.AppCompat,
+         requis pour que AppCompatDelegate.setApplicationLocales() fonctionne avec Compose (doc
+         officielle Android, voir MainActivity.kt), sans ce changement l'app crasherait au
+         lancement dès que MainActivity est passée à AppCompatActivity.
     -->
-    <style name="Theme.AndroidMoCap" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.AndroidMoCap" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowBackground">@color/launch_background</item>
         <item name="android:statusBarColor">@color/launch_background</item>
         <item name="android:navigationBarColor">@color/launch_background</item>

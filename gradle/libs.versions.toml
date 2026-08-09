@@ -13,6 +13,9 @@ javaosc = "0.9"
 datastorePreferences = "1.1.7"
 nvWebsocketClient = "2.14"
 kotlinxSerializationJson = "1.9.0"
+# 1.7.1 : dernière version stable au moment de l'ajout (1.8.0-rc01 est une pré-version, exclue --
+# vérifié via dl.google.com/android/maven2, search.maven.org n'indexe pas les artefacts AndroidX).
+appcompat = "1.7.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -59,6 +62,13 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 
 # Persistance des réglages de calibrage
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastorePreferences" }
+
+# Sélecteur de langue en-app (point 30) : MainActivity doit étendre AppCompatActivity pour que
+# AppCompatDelegate.setApplicationLocales() fonctionne avec Compose (doc officielle Android, voir
+# MainActivity.kt) -- pas de rapport avec les autres usages d'AndroidX déjà présents (aucun n'est
+# du support UI classique). Fournit aussi AppLocalesMetadataHolderService (persistance auto de la
+# langue choisie sur toutes les versions d'Android, voir AndroidManifest.xml).
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 
 # Tests unitaires (JVM pur, voir AndroidMoCap_tests_unitaires.md pour ce qui est couvert et pourquoi)
 junit = { group = "junit", name = "junit", version.ref = "junit" }

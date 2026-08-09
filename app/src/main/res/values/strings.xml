@@ -120,6 +120,13 @@
     <string name="display_power_save_description">After the delay below without touching the screen: dimmed screen, hidden camera preview (tracking and sending keep running normally). A single tap exits it.</string>
     <string name="display_power_save_delay">Idle delay: %1$d s</string>
     <string name="display_low_battery_threshold">Low battery alert threshold: %1$d%%</string>
+    <!-- In-app language selector (point 30), works on all Android versions, unlike the native
+         system per-app language picker (Settings > Apps > App languages), which only exists since
+         Android 13. -->
+    <string name="display_language_label">App language</string>
+    <string name="display_language_system">Follow system</string>
+    <string name="display_language_french">Français</string>
+    <string name="display_language_english">English</string>
 
     <!-- Experimental features screen -->
     <string name="experimental_features_title">Experimental features</string>

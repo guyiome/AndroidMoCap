@@ -135,6 +135,10 @@ dependencies {
     // connexion et cible réseau
     implementation(libs.androidx.datastore.preferences)
 
+    // Sélecteur de langue en-app (point 30) : MainActivity étend AppCompatActivity, requis par
+    // AppCompatDelegate.setApplicationLocales() sous Compose (voir gradle/libs.versions.toml).
+    implementation(libs.androidx.appcompat)
+
     // Tests unitaires (JVM pur -- pas de dépendance Android, voir AndroidMoCap_tests_unitaires.md)
     testImplementation(libs.junit)
 }

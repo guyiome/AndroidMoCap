@@ -64,7 +64,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 21 | Tri en sous-écrans des réglages | **Implémenté sur `main`, voir point 26** (l'index le disait encore "aucun code écrit" par erreur) |
 | 28 | Fiabilisation du clignement des yeux avec lunettes | Idée de conception ouverte le 6 août 2026, voir section dédiée plus bas -- aucun code écrit |
 | 29 | Validation des traductions FR/EN par locuteurs natifs | Backlog, voir point 23 -- **deux passes de self-review faites** (6 août, commit `1b0030a`, 86 clés ; 7 août, clés des points 32-35, incohérence de style corrigée entre les puces ARCore/GPU et thermique), mais aucune relecture par un locuteur natif à ce jour, ni en français ni en anglais |
-| 30 | Sélecteur de langue dans l'app pour Android 11/12 | Backlog, voir point 23 -- pas d'équivalent au sélecteur système Android 13+ sur ces versions, demanderait `androidx.appcompat` + `AppCompatDelegate` |
+| 30 | Sélecteur de langue dans l'app pour Android 11/12 | **✅ implémenté le 9 août 2026** (`androidx.appcompat` 1.7.1 + `AppCompatDelegate.setApplicationLocales()`), build local vert -- confirmation device en attente, voir section dédiée plus bas |
 | 31 | CI cassée depuis le premier run (`gradlew` sans bit exécutable), puis silencieusement bloquée depuis | **✅ entièrement résolu le 7 août 2026** (commit `df640a4` pour `gradlew` ; cause du blocage silencieux trouvée le même jour -- budget Actions à 0 $, "Stop usage" actif -- corrigée et vérifiée par un run CI réussi), voir section dédiée plus bas |
 | 32 | Panneau de blendshapes du HUD : tongueOut disparaissait, noms masqués par le bandeau système | **✅ corrigés et vérifiés sur device le 7 août 2026**, voir section dédiée plus bas |
 | 33 | Proposer l'installation ARCore au lieu du repli silencieux | Backlog, priorité mineure, idée ouverte le 7 août 2026, aucun code écrit |
@@ -1645,6 +1645,70 @@ flux continu de messages `/VMC/Ext/Blend/Val` avec noms de blendshapes ARKit cor
 `/VMC/Ext/Blend/Apply` à la fin de chaque frame. **Le point 38 est maintenant validé de bout en
 bout au niveau du contenu**, pas seulement de la connexion -- crash corrigé, format de paquet
 correct, et désormais contenu des données confirmé correct par un outil tiers indépendant.
+
+### 43. Sélecteur de langue en-app (point 30) -- ✅ implémenté, build local vert, test device en attente
+
+Demande explicite (9 août 2026) : offrir un sélecteur de langue **dans l'app**, fonctionnel sur
+toutes les versions d'Android -- pas seulement le sélecteur système natif (réglages système >
+langues de l'app, `res/xml/locales_config.xml`), réservé à Android 13+ et donc invisible sur les
+deux appareils de test de ce projet (Android 11).
+
+**Approche retenue, vérifiée sur la doc officielle Android** (`developer.android.com/guide/topics/
+resources/app-languages`) plutôt que supposée : `AppCompatDelegate.setApplicationLocales()`, qui
+fonctionne sur toutes les API depuis 21 (stockage propre à AppCompat sous API 33, délégué à
+`LocaleManager` au-delà). Point dur explicitement documenté par Google : **sous Compose, cette API
+exige que l'Activity étende `AppCompatActivity`**, pas `ComponentActivity` -- sinon l'appel est
+silencieusement sans effet. L'alternative "cadre système seul" (`LocaleManager` direct) ne
+fonctionne qu'à partir de l'API 33, ce qui aurait échoué le critère explicite "toutes les versions".
+
+**Chaîne de prérequis, chacun vérifié avant modification** :
+1. `AppCompatActivity.onCreate()` exige un thème descendant de `Theme.AppCompat.*` -- le thème du
+   projet (`Theme.AndroidMoCap`, `themes.xml`) avait pour parent `android:Theme.Material.NoActionBar`
+   (thème plateforme, pas AppCompat), qui aurait fait planter l'app au lancement une fois
+   `MainActivity` changée. Parent remplacé par `Theme.AppCompat.DayNight.NoActionBar` -- les
+   surcharges existantes (`windowBackground`/`statusBarColor`/`navigationBarColor`, fond sombre au
+   lancement) restent valables, ce sont des attributs `android:` de plateforme, pas spécifiques à
+   AppCompat.
+2. `androidx.appcompat:appcompat:1.7.1` ajouté (`gradle/libs.versions.toml` +
+   `app/build.gradle.kts`) -- 1.7.1 vérifiée comme dernière version **stable** via
+   `dl.google.com/android/maven2/androidx/appcompat/appcompat/maven-metadata.xml` (le tag "latest
+   release" du dépôt, `1.8.0-rc01`, est une pré-version, explicitement écartée ; `search.maven.org`
+   n'indexe pas les artefacts AndroidX de la même façon, détour nécessaire).
+3. `MainActivity` étend maintenant `AppCompatActivity` (import `androidx.appcompat.app.AppCompatActivity`)
+   au lieu de `ComponentActivity` -- superclasse stricte, `setContent {}` et le flux de permission
+   caméra existant (`registerForActivityResult`) restent inchangés.
+4. `AndroidManifest.xml` : ajout du `<service android:name="androidx.appcompat.app.
+   AppLocalesMetadataHolderService" android:enabled="false" ...>` avec
+   `<meta-data android:name="autoStoreLocales" android:value="true" />` -- persistance automatique
+   de la langue choisie d'un lancement à l'autre, sur toutes les versions, sans DataStore ni code de
+   lecture/écriture propre à ce projet (contrairement au reste des réglages persistés de l'app).
+
+**Conception** : `settings/AppLanguage.kt` (nouveau, pur, testé JVM -- `AppLanguageTest.kt`, 5 tests)
+-- enum `SYSTEM`/`FRENCH`/`ENGLISH` + `appLanguageFromTag()` (reconstruit l'enum depuis
+`AppCompatDelegate.getApplicationLocales().toLanguageTags()`, qui renvoie une chaîne **vide** --
+pas `null` -- quand aucune langue n'est forcée). Volontairement limité au mapping nom/tag : la
+construction du `LocaleListCompat` réel et l'appel `AppCompatDelegate.setApplicationLocales()`
+vivent dans `MainViewModel.setAppLanguage()` (dépendance au framework Android, non testable en JVM
+pur ici, même contrainte que les autres senders réseau du projet). `MainUiState.appLanguage` lu une
+seule fois au lancement (`init`, pas de `Flow` à collecter -- AppCompat gère lui-même la persistance,
+rien d'autre à observer), mis à jour immédiatement à chaque changement (effet AppCompat synchrone,
+pas besoin de relancer l'app).
+
+**UI** : nouvelle section dans `DisplaySettingsScreen` (catégorie "Affichage & confort" -- pas de
+catégorie dédiée pour un seul réglage), trois `FilterChip` ("Suivre le système" / "Français" /
+"English"), même patron visuel que le sélecteur de type de connexion. Parité FR/EN des nouvelles
+clés vérifiée (129/129, `comm -23`/`comm -13`).
+
+`./gradlew testDebugUnitTest assembleDebug` : `BUILD SUCCESSFUL` (129 clés `strings.xml` FR/EN en
+parité, `AppLanguageTest` : 5/5 verts). Deux erreurs de lint XML "--" dans des commentaires
+(`themes.xml`, `AndroidManifest.xml`, `strings.xml`/`values-fr`) trouvées et corrigées en cours de
+route -- même piège XML déjà rencontré plusieurs fois cette session, toujours le même remède
+(remplacer `--` par une virgule ou reformuler).
+
+**Non vérifiable depuis ce sandbox** : le comportement réel sur device (bascule effective de la
+langue à l'exécution, persistance après redémarrage complet sur un appareil Android 11 -- le cas
+d'usage réel visé par "toutes les versions"). Statut : implémenté et testé côté JVM/build, **en
+attente de confirmation device**.
 
 ## Automatisation
 

@@ -4,9 +4,9 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.WindowManager
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -14,7 +14,12 @@ import androidx.core.content.ContextCompat
 import com.guyiome.androidmocap.ui.MainScreen
 import com.guyiome.androidmocap.ui.theme.AndroidMoCapTheme
 
-class MainActivity : ComponentActivity() {
+// AppCompatActivity (pas ComponentActivity) : requis par AppCompatDelegate.setApplicationLocales()
+// sous Compose pour que le sélecteur de langue en-app fonctionne (point 30, doc officielle Android
+// -- "If you're using Compose with setApplicationLocales, you must extend your activity from
+// AppCompatActivity"), voir aussi le thème Theme.AppCompat.DayNight requis (themes.xml) et
+// AppLocalesMetadataHolderService (AndroidManifest.xml) pour la persistance sur toutes versions.
+class MainActivity : AppCompatActivity() {
 
     private var hasCameraPermission by mutableStateOf(false)
 

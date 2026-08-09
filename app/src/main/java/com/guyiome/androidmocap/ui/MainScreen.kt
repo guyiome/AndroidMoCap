@@ -312,6 +312,7 @@ fun MainScreen(
                     onSetPowerSaveDelay = { seconds -> viewModel.setPowerSaveDelaySeconds(seconds) },
                     onSetFaceMeshOverlay = { enabled -> viewModel.setFaceMeshOverlayEnabled(enabled) },
                     onSetKeepMeshOverlayInPowerSave = { enabled -> viewModel.setKeepMeshOverlayInPowerSave(enabled) },
+                    onSetAppLanguage = { language -> viewModel.setAppLanguage(language) },
                 )
             }
 

@@ -118,6 +118,13 @@
     <string name="display_power_save_description">Après le délai ci-dessous sans toucher l\'écran : écran assombri, aperçu caméra masqué (le tracking et l\'envoi continuent normalement). Un simple toucher de l\'écran en ressort.</string>
     <string name="display_power_save_delay">Délai d\'inactivité : %1$d s</string>
     <string name="display_low_battery_threshold">Seuil d\'alerte batterie faible : %1$d%%</string>
+    <!-- Sélecteur de langue en-app (point 30), fonctionne sur toutes les versions d'Android,
+         contrairement au sélecteur système natif (Réglages > Applis > Langues des applis), qui
+         n'existe que depuis Android 13. -->
+    <string name="display_language_label">Langue de l\'app</string>
+    <string name="display_language_system">Suivre le système</string>
+    <string name="display_language_french">Français</string>
+    <string name="display_language_english">English</string>
 
     <!-- Écran Fonctionnalités expérimentales -->
     <string name="experimental_features_title">Fonctionnalités expérimentales</string>

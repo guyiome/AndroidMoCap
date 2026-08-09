@@ -4,8 +4,10 @@ import android.app.Application
 import android.content.Context
 import android.opengl.GLSurfaceView
 import android.util.Log
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.camera.view.PreviewView
 import androidx.compose.runtime.Immutable
+import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -21,9 +23,11 @@ import com.guyiome.androidmocap.network.VTubeStudioSender
 import com.guyiome.androidmocap.network.VmcOscSender
 import com.guyiome.androidmocap.network.getLocalIpAddress
 import com.guyiome.androidmocap.sensors.DeviceOrientationTracker
+import com.guyiome.androidmocap.settings.AppLanguage
 import com.guyiome.androidmocap.settings.AppSettingsStore
 import com.guyiome.androidmocap.settings.ConnectionSettingsStore
 import com.guyiome.androidmocap.settings.ConnectionType
+import com.guyiome.androidmocap.settings.appLanguageFromTag
 import com.guyiome.androidmocap.settings.DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT
 import com.guyiome.androidmocap.settings.DEFAULT_POWER_SAVE_DELAY_SECONDS
 import com.guyiome.androidmocap.tracking.ArCoreHeadPoseTracker
@@ -161,6 +165,11 @@ data class MainUiState(
     // Volontairement NON persisté (absent d'AppSettingsStore) : bascule de session active, pas un
     // réglage de lancement -- repart toujours à null (automatique) au prochain démarrage de l'app.
     val debugThermalOverride: Boolean? = null,
+    // Langue forcée de l'app (point 30) -- reflète AppCompatDelegate.getApplicationLocales(), pas
+    // persisté par ce projet (AppCompat s'en charge lui-même, voir AppLocalesMetadataHolderService
+    // dans AndroidManifest.xml) : lu une fois au lancement (voir init), mis à jour immédiatement à
+    // chaque changement via setAppLanguage(), sans attendre un redémarrage de l'app.
+    val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     val errorMessage: String? = null,
 )
 
@@ -268,6 +277,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var trackingInitialized = false
 
     init {
+        // Langue forcée (point 30) : lue une seule fois ici, pas de Flow à collecter -- AppCompat
+        // gère lui-même la persistance (voir MainUiState.appLanguage), il n'y a rien à observer
+        // d'autre que l'état déjà appliqué par le framework au moment où ce ViewModel est créé.
+        // toLanguageTags() renvoie une chaîne vide (pas null) quand aucune langue n'est forcée --
+        // appLanguageFromTag gère ce cas.
+        _uiState.update {
+            it.copy(appLanguage = appLanguageFromTag(AppCompatDelegate.getApplicationLocales().toLanguageTags()))
+        }
         // Lu dès le lancement (pas seulement une fois la permission caméra accordée) : le choix
         // de type de connexion et la dernière IP VMC doivent être disponibles pour le bouton de
         // connexion de l'écran principal dès que possible.
@@ -702,6 +719,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // --- Réglages généraux (persistés) ---
+
+    /**
+     * Sélecteur de langue en-app (point 30) : force la langue de l'app indépendamment de la langue
+     * système, sur toutes les versions d'Android (contrairement au sélecteur système natif, réglages
+     * système > langues de l'app, réservé à Android 13+). Effet immédiat (AppCompat recrée les
+     * Activity concernées) -- pas besoin de relancer l'app. Persistance automatique gérée par
+     * AppCompat (voir AppLocalesMetadataHolderService dans AndroidManifest.xml), rien à écrire
+     * nous-mêmes dans ConnectionSettingsStore/AppSettingsStore.
+     */
+    fun setAppLanguage(language: AppLanguage) {
+        val localeList = if (language.languageTag == null) {
+            LocaleListCompat.getEmptyLocaleList()
+        } else {
+            LocaleListCompat.forLanguageTags(language.languageTag)
+        }
+        AppCompatDelegate.setApplicationLocales(localeList)
+        _uiState.update { it.copy(appLanguage = language) }
+    }
 
     fun setLowBatteryThresholdPercent(percent: Int) {
         viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setLowBatteryThresholdPercent(percent) }

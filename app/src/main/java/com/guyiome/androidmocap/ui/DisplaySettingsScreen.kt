@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.guyiome.androidmocap.R
+import com.guyiome.androidmocap.settings.AppLanguage
 
 /**
  * Réglages d'affichage et de confort d'usage -- une des quatre catégories de [SettingsScreen]
@@ -45,6 +48,7 @@ fun DisplaySettingsScreen(
     onSetPowerSaveDelay: (Int) -> Unit,
     onSetFaceMeshOverlay: (Boolean) -> Unit,
     onSetKeepMeshOverlayInPowerSave: (Boolean) -> Unit,
+    onSetAppLanguage: (AppLanguage) -> Unit,
 ) {
     BackHandler(onBack = onClose)
     Box(
@@ -166,6 +170,36 @@ fun DisplaySettingsScreen(
                 valueRange = 5f..50f,
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            // Sélecteur de langue en-app (point 30) : fonctionne sur toutes les versions d'Android,
+            // contrairement au sélecteur système natif (réglages système > langues de l'app,
+            // Android 13+ seulement, voir res/xml/locales_config.xml) -- utile en particulier sur
+            // les deux appareils de test de ce projet (Android 11), qui n'ont pas ce réglage système.
+            Spacer(Modifier.height(24.dp))
+            Text(
+                stringResource(R.string.display_language_label),
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Row(modifier = Modifier.padding(top = 8.dp)) {
+                FilterChip(
+                    selected = uiState.appLanguage == AppLanguage.SYSTEM,
+                    onClick = { onSetAppLanguage(AppLanguage.SYSTEM) },
+                    label = { Text(stringResource(R.string.display_language_system)) },
+                )
+                Spacer(Modifier.width(8.dp))
+                FilterChip(
+                    selected = uiState.appLanguage == AppLanguage.FRENCH,
+                    onClick = { onSetAppLanguage(AppLanguage.FRENCH) },
+                    label = { Text(stringResource(R.string.display_language_french)) },
+                )
+                Spacer(Modifier.width(8.dp))
+                FilterChip(
+                    selected = uiState.appLanguage == AppLanguage.ENGLISH,
+                    onClick = { onSetAppLanguage(AppLanguage.ENGLISH) },
+                    label = { Text(stringResource(R.string.display_language_english)) },
+                )
+            }
         }
     }
 }
