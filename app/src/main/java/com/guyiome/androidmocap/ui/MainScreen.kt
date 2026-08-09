@@ -1,6 +1,7 @@
 package com.guyiome.androidmocap.ui
 
 import android.app.Activity
+import android.content.Intent
 import android.opengl.GLSurfaceView
 import android.view.WindowManager
 import androidx.camera.view.PreviewView
@@ -78,6 +79,7 @@ fun MainScreen(
     var showConnectionSettings by remember { mutableStateOf(false) }
     var showDisplaySettings by remember { mutableStateOf(false) }
     var showExperimentalFeatures by remember { mutableStateOf(false) }
+    var showLoggingSettings by remember { mutableStateOf(false) }
     var showBlendshapeSelection by remember { mutableStateOf(false) }
     var iconRotationDegrees by remember { mutableStateOf(0f) }
     var batteryPercent by remember { mutableStateOf(100) }
@@ -271,6 +273,7 @@ fun MainScreen(
                     onOpenConnection = { showConnectionSettings = true },
                     onOpenDisplay = { showDisplaySettings = true },
                     onOpenExperimental = { showExperimentalFeatures = true },
+                    onOpenLogging = { showLoggingSettings = true },
                 )
             }
 
@@ -326,6 +329,25 @@ fun MainScreen(
 
             if (showExperimentalFeatures) {
                 ExperimentalFeaturesScreen(onClose = { showExperimentalFeatures = false })
+            }
+
+            if (showLoggingSettings) {
+                // Vérifié une seule fois à l'ouverture (pas à chaque recomposition -- MainScreen
+                // recompose jusqu'à 60Hz via trackingFrame ci-dessus, une vérification disque à ce
+                // rythme serait du gaspillage pour un simple indicateur d'écran de réglages).
+                var hasLogsToShare by remember { mutableStateOf(false) }
+                LaunchedEffect(showLoggingSettings) { hasLogsToShare = viewModel.hasLogsToShare() }
+                LoggingSettingsScreen(
+                    logLevel = uiState.logLevel,
+                    hasLogsToShare = hasLogsToShare,
+                    onClose = { showLoggingSettings = false },
+                    onSetLogLevel = { level -> viewModel.setLogLevel(level) },
+                    onShareLogs = {
+                        viewModel.buildShareLogsIntent()?.let { intent ->
+                            context.startActivity(Intent.createChooser(intent, null))
+                        }
+                    },
+                )
             }
 
             if (showBlendshapeSelection) {

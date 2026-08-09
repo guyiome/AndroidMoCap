@@ -135,6 +135,16 @@
     <string name="experimental_features_title">Fonctionnalités expérimentales</string>
     <string name="experimental_features_placeholder">Aucune fonctionnalité expérimentale disponible pour l\'instant -- réservé pour la détection de la langue tirée et des joues gonflées (voir la revue technique).</string>
 
+    <!-- Écran Journalisation -->
+    <string name="logging_settings_title">Logging</string>
+    <string name="logging_level_label">Niveau conservé dans le fichier exportable</string>
+    <string name="logging_level_error">Error</string>
+    <string name="logging_level_warn">Warning</string>
+    <string name="logging_level_info">Info</string>
+    <string name="logging_explanation">Le fichier exporté peut contenir des informations techniques (erreurs, statut de connexion) et l\'adresse IP locale que tu as configurée -- jamais de données de suivi du visage. Les adresses IP sont masquées automatiquement hors build de développement.</string>
+    <string name="logging_share_button">Partager les logs</string>
+    <string name="logging_share_empty_hint">Rien d\'enregistré pour l\'instant à ce niveau.</string>
+
     <!-- Menu Réglages (sous-titres) -->
     <string name="settings_diagnostics_subtitle">Palier %1$s · visage %2$s</string>
     <string name="state_face_detected">détecté</string>
@@ -148,6 +158,7 @@
     <string name="settings_no_connection_type_subtitle">Aucun type choisi</string>
     <string name="settings_display_subtitle">Blendshapes affichés, overlay du mesh, mode éco, seuil batterie</string>
     <string name="settings_experimental_subtitle">Aucune pour l\'instant</string>
+    <string name="settings_logging_subtitle">Niveau de log, partage des logs</string>
 
     <!-- Erreurs (MainViewModel, non-@Composable, résolues via Context/Application) -->
     <string name="error_vmc_ip_missing">Renseigne d\'abord une IP VMC dans les réglages.</string>

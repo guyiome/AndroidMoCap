@@ -2,7 +2,6 @@ package com.guyiome.androidmocap.tracking
 
 import android.content.Context
 import android.os.SystemClock
-import android.util.Log
 import com.google.mediapipe.framework.image.MPImage
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.core.Delegate
@@ -10,6 +9,7 @@ import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
 import com.guyiome.androidmocap.R
+import com.guyiome.androidmocap.logging.AppLog
 
 /**
  * Enrobe MediaPipe Face Landmarker en mode LIVE_STREAM.
@@ -90,7 +90,7 @@ class FaceLandmarkerHelper(
                 activeDelegateIsGpu = true
                 return
             }
-            Log.w(TAG, "Délégué GPU indisponible sur cet appareil, repli sur CPU.")
+            AppLog.w(TAG, "Délégué GPU indisponible sur cet appareil, repli sur CPU.")
         }
         val cpuOk = tryCreateLandmarker(Delegate.CPU)
         activeDelegateIsGpu = false
@@ -123,7 +123,7 @@ class FaceLandmarkerHelper(
             faceLandmarker = FaceLandmarker.createFromOptions(context, options)
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Échec de création du FaceLandmarker avec delegate=$delegate", e)
+            AppLog.e(TAG, "Échec de création du FaceLandmarker avec delegate=$delegate", e)
             false
         }
     }

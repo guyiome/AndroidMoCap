@@ -7,7 +7,6 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
 import android.os.SystemClock
-import android.util.Log
 import android.util.Size
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -22,6 +21,7 @@ import androidx.lifecycle.LifecycleOwner
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.MPImage
 import com.guyiome.androidmocap.R
+import com.guyiome.androidmocap.logging.AppLog
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -180,9 +180,9 @@ class CameraController(
             // Résolution réellement retenue par CameraX (peut différer de la cible demandée selon
             // ce que l'appareil supporte, voir FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER ci-dessus) --
             // logué pour vérifier sur device sans deviner (revue technique, issue #7).
-            Log.i(TAG, "ImageAnalysis lié, résolution retenue : ${analysis.resolutionInfo?.resolution}")
+            AppLog.i(TAG, "ImageAnalysis lié, résolution retenue : ${analysis.resolutionInfo?.resolution}")
         } catch (e: Exception) {
-            Log.e(TAG, "Échec de bind CameraX (analyse)", e)
+            AppLog.e(TAG, "Échec de bind CameraX (analyse)", e)
             onError(context.getString(R.string.error_camera_analysis_bind_failed, e.message ?: ""))
         }
     }
@@ -196,7 +196,7 @@ class CameraController(
             provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_FRONT_CAMERA, useCase)
             previewUseCase = useCase
         } catch (e: Exception) {
-            Log.e(TAG, "Échec de bind CameraX (aperçu)", e)
+            AppLog.e(TAG, "Échec de bind CameraX (aperçu)", e)
             onError(context.getString(R.string.error_camera_preview_bind_failed, e.message ?: ""))
         }
     }

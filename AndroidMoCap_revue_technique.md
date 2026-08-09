@@ -81,6 +81,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 47 | Optimisation lumière côté app | En discussion (9 août 2026) -- mis de côté volontairement après le point 28/45 (le vrai problème rencontré était une ombre directionnelle, réglée physiquement ; compensation d'exposition jugée peu utile pour ce cas précis), aucun code écrit |
 | 48 | Robustesse du clignement à l'angle de caméra (suite du 45) | **✅ confirmé sur device le 9 août 2026** -- référence EAR "fermé" désormais auto-adaptative par œil (`AdaptiveEarFloor`), corrige un clin d'œil réel écrasé à un angle de caméra en contre-plongée ; testé sans réintroduire la fuite gauche/droite, voir section dédiée plus bas |
 | 49 | Canal de release beta | **✅ mis en place (9 août 2026)** -- tag `-beta` publie une Release GitHub en prerelease (`release.yml`), voir section dédiée plus bas |
+| 50 | Journalisation uniformisée + partage utilisateur | **✅ confirmé sur device (9 août 2026)** -- un bug réel trouvé et corrigé en cours de validation (niveau INFO vide sur le palier ARCore), couverture étendue à 4 nouveaux logs `INFO`, voir section dédiée plus bas |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -2041,7 +2042,79 @@ Indépendant de la visibilité du dépôt (contrairement au point 14 ci-dessus, 
 tant que le dépôt est privé) -- ne dépend d'aucun accès à l'API GitHub, uniquement du comportement
 de publication du workflow.
 
-## Automatisation
+### 50. Journalisation uniformisée + partage utilisateur -- ✅ mis en place
+
+Demande explicite de l'utilisateur, en préparation du passage du dépôt en public : des logs
+"propres" pour la prod, un format cohérent d'un appel à l'autre, et une option pour qu'un
+utilisateur (pas seulement le développeur) puisse fournir ses logs en cas de souci.
+
+**Constat de départ** (audit, pas supposé) : `android.util.Log` appelé directement dans 8 fichiers
+(~30 sites), niveaux utilisés de façon cohérente par observation (`e` = échec réel, `w` = repli qui
+fonctionne quand même, `d` = traçage verbeux) mais sans convention écrite ; aucun log retiré en
+release (ni `BuildConfig.DEBUG`, ni règle R8) ; aucune persistance, uniquement `logcat`.
+
+**Conception, en plusieurs passes avec l'utilisateur avant de coder** :
+- Convention Android officielle confirmée (javadoc d'`android.util.Log`) : VERBOSE < DEBUG < INFO <
+  WARN < ERROR, les deux premiers ne devraient jamais tourner en release.
+- Idée initiale (règle R8 `-assumenosideeffects`) écartée : son effet serait incertain avec
+  `-dontoptimize` déjà en place (point 8, crash Flogger) -- remplacée par un gating explicite en
+  code (`BuildConfig.DEBUG`), fiable sans dépendre du comportement de l'optimiseur.
+- Risque RGPD discuté avant implémentation : IP locales (host/port des cibles réseau configurées)
+  identifiées comme le seul contenu potentiellement sensible réellement présent dans les logs de
+  l'app -- jamais de valeur de tracking facial au-dessus de DEBUG (donc jamais dans le fichier
+  exportable), aucune transmission automatique (le fichier ne part que si l'utilisateur déclenche
+  lui-même le partage).
+- Masquage IP demandé explicitement par l'utilisateur (derniers octets -> `x`, actif hors build
+  debug) plutôt que de compter uniquement sur la discrétion de l'utilisateur au moment de choisir un
+  destinataire de partage.
+
+**Implémenté** :
+- `logging/LogLevel.kt`, `logging/LogFormatting.kt` (purs, testés -- `formatLogLine`,
+  `maskIpAddresses`, `appendWithRotation`, `shouldPersist`) : format de ligne auto-suffisant
+  (`AAAA-MM-JJ HH:mm:ss.SSS NIVEAU/TAG: message`), masquage IPv4 par regex appliqué une seule fois
+  au niveau du sink (pas à chaque site d'appel), rotation par taille (~1,5 Mo) qui garde toujours
+  les entrées les plus récentes.
+- `logging/AppLog.kt` (sink réel, non testable en JVM -- même catégorie que le reste du glue code
+  Android de ce projet) : `v`/`d` no-op hors `BuildConfig.DEBUG` (ni logcat, ni fichier), `i`/`w`/`e`
+  toujours vers logcat + vers un fichier persistant (`filesDir/logs/app_logs.txt`) si le niveau
+  configuré l'autorise, masquage IP appliqué hors debug uniquement.
+- `AppSettingsStore.logLevel` : niveau minimal conservé dans le fichier, ERROR par défaut, réglable
+  jusqu'à WARN/INFO -- VERBOSE/DEBUG volontairement absents des valeurs proposées.
+- Partage : `FileProvider` scoppé à `filesDir/logs/` uniquement (`res/xml/file_paths.xml`), bouton
+  "Partager les logs" dans le nouvel écran `LoggingSettingsScreen` (cinquième catégorie de
+  `SettingsScreen`, voir point 21) -- **toujours visible, pas caché** derrière le déverrouillage
+  debug de `DiagnosticsScreen`, son but étant justement de servir à n'importe quel utilisateur, pas
+  seulement au développeur.
+- Migration mécanique des ~30 sites d'appel existants vers `AppLog` (même signature, aucun
+  changement de logique).
+
+**Tests** : `LogFormattingTest.kt` (13 tests -- formatage, masquage IP simple/multiple/absent,
+rotation avec/sans dépassement, non-troncature en ligne partielle, filtrage par niveau).
+
+**✅ confirmé sur device** (9 août 2026) : écran de réglages fonctionnel, niveau réglable, partage
+déclenché.
+
+**Bug réel trouvé et corrigé pendant la validation device, pas supposé** : au niveau INFO, aucun
+fichier ne se générait. Cause identifiée par instrumentation directe sur l'appareil (lecture du
+fichier de préférences via `run-as`, log de diagnostic temporaire) : le seul log `INFO`
+inconditionnel de toute l'app se trouvait dans `CameraController` (succès de connexion caméra) --
+un chemin qui ne s'exécute jamais sur le device de test, qui tourne sur le palier OPTIMAL (ARCore),
+un pipeline caméra entièrement différent. Corrigé en ajoutant un log `INFO` équivalent dans
+`ArCoreHeadPoseTracker` (démarrage de session). Deuxième bug apparenté trouvé au passage : le tout
+premier log de démarrage pouvait partir avant que `AppLog.setMinimumPersistedLevel()` n'ait reçu sa
+première valeur depuis `AppSettingsStore.logLevel` (le collecteur réactif de `MainViewModel.init{}`
+n'a aucune garantie de gagner la course contre le premier log de démarrage) -- corrigé une bonne
+fois en synchronisant le niveau de façon anticipée/bloquante (`appSettingsStore.logLevel.first()`)
+au tout début d'`initializeTracking()`, avant tout log de démarrage, plutôt que par patch au cas par
+cas à chaque nouveau site d'appel.
+
+**Couverture étendue** (9 août 2026, demande explicite de l'utilisateur -- la couverture initiale
+étant surtout des cas d'échec) : quatre nouveaux logs `INFO`, dont deux confirmés sur device dans la
+foulée de la correction ci-dessus (marqueur de démarrage avec version d'app, palier de tracking
+retenu et pourquoi) et deux implémentés mais pas encore exercés en conditions réelles (connexion/
+déconnexion réussie des trois émetteurs réseau -- nécessite une vraie cible PC ; changement de débit
+réellement appliqué par le throttling thermique -- nécessite un appareil qui chauffe réellement,
+même limite que le point 37 de ce document).
 
 **Vérification nocturne GitHub (Claude Code cloud, routine planifiée)** -- créée le 6 août 2026,
 tous les jours à 19:00 UTC (~21h Paris en été, ~20h en hiver -- le cron reste fixe en UTC). Lecture

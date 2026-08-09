@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Portée du FileProvider (voir AndroidManifest.xml, revue technique point 50) : expose
+     uniquement filesDir/logs/ (voir logging/AppLog.kt), pas le reste du stockage privé de l'app.
+-->
+<paths>
+    <files-path name="logs" path="logs/" />
+</paths>

@@ -70,6 +70,13 @@ L'app ne communique qu'avec la cible choisie dans les réglages, sur le réseau 
 service tiers, aucune télémétrie, aucune donnée envoyée en dehors de ce flux volontaire vers le
 PC receveur.
 
+**Logs** : conservés localement (fichier privé à l'app, jamais transmis automatiquement), niveau
+"Erreur" par défaut, réglable dans Réglages > Journalisation. Peuvent contenir des informations
+techniques (erreurs, statut de connexion) et l'adresse IP locale configurée -- jamais de données de
+suivi du visage. Les adresses IP sont masquées automatiquement en dehors des builds de
+développement. Un bouton "Partager les logs" permet d'envoyer ce fichier (ex. pour signaler un
+problème) -- entièrement à l'initiative de l'utilisateur, qui choisit la destination.
+
 ## Compiler depuis les sources
 
 1. **Télécharger le modèle MediaPipe** (obligatoire, trop volumineux pour être versionné) et le

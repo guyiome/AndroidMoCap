@@ -1,6 +1,6 @@
 package com.guyiome.androidmocap.network
 
-import android.util.Log
+import com.guyiome.androidmocap.logging.AppLog
 import com.guyiome.androidmocap.tracking.FaceTrackingResult
 import com.illposed.osc.BufferBytesReceiver
 import com.illposed.osc.OSCBundle
@@ -135,7 +135,7 @@ class VmcOscSender(
         socket = try {
             DatagramSocket()
         } catch (e: Exception) {
-            Log.w(TAG, "Impossible d'ouvrir le socket UDP local pour la cible VMC $host:$port", e)
+            AppLog.w(TAG, "Impossible d'ouvrir le socket UDP local pour la cible VMC $host:$port", e)
             null
         }
     }

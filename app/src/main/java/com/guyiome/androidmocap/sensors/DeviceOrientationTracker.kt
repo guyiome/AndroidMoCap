@@ -5,7 +5,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.util.Log
+import com.guyiome.androidmocap.logging.AppLog
 import com.guyiome.androidmocap.tracking.RotationMath
 
 /**
@@ -36,7 +36,7 @@ class DeviceOrientationTracker(context: Context) : SensorEventListener {
     fun start() {
         val sensor = rotationSensor
         if (sensor == null) {
-            Log.w(TAG, "TYPE_GAME_ROTATION_VECTOR indisponible -- compensation de rotation du téléphone désactivée.")
+            AppLog.w(TAG, "TYPE_GAME_ROTATION_VECTOR indisponible -- compensation de rotation du téléphone désactivée.")
             return
         }
         sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_GAME)

@@ -1,6 +1,6 @@
 package com.guyiome.androidmocap.network
 
-import android.util.Log
+import com.guyiome.androidmocap.logging.AppLog
 import com.guyiome.androidmocap.tracking.FaceTrackingResult
 import com.neovisionaries.ws.client.WebSocket
 import com.neovisionaries.ws.client.WebSocketAdapter
@@ -110,14 +110,14 @@ class VTubeStudioSender(
     private fun connect() {
         connectionState = nextVTubeStudioConnectionState(connectionState, VTubeStudioConnectionEvent.Connect)
         val url = "ws://${host.hostAddress}:$port"
-        Log.d(TAG, "Connexion vers $url")
+        AppLog.d(TAG, "Connexion vers $url")
         try {
             webSocket = factory.createSocket(url).apply {
                 addListener(Listener())
                 connectAsynchronously()
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Impossible de préparer la connexion WebSocket vers $url", e)
+            AppLog.w(TAG, "Impossible de préparer la connexion WebSocket vers $url", e)
             applyEvent(VTubeStudioConnectionEvent.SocketFailed(e.message ?: "Connexion impossible"))
         }
     }
@@ -129,7 +129,7 @@ class VTubeStudioSender(
      */
     private fun sendLogged(socket: WebSocket, description: String, text: String) {
         socket.sendText(text)
-        Log.d(TAG, "Envoi $description : $text")
+        AppLog.d(TAG, "Envoi $description : $text")
     }
 
     /**
@@ -145,7 +145,7 @@ class VTubeStudioSender(
                 if (parametersRequested.getAndSet(true)) return
                 val names = result.blendshapes.map { it.name }
                 pendingParameterCreationResponses.set(names.size)
-                Log.d(TAG, "Envoi de ${names.size} ParameterCreationRequest")
+                AppLog.d(TAG, "Envoi de ${names.size} ParameterCreationRequest")
                 buildParameterCreationRequestsJson(nextRequestId("params"), names)
                     .forEach { sendLogged(socket, "ParameterCreationRequest", it) }
             }
@@ -170,7 +170,7 @@ class VTubeStudioSender(
     private fun applyEvent(event: VTubeStudioConnectionEvent) {
         val previous = connectionState
         connectionState = nextVTubeStudioConnectionState(connectionState, event)
-        Log.d(TAG, "État : $previous --($event)--> $connectionState")
+        AppLog.d(TAG, "État : $previous --($event)--> $connectionState")
     }
 
     /** Décompte une réponse de création de paramètre, succès ou échec confondus -- voir l'appel côté "APIError". */
@@ -185,8 +185,8 @@ class VTubeStudioSender(
             if (closed) return
             val token = authToken
             usedStoredToken = token != null
-            Log.d(TAG, "Socket ouvert, jeton stocké = $usedStoredToken")
-            Log.d(TAG, "En-têtes de la poignée de main : $headers")
+            AppLog.d(TAG, "Socket ouvert, jeton stocké = $usedStoredToken")
+            AppLog.d(TAG, "En-têtes de la poignée de main : $headers")
             applyEvent(VTubeStudioConnectionEvent.SocketOpened(hasStoredToken = token != null))
             if (token != null) {
                 sendLogged(webSocket, "AuthenticationRequest", buildAuthRequestJson(nextRequestId("auth"), token))
@@ -197,11 +197,11 @@ class VTubeStudioSender(
 
         override fun onTextMessage(webSocket: WebSocket, text: String) {
             if (closed) return
-            Log.d(TAG, "Message reçu : $text")
+            AppLog.d(TAG, "Message reçu : $text")
             val envelope = try {
                 parseEnvelope(text)
             } catch (e: Exception) {
-                Log.w(TAG, "Message VTube Studio illisible, ignoré", e)
+                AppLog.w(TAG, "Message VTube Studio illisible, ignoré", e)
                 return
             }
 
@@ -222,7 +222,7 @@ class VTubeStudioSender(
                         // usedStoredToken/retriedAfterInvalidToken. Un jeton flambant neuf refusé
                         // (donc usedStoredToken == false) tombe dans le else, pas de retry possible.
                         usedStoredToken && !retriedAfterInvalidToken.getAndSet(true) -> {
-                            Log.w(TAG, "Jeton stocké refusé (${auth?.reason}), nouvelle demande d'autorisation")
+                            AppLog.w(TAG, "Jeton stocké refusé (${auth?.reason}), nouvelle demande d'autorisation")
                             authToken = null
                             applyEvent(VTubeStudioConnectionEvent.StoredTokenRejected)
                             sendLogged(webSocket, "AuthenticationTokenRequest", buildAuthTokenRequestJson(nextRequestId("token")))
@@ -246,11 +246,11 @@ class VTubeStudioSender(
                             // paramètre est perdu (ne sera jamais injecté), les autres continuent
                             // normalement. Compté comme "traité" au même titre qu'un succès pour ne
                             // pas bloquer indéfiniment en attente de sa réponse.
-                            Log.w(TAG, "Création de paramètre refusée, ignorée : $reason")
+                            AppLog.w(TAG, "Création de paramètre refusée, ignorée : $reason")
                             countDownParameterCreation()
                         }
                         else ->
-                            Log.w(TAG, "Erreur VTube Studio ($reason) reçue hors séquence, état courant $connectionState")
+                            AppLog.w(TAG, "Erreur VTube Studio ($reason) reçue hors séquence, état courant $connectionState")
                     }
                 }
                 else -> Unit // InjectParameterDataResponse et autres accusés de réception : rien à faire.
@@ -264,19 +264,19 @@ class VTubeStudioSender(
             closedByServer: Boolean,
         ) {
             if (closed) return
-            Log.d(TAG, "Socket fermé (par ${if (closedByServer) "le serveur" else "l'app"})")
+            AppLog.d(TAG, "Socket fermé (par ${if (closedByServer) "le serveur" else "l'app"})")
             applyEvent(VTubeStudioConnectionEvent.Disconnect)
         }
 
         override fun onError(webSocket: WebSocket, cause: WebSocketException) {
             if (closed) return
-            Log.w(TAG, "Erreur WebSocket VTube Studio ($host:$port)", cause)
+            AppLog.w(TAG, "Erreur WebSocket VTube Studio ($host:$port)", cause)
             applyEvent(VTubeStudioConnectionEvent.SocketFailed(cause.message ?: "Erreur de connexion"))
         }
 
         override fun onConnectError(webSocket: WebSocket, exception: WebSocketException) {
             if (closed) return
-            Log.w(TAG, "Échec de connexion WebSocket VTube Studio ($host:$port)", exception)
+            AppLog.w(TAG, "Échec de connexion WebSocket VTube Studio ($host:$port)", exception)
             applyEvent(VTubeStudioConnectionEvent.SocketFailed(exception.message ?: "Connexion échouée"))
         }
     }

@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.guyiome.androidmocap.logging.LogLevel
 import com.guyiome.androidmocap.tracking.TrackingTier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -38,6 +39,7 @@ class AppSettingsStore(private val context: Context) {
         val TIER_OVERRIDE = stringPreferencesKey("tier_override")
         val DEBUG_FORCE_ARCORE_UNAVAILABLE = booleanPreferencesKey("debug_force_arcore_unavailable")
         val DEBUG_FORCE_GPU_UNAVAILABLE = booleanPreferencesKey("debug_force_gpu_unavailable")
+        val LOG_LEVEL = stringPreferencesKey("log_level")
     }
 
     val lowBatteryThresholdPercent: Flow<Int> = context.appSettingsDataStore.data.map { prefs ->
@@ -176,5 +178,20 @@ class AppSettingsStore(private val context: Context) {
             prefs[Keys.DEBUG_FORCE_ARCORE_UNAVAILABLE] = false
             prefs[Keys.DEBUG_FORCE_GPU_UNAVAILABLE] = false
         }
+    }
+
+    /**
+     * Niveau minimal conservé dans le fichier de logs exportable (voir `logging/AppLog.kt`, revue
+     * technique point 50) -- `ERROR` par défaut, réglable jusqu'à `WARN`/`INFO` depuis
+     * `LoggingSettingsScreen`. `VERBOSE`/`DEBUG` ne sont volontairement pas des valeurs valides ici
+     * (convention Android officielle -- jamais persistés, voir kdoc de `LogLevel`) ; une valeur
+     * stockée invalide ou absente retombe sur `ERROR` plutôt que de planter.
+     */
+    val logLevel: Flow<LogLevel> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[Keys.LOG_LEVEL]?.let { name -> runCatching { LogLevel.valueOf(name) }.getOrNull() } ?: LogLevel.ERROR
+    }
+
+    suspend fun setLogLevel(level: LogLevel) {
+        context.appSettingsDataStore.edit { prefs -> prefs[Keys.LOG_LEVEL] = level.name }
     }
 }

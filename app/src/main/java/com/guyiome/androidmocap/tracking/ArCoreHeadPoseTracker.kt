@@ -13,7 +13,6 @@ import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.os.SystemClock
-import android.util.Log
 import android.view.Surface
 import com.google.ar.core.AugmentedFace
 import com.google.ar.core.CameraConfig
@@ -32,6 +31,7 @@ import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationExceptio
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.MPImage
 import com.guyiome.androidmocap.camera.CameraController
+import com.guyiome.androidmocap.logging.AppLog
 import java.nio.ByteBuffer
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -239,6 +239,11 @@ class ArCoreHeadPoseTracker(
     fun start() {
         val currentSession = session ?: tryCreateSession()?.also {
             session = it
+            // Seul log INFO du chemin ARCore (palier OPTIMAL) -- pendant longtemps CameraController
+            // (palier STANDARD/COMPATIBLE) était le seul fichier avec un log INFO inconditionnel,
+            // laissant le fichier de logs exportable vide sur un device qui tourne sur ARCore même
+            // au niveau INFO (constaté sur device, revue technique point 50).
+            AppLog.i(TAG, "Session ARCore/Augmented Faces démarrée")
             maybeBindCameraTexture()
             maybeSetDisplayGeometry()
         } ?: return
@@ -345,7 +350,7 @@ class ArCoreHeadPoseTracker(
             // aux 5 catch ci-dessus, newSession peut très bien être non-null ici (échec après
             // Session(context), ex. getSupportedCameraConfigs()/setCameraConfig()/configure()) --
             // à fermer pour ne pas fuir la Session ARCore native.
-            Log.e(TAG, "Session ARCore/Augmented Faces indisponible", e)
+            AppLog.e(TAG, "Session ARCore/Augmented Faces indisponible", e)
             newSession?.close()
             onUnavailable("Configuration ARCore Augmented Faces refusée par cet appareil (${e.message}).")
             null
@@ -365,7 +370,7 @@ class ArCoreHeadPoseTracker(
             cameraManager.getCameraCharacteristics(cameraId)
                 .get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
         } catch (e: Exception) {
-            Log.w(TAG, "Impossible de lire l'orientation du capteur caméra ARCore, repli sur 0°", e)
+            AppLog.w(TAG, "Impossible de lire l'orientation du capteur caméra ARCore, repli sur 0°", e)
             0
         }
     }
@@ -451,7 +456,7 @@ class ArCoreHeadPoseTracker(
         } catch (e: NotYetAvailableException) {
             return
         } catch (e: Exception) {
-            Log.w(TAG, "Échec d'acquisition de l'image caméra ARCore", e)
+            AppLog.w(TAG, "Échec d'acquisition de l'image caméra ARCore", e)
             return
         }
 
@@ -485,7 +490,7 @@ class ArCoreHeadPoseTracker(
                 val frameTimeMs = SystemClock.uptimeMillis()
                 onFrame(mpImage, frameTimeMs)
             } catch (e: Exception) {
-                Log.e(TAG, "Échec de conversion YUV -> Bitmap de l'image caméra ARCore", e)
+                AppLog.e(TAG, "Échec de conversion YUV -> Bitmap de l'image caméra ARCore", e)
             } finally {
                 pendingConversions.decrementAndGet()
             }

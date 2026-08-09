@@ -147,6 +147,28 @@ data collect only `MainUiState`, avoiding needless recomposition. `initializeTra
 idempotent (`trackingInitialized` guard) since it's called from a lifecycle-bound entry point that can
 fire more than once.
 
+**Logging.** `logging/AppLog.kt` is the single entry point — replaces direct `android.util.Log`
+calls everywhere else in the app (revue technique point 50). `v`/`d` are no-ops outside
+`BuildConfig.DEBUG` (neither logcat nor the file — explicit code gate, not an R8
+`-assumenosideeffects` rule, whose effect would be uncertain given `-dontoptimize`, point 8).
+`i`/`w`/`e` always reach logcat, and reach a rotating file (`filesDir/logs/app_logs.txt`, ~1.5MB cap,
+`logging/LogFormatting.kt`, pure/tested) if `AppSettingsStore.logLevel` allows it (ERROR by default,
+selectable up to WARN/INFO — VERBOSE/DEBUG are deliberately not selectable, matching Android's own
+convention that they shouldn't survive into release). IPs in the message are masked
+(`maskIpAddresses()`, last two octets → `x`) outside debug builds before the line is written — the
+one piece of user-identifiable-ish data these logs realistically contain (no face-tracking values
+above DEBUG, ever — keep it that way for any future log call). The file is shareable via
+`LoggingSettingsScreen` (`MainViewModel.buildShareLogsIntent()`, `FileProvider` scoped to
+`filesDir/logs/` only, see `res/xml/file_paths.xml`) — deliberately **not** hidden behind
+`DiagnosticsScreen`'s debug unlock, since any user (not just the developer) should be able to report
+an issue with it. **Startup-ordering gotcha, confirmed on device and fixed**: don't rely on the
+reactive `appSettingsStore.logLevel` collector in `MainViewModel.init{}` alone for anything logged
+very early — it has no guaranteed ordering against other startup work, and an early log can lose
+that race and get silently dropped under the still-default `ERROR` level. `initializeTracking()`
+eagerly awaits `appSettingsStore.logLevel.first()` and calls `AppLog.setMinimumPersistedLevel()`
+as its very first line specifically to close this gap for every startup log that follows (tier
+selection, ARCore/CameraX bind) — add new early-startup logs after that point, not before.
+
 **Mesh overlay projection.** `ui/LandmarkProjection.kt` (pure, tested) maps MediaPipe's normalized
 `[0,1]` mesh coordinates to screen pixels, reproducing `PreviewView`'s default centered "FILL_CENTER"
 crop using the analyzed image's actual dimensions (falls back to naive per-axis stretch if dimensions
@@ -182,11 +204,11 @@ wrap Jetpack DataStore Preferences. Blendshape selection persistence across sess
 (`persistBlendshapeSelectionEnabled`, default off — historic reset-on-launch behavior preserved
 unless the user turns it on).
 
-**UI navigation.** `SettingsScreen.kt` is a 4-category menu (`DiagnosticsScreen`,
-`ConnectionSettingsScreen`, `DisplaySettingsScreen`, `ExperimentalFeaturesScreen`, the last currently a
-placeholder) plus `BlendshapeSelectionScreen`, all overlay screens closable via a standard back arrow,
-the hardware back button, or the predictive-back gesture (`BackHandler`) — all three trigger the same
-`onClose`.
+**UI navigation.** `SettingsScreen.kt` is a 5-category menu (`DiagnosticsScreen`,
+`ConnectionSettingsScreen`, `DisplaySettingsScreen`, `ExperimentalFeaturesScreen` — currently a
+placeholder, `LoggingSettingsScreen`) plus `BlendshapeSelectionScreen`, all overlay screens closable
+via a standard back arrow, the hardware back button, or the predictive-back gesture (`BackHandler`) —
+all three trigger the same `onClose`.
 
 **In-app language selector** (point 30, `DisplaySettingsScreen` — "Langue de l'app"), confirmed
 working on device including persistence across a full restart. Requires `MainActivity` to extend

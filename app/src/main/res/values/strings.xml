@@ -137,6 +137,16 @@
     <string name="experimental_features_title">Experimental features</string>
     <string name="experimental_features_placeholder">No experimental feature available yet -- reserved for tongue-out and cheek-puff detection (see the technical review).</string>
 
+    <!-- Logging settings screen -->
+    <string name="logging_settings_title">Logging</string>
+    <string name="logging_level_label">Level kept in the exportable file</string>
+    <string name="logging_level_error">Error</string>
+    <string name="logging_level_warn">Warning</string>
+    <string name="logging_level_info">Info</string>
+    <string name="logging_explanation">The exported file may contain technical information (errors, connection status) and the local IP address you configured -- never face-tracking data. IP addresses are masked automatically outside development builds.</string>
+    <string name="logging_share_button">Share logs</string>
+    <string name="logging_share_empty_hint">Nothing logged yet at this level.</string>
+
     <!-- Settings menu (subtitles) -->
     <string name="settings_diagnostics_subtitle">Tier %1$s · face %2$s</string>
     <string name="state_face_detected">detected</string>
@@ -150,6 +160,7 @@
     <string name="settings_no_connection_type_subtitle">No type selected</string>
     <string name="settings_display_subtitle">Displayed blendshapes, mesh overlay, power save, battery threshold</string>
     <string name="settings_experimental_subtitle">None for now</string>
+    <string name="settings_logging_subtitle">Log level, share logs</string>
 
     <!-- Errors (MainViewModel, non-@Composable, resolved via Context/Application) -->
     <string name="error_vmc_ip_missing">Enter a VMC IP address in settings first.</string>

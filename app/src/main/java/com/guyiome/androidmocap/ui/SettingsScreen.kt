@@ -51,6 +51,7 @@ fun SettingsScreen(
     onOpenConnection: () -> Unit,
     onOpenDisplay: () -> Unit,
     onOpenExperimental: () -> Unit,
+    onOpenLogging: () -> Unit,
 ) {
     // Bouton système/geste retour équivalent au bouton de fermeture affiché -- voir rapport
     // technique, point 22 (ergonomie navigation).
@@ -108,6 +109,11 @@ fun SettingsScreen(
                 title = stringResource(R.string.experimental_features_title),
                 subtitle = stringResource(R.string.settings_experimental_subtitle),
                 onClick = onOpenExperimental,
+            )
+            SettingsMenuRow(
+                title = stringResource(R.string.logging_settings_title),
+                subtitle = stringResource(R.string.settings_logging_subtitle),
+                onClick = onOpenLogging,
             )
 
             uiState.errorMessage?.let { message ->

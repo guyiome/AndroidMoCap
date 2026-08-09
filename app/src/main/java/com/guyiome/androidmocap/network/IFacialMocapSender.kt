@@ -1,6 +1,6 @@
 package com.guyiome.androidmocap.network
 
-import android.util.Log
+import com.guyiome.androidmocap.logging.AppLog
 import com.guyiome.androidmocap.tracking.FaceTrackingResult
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -79,7 +79,7 @@ class IFacialMocapSender(
                     try {
                         sock.receive(packet)
                     } catch (e: Exception) {
-                        if (running.get()) Log.w(TAG, "Erreur de réception UDP sur le port $PORT", e)
+                        if (running.get()) AppLog.w(TAG, "Erreur de réception UDP sur le port $PORT", e)
                         continue
                     }
                     val text = String(packet.data, 0, packet.length, Charsets.UTF_8)
@@ -95,7 +95,7 @@ class IFacialMocapSender(
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Impossible d'écouter sur le port $PORT", e)
+                AppLog.e(TAG, "Impossible d'écouter sur le port $PORT", e)
             }
         }, "IFacialMocapListener").apply {
             isDaemon = true

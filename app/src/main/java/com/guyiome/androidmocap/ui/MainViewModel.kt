@@ -2,21 +2,25 @@ package com.guyiome.androidmocap.ui
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import android.opengl.GLSurfaceView
-import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.camera.view.PreviewView
 import androidx.compose.runtime.Immutable
+import androidx.core.content.FileProvider
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
+import com.guyiome.androidmocap.BuildConfig
 import com.guyiome.androidmocap.R
 import com.guyiome.androidmocap.camera.CameraController
 import com.guyiome.androidmocap.capabilities.DeviceCapabilities
 import com.guyiome.androidmocap.capabilities.DeviceCapabilityDetector
+import com.guyiome.androidmocap.logging.AppLog
+import com.guyiome.androidmocap.logging.LogLevel
 import com.guyiome.androidmocap.network.IFacialMocapSender
 import com.guyiome.androidmocap.network.VTubeStudioConnectionState
 import com.guyiome.androidmocap.network.VTubeStudioSender
@@ -55,6 +59,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 import java.net.InetAddress
 
 /**
@@ -172,6 +177,10 @@ data class MainUiState(
     // dans AndroidManifest.xml) : lu une fois au lancement (voir init), mis à jour immédiatement à
     // chaque changement via setAppLanguage(), sans attendre un redémarrage de l'app.
     val appLanguage: AppLanguage = AppLanguage.SYSTEM,
+    // Niveau minimal conservé dans le fichier de logs exportable (voir logging/AppLog.kt, revue
+    // technique point 50) -- collecté en continu (pas juste au lancement) : un changement
+    // s'applique immédiatement, contrairement à tierOverride/debugForce* ci-dessus.
+    val logLevel: LogLevel = LogLevel.ERROR,
     val errorMessage: String? = null,
 )
 
@@ -388,6 +397,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         viewModelScope.launch {
+            // Collecté en continu, effet immédiat (contrairement à tierOverride/debugForce*
+            // ci-dessus) : AppLog.setMinimumPersistedLevel doit refléter le réglage courant à
+            // chaque log, pas seulement au lancement. La toute première valeur est aussi
+            // synchronisée de façon anticipée/bloquante dans initializeTracking() -- voir son kdoc
+            // -- ce collecteur reste nécessaire pour les changements faits en direct depuis
+            // LoggingSettingsScreen, après le démarrage.
+            appSettingsStore.logLevel.collect { level ->
+                _uiState.update { it.copy(logLevel = level) }
+                AppLog.setMinimumPersistedLevel(level)
+            }
+        }
+        viewModelScope.launch {
             // Chargée une seule fois au lancement (first(), pas collect en continu comme les
             // collecteurs ci-dessus) : contrairement à un simple réglage on/off, réappliquer cette
             // valeur à chaque émission du Flow écraserait la sélection en cours dès que
@@ -412,6 +433,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (trackingInitialized) return
         trackingInitialized = true
 
+        // Synchronisé ici de façon anticipée/bloquante (pas seulement via le collecteur réactif de
+        // logLevel dans init{}, qui pourrait ne pas encore avoir livré sa première valeur à ce
+        // stade) -- pour que tous les logs de démarrage qui suivent (palier retenu ci-dessous,
+        // démarrage de session ARCore...) respectent déjà le bon niveau. Même classe de bug que
+        // celui trouvé sur le tout premier log ARCore, où le niveau par défaut (ERROR) était encore
+        // actif au moment du log (revue technique, point 50) -- corrigé une bonne fois ici plutôt
+        // que par patch au cas par cas.
+        AppLog.setMinimumPersistedLevel(appSettingsStore.logLevel.first())
+        AppLog.i(TAG, "Démarrage de l'app, version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+
         val context = getApplication<Application>()
         val capabilities = DeviceCapabilityDetector.detect(context)
         val tierOverride = appSettingsStore.tierOverride.first()
@@ -421,6 +452,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val debugForceArCoreUnavailable = appSettingsStore.debugForceArCoreUnavailable.first()
         val debugForceGpuUnavailable = appSettingsStore.debugForceGpuUnavailable.first()
         val tierConfig = TrackingTierSelector.select(capabilities, tierOverride)
+        AppLog.i(
+            TAG,
+            "Palier retenu : ${tierConfig.tier}" +
+                if (tierOverride != null) " (forcé manuellement)" else " (sélection automatique)",
+        )
         nominalTargetFps = tierConfig.targetFps
         thermalThrottleState = ThermalThrottleState.initial(nominalFps = tierConfig.targetFps)
 
@@ -477,7 +513,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // ce repli est synchrone (tryCreateSession() ne fait aucun appel asynchrone) et
                 // se termine donc avant que MainScreen n'appelle startCamera().
                 onUnavailable = { message ->
-                    Log.w(TAG, "ARCore indisponible, repli sur CameraX : $message")
+                    AppLog.w(TAG, "ARCore indisponible, repli sur CameraX : $message")
                     // close() avant de nuller la référence -- sans ça, imageProcessingExecutor
                     // (thread dédié créé dès la construction, avant même start()) fuyait pour le
                     // reste de la session (relecture du 7 août 2026, point 1).
@@ -498,7 +534,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             arCoreTracker.start()
         } else {
             if (tierConfig.useArCorePose && debugForceArCoreUnavailable) {
-                Log.w(TAG, "Mock de debug : ARCore forcé indisponible, repli CameraX simulé.")
+                AppLog.w(TAG, "Mock de debug : ARCore forcé indisponible, repli CameraX simulé.")
             }
             cameraController = createCameraController(context, lifecycleOwner, tierConfig)
         }
@@ -547,7 +583,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // direct à chaque sondage, prioritaire sur le capteur réel tant qu'il est non-null.
                 val throttling = _uiState.value.debugThermalOverride
                     ?: DeviceCapabilityDetector.isThermalThrottling(context)
+                val previousFps = thermalThrottleState.currentFps
                 thermalThrottleState = thermalThrottleState.next(nominalTargetFps, throttling)
+                // Débit réellement changé (pas juste "suggestion" -- thermalDowngradeSuggested
+                // ci-dessous reste un signal séparé, potentiellement affiché sans qu'un changement
+                // de débit ait eu lieu) : log une seule fois par transition, pas à chaque sondage.
+                if (thermalThrottleState.currentFps != previousFps) {
+                    AppLog.i(
+                        TAG,
+                        "Débit ajusté par le throttling thermique : $previousFps -> ${thermalThrottleState.currentFps} fps",
+                    )
+                }
                 cameraController?.setTargetFps(thermalThrottleState.currentFps)
                 arCoreHeadPoseTracker?.setTargetFps(thermalThrottleState.currentFps)
                 _uiState.update {
@@ -689,7 +735,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val blinkRightRaw = calibrated.blendshapes.firstOrNull { it.name == "eyeBlinkRight" }?.score ?: 0f
             val blinkLeftCorrected = corrected.blendshapes.firstOrNull { it.name == "eyeBlinkLeft" }?.score ?: 0f
             val blinkRightCorrected = corrected.blendshapes.firstOrNull { it.name == "eyeBlinkRight" }?.score ?: 0f
-            Log.d(
+            AppLog.d(
                 EAR_DIAG_TAG,
                 "eyeBlinkLeft brut=%.3f corrige=%.3f | eyeBlinkRight brut=%.3f corrige=%.3f".format(
                     blinkLeftRaw, blinkLeftCorrected, blinkRightRaw, blinkRightCorrected,
@@ -803,6 +849,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setKeepMeshOverlayInPowerSave(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setKeepMeshOverlayInPowerSave(enabled) }
     }
+
+    /**
+     * Niveau minimal conservé dans le fichier de logs exportable (voir logging/AppLog.kt, revue
+     * technique point 50) -- persisté, réglable depuis LoggingSettingsScreen, effet immédiat (voir
+     * le collecteur `appSettingsStore.logLevel` dans init{}).
+     */
+    fun setLogLevel(level: LogLevel) {
+        viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setLogLevel(level) }
+    }
+
+    /**
+     * Construit l'intent de partage du fichier de logs (bouton "Partager les logs",
+     * LoggingSettingsScreen) -- `null` si rien n'a encore été loggé au niveau configuré (pas
+     * d'erreur affichée dans ce cas, juste rien à partager). URI `content://` via [FileProvider]
+     * (voir AndroidManifest.xml/res/xml/file_paths.xml) plutôt qu'une URI `file://` directe,
+     * bloquée par le système sur les versions récentes d'Android (`FileUriExposedException`).
+     * Non testable en JVM (accès disque + `FileProvider` réel) -- même catégorie que le reste du
+     * glue code Android de ce ViewModel.
+     */
+    fun buildShareLogsIntent(): Intent? {
+        val context = getApplication<Application>()
+        if (!hasLogsToShare()) return null
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", logFile())
+        return Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    }
+
+    /** Y a-t-il quoi que ce soit à partager ? Vérification légère (existence + taille), pas de lecture. */
+    fun hasLogsToShare(): Boolean = logFile().let { it.exists() && it.length() > 0L }
+
+    private fun logFile(): File = File(File(getApplication<Application>().filesDir, "logs"), AppLog.LOG_FILE_NAME)
 
     /**
      * Force un palier de tracking (ou `null` pour revenir à la sélection automatique) -- persisté,
@@ -969,6 +1049,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // Mémorisée pour que le bouton de connexion de l'écran principal puisse s'y
                     // reconnecter directement, sans ressaisir l'IP.
                     connectionSettingsStore.setVmcHost(hostText)
+                    AppLog.i(TAG, "VMC connecté à $hostText:$port")
                 } else {
                     vmcSender = null
                     val message = getApplication<Application>().getString(R.string.error_vmc_connection_failed, hostText)
@@ -982,9 +1063,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun disconnectVmcTarget() {
+        val wasConnected = _uiState.value.vmcEnabled
         vmcSender?.close()
         vmcSender = null
         _uiState.update { it.copy(vmcEnabled = false, vmcConnecting = false, vmcTargetLabel = "") }
+        if (wasConnected) AppLog.i(TAG, "VMC déconnecté")
     }
 
     // --- VTube Studio : intégration directe via l'API Plugin (point 39) ---
@@ -1005,7 +1088,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     host = address,
                     port = port,
                     storedAuthToken = savedVtsAuthToken,
-                    onStateChanged = { state -> _uiState.update { it.copy(vtsConnectionState = state) } },
+                    onStateChanged = { state ->
+                        _uiState.update { it.copy(vtsConnectionState = state) }
+                        // ParametersRegistered = seul état "vraiment prêt" de la machine à état
+                        // (voir VTubeStudioConnectionState) -- ne se déclenche qu'une fois par cycle
+                        // de connexion réussi, pas de garde anti-doublon nécessaire ici.
+                        if (state == VTubeStudioConnectionState.ParametersRegistered) {
+                            AppLog.i(TAG, "VTube Studio connecté et paramètres enregistrés")
+                        }
+                    },
                     onNewAuthToken = { token ->
                         // Callback appelé depuis un thread interne à nv-websocket-client -- écrire
                         // dans ConnectionSettingsStore (DataStore) est déjà sûr depuis n'importe
@@ -1025,9 +1116,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun disconnectVtsTarget() {
+        val wasConnected = _uiState.value.vtsConnectionState != VTubeStudioConnectionState.Disconnected
         vtubeStudioSender?.close()
         vtubeStudioSender = null
         _uiState.update { it.copy(vtsTargetLabel = "", vtsConnectionState = VTubeStudioConnectionState.Disconnected) }
+        if (wasConnected) AppLog.i(TAG, "VTube Studio déconnecté")
     }
 
     /**
@@ -1048,14 +1141,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun startIFacialMocapListening() {
         val sender = iFacialMocapSender ?: IFacialMocapSender { connectedTo ->
             _uiState.update { it.copy(iFacialMocapConnectedTo = connectedTo) }
+            // connectedTo non-nul = handshake reçu (voir IFacialMocapSender) ; nul = arrêt côté PC
+            // (STOP_HANDSHAKE), distinct de stopIFacialMocapListening() ci-dessous (arrêt côté app).
+            if (connectedTo != null) {
+                AppLog.i(TAG, "UDP/VBridger connecté depuis $connectedTo")
+            } else {
+                AppLog.i(TAG, "UDP/VBridger déconnecté (arrêt côté PC)")
+            }
         }.also { iFacialMocapSender = it }
         sender.startListening()
         _uiState.update { it.copy(iFacialMocapListening = true) }
     }
 
     fun stopIFacialMocapListening() {
+        val wasListening = _uiState.value.iFacialMocapListening
         iFacialMocapSender?.stopListening()
         _uiState.update { it.copy(iFacialMocapListening = false, iFacialMocapConnectedTo = null) }
+        if (wasListening) AppLog.i(TAG, "UDP/VBridger écoute arrêtée")
     }
 
     override fun onCleared() {
