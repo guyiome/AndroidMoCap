@@ -76,7 +76,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 39 | VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin | **✅ Validé de bout en bout sur device le 8 août 2026** (WebSocket/nv-websocket-client + kotlinx.serialization -- OkHttp abandonné, incompatible avec le serveur `websocket-sharp` de VTube Studio) -- connexion, popup d'autorisation, création des paramètres, réception confirmés fonctionnels, voir section dédiée plus bas |
 | 40 | Indicateur visuel "connexion en cours" sur l'écran principal | **✅ confirmé fonctionnel sur device le 8 août 2026** pour iFacialMocap et VTube Studio (VMC non observable en pratique -- fenêtre trop brève, comportement attendu, pas un bug) -- bug corrigé au passage (l'icône ne passait jamais au vert pour VTube Studio), voir section dédiée plus bas |
 | 41 | Traduction des blendshapes ARKit pour éviter le remapping manuel (VRM/Blender, VTube Studio) | Backlog, faisabilité étudiée le 8 août 2026 -- Blender/VRM déjà bon (convention "Perfect Sync"), VTube Studio jugé viable avec les formules VBridger (`AdvancedARKitSettings`) comme point de départ, OVR non exploré, voir section dédiée plus bas |
-| 42 | Résolution caméra adaptée au palier (issue GitHub #7) | **✅ implémenté le 9 août 2026** (`ResolutionSelector`, 640x480, `STANDARD`/`COMPATIBLE`), confirmé appliqué sur device -- ⚠️ test thermique A/B mené sur deux appareils, résultat inconclusif/contradictoire, aucun bénéfice mesurable démontré, voir section dédiée plus bas |
+| 42 | Résolution caméra adaptée au palier (issue GitHub #7) | **✅ implémenté et issue fermée le 9 août 2026** (`ResolutionSelector`, 640x480, `STANDARD`/`COMPATIBLE`), confirmé appliqué sur device -- ⚠️ test thermique A/B mené sur deux appareils, résultat inconclusif/contradictoire, fermeture actant le code fait, pas un gain démontré, voir section dédiée plus bas |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -1296,6 +1296,9 @@ pour ressortir proprement de ce protocole.
 confirmé), reste justifié sur le principe (moins de décodage/copie, zéro perte de précision côté
 MediaPipe), mais **aucun bénéfice thermique mesurable démontré** avec ce protocole -- pas présenté
 comme un gain confirmé, contrairement au reste du travail "confirmé sur device" de cette session.
+
+**Issue #7 fermée (9 août 2026)** avec ce même bilan honnête en commentaire -- fermeture actant que
+le code est fait et vérifié, pas que le gain annoncé par l'issue d'origine est démontré.
 
 Question posée après validation du point 39 : peut-on traduire les 52 blendshapes ARKit pour
 correspondre exactement à ce qu'attendent différents récepteurs, plutôt que de compter sur un
