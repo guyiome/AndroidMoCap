@@ -27,9 +27,34 @@ package com.guyiome.androidmocap.tracking
  * donc beaucoup de lissage, un vrai clignement (vitesse élevée) reçoit une coupure plus haute donc
  * peu de retard -- avec un mécanisme général réutilisable plutôt qu'un hack spécifique aux yeux.
  *
- * Seuils/constantes volontairement **fixes, pas calibrés par utilisateur** -- cohérent avec la
- * conception "mode léger actif sur tous les paliers" discutée pour ce point : une calibration
- * personnalisée reste une piste pour un futur mode expérimental, pas un prérequis ici.
+ * **Troisième problème mesuré, cette fois lié à l'angle de caméra** (9 août 2026, téléphone posé
+ * sous l'écran donc caméra en légère contre-plongée) : un clin d'œil droit réel et volontaire
+ * (brut ~0,55) n'était corrigé qu'à hauteur de ~0,03-0,07 -- la correction anti-fuite écrasait
+ * l'essentiel d'une vraie fermeture. Cause : [EAR_CLOSED_REFERENCE] est une constante mesurée face
+ * caméra ; à cet angle, l'EAR d'un œil réellement fermé ne descend pas aussi bas (le contour de la
+ * paupière reste visible sous un angle différent), donc l'ouverture calculée contre cette référence
+ * fixe restait au-dessus de [EAR_DAMPING_THRESHOLD] même œil fermé -- **ici la vraie référence
+ * "fermé" est plus haute que la constante historique**, pas plus basse : un simple suivi de minimum
+ * (qui ne peut que descendre vite et remonter lentement) ne l'aurait jamais découverte, puisque
+ * l'EAR à cet angle ne descend jamais sous la constante fixe pour se faire remarquer comme nouveau
+ * minimum.
+ *
+ * Comme le téléphone ne sera pas toujours dans une position idéale, la référence "fermé" est
+ * maintenant suivie dynamiquement par œil ([AdaptiveEarFloor]), calée sur le score brut du
+ * blendshape (signal indépendant de l'EAR) plutôt que sur l'EAR seul : quand ce score dépasse
+ * [EAR_FLOOR_ACTIVITY_THRESHOLD] (un clignement, réel ou fuite, est probablement en cours), l'EAR
+ * minimum observé durant cet "épisode" est retenu, puis mélangé dans la référence une fois
+ * l'épisode terminé ([EAR_FLOOR_EPISODE_BLEND]). Prendre le minimum sur tout l'épisode (et non
+ * l'EAR de la dernière frame) protège naturellement du deuxième problème ci-dessus : sur une
+ * fermeture tenue où l'EAR dérive vers "ouvert" en cours d'épisode, c'est la valeur basse du tout
+ * début de l'épisode qui est retenue, pas la valeur déjà remontée. La référence "ouvert"
+ * ([EAR_OPEN_REFERENCE]) reste fixe : aucune mesure device n'indique qu'elle soit en cause, seule
+ * la référence "fermé" l'était.
+ *
+ * Seuils/constantes volontairement **fixes, pas calibrés par utilisateur** (sauf la référence
+ * "fermé" ci-dessus, désormais auto-adaptative) -- cohérent avec la conception "mode léger actif
+ * sur tous les paliers" discutée pour ce point : une calibration manuelle complète reste une piste
+ * pour un futur mode expérimental, pas un prérequis ici.
  */
 
 /** EAR observé pour un œil bien ouvert sur le device de test (plage mesurée ~0,35-0,42). */
@@ -61,6 +86,49 @@ internal const val EAR_OPENNESS_MIN_CUTOFF = 0.5f
 internal const val EAR_OPENNESS_BETA = 5f
 
 /**
+ * Score brut `eyeBlinkLeft`/`eyeBlinkRight` au-delà duquel [AdaptiveEarFloor] considère qu'un
+ * clignement (réel ou fuite -- peu importe pour la calibration, voir plus bas) est probablement en
+ * cours sur cet œil. Calé au-dessus du gros de la plage de fuite mesurée (~0,26-0,49, revue
+ * technique point 28/45) pour limiter les épisodes déclenchés par une pure fuite, sans exiger une
+ * fermeture aussi franche que le maximum mesuré (~0,55-0,8) -- pas besoin de capter chaque
+ * clignement, seulement d'en échantillonner assez régulièrement pour calibrer.
+ */
+internal const val EAR_FLOOR_ACTIVITY_THRESHOLD = 0.45f
+
+/**
+ * Poids du minimum d'un épisode de clignement dans la mise à jour d'[AdaptiveEarFloor] une fois cet
+ * épisode terminé -- volontairement partiel (pas un remplacement pur) pour qu'un épisode isolé
+ * pollué (ex. fuite passée au-dessus du seuil d'activité par erreur) ne redéfinisse pas la
+ * référence à lui seul ; elle converge sur plusieurs épisodes plutôt que sur le dernier vu.
+ */
+internal const val EAR_FLOOR_EPISODE_BLEND = 0.3f
+
+/**
+ * Référence EAR "fermé" suivie dynamiquement par œil, remplaçant la constante fixe
+ * [EAR_CLOSED_REFERENCE] quand l'angle de caméra réel s'en écarte (voir kdoc du fichier -- clin
+ * d'œil droit réel mesuré sur device le 9 août 2026, écrasé par une référence fixe trop basse pour
+ * l'angle réel, un simple suivi de minimum n'aurait pas pu la découvrir). [episodeMin] mémorise
+ * l'EAR minimum observé depuis le début du clignement en cours ([EAR_FLOOR_ACTIVITY_THRESHOLD]) --
+ * `null` en dehors d'un épisode. À la fin de l'épisode (score repassé sous le seuil), ce minimum est
+ * mélangé dans [value] via [EAR_FLOOR_EPISODE_BLEND]. Initialisée à [EAR_CLOSED_REFERENCE], qui sert
+ * de point de départ raisonnable avant qu'un vrai clignement ne soit observé, pas de vérité
+ * absolue. Fonction pure, testable en JVM.
+ */
+internal data class AdaptiveEarFloor(
+    val value: Float = EAR_CLOSED_REFERENCE,
+    val episodeMin: Float? = null,
+) {
+    fun next(ear: Float, rawBlinkScore: Float): AdaptiveEarFloor {
+        val active = rawBlinkScore >= EAR_FLOOR_ACTIVITY_THRESHOLD
+        return when {
+            active -> copy(episodeMin = minOf(episodeMin ?: ear, ear))
+            episodeMin != null -> AdaptiveEarFloor(value = value + EAR_FLOOR_EPISODE_BLEND * (episodeMin - value))
+            else -> this
+        }
+    }
+}
+
+/**
  * Ouverture normalisée de l'œil d'après son EAR -- 0 = aussi fermé que [closedReference] (ou plus),
  * 1 = aussi ouvert que [openReference] (ou plus). Fonction pure, testable en JVM.
  */
@@ -89,12 +157,14 @@ internal fun correctBlinkScore(
 }
 
 /**
- * État porté d'une frame à l'autre par [correctEyeBlinkScores] -- un [OneEuroFilter] par œil,
- * initialisé avec [EAR_OPENNESS_MIN_CUTOFF]/[EAR_OPENNESS_BETA].
+ * État porté d'une frame à l'autre par [correctEyeBlinkScores] -- un [OneEuroFilter] et un
+ * [AdaptiveEarFloor] par œil, le premier initialisé avec [EAR_OPENNESS_MIN_CUTOFF]/[EAR_OPENNESS_BETA].
  */
 internal data class EyeBlinkCorrectionState(
     val left: OneEuroFilter = OneEuroFilter(minCutoff = EAR_OPENNESS_MIN_CUTOFF, beta = EAR_OPENNESS_BETA),
     val right: OneEuroFilter = OneEuroFilter(minCutoff = EAR_OPENNESS_MIN_CUTOFF, beta = EAR_OPENNESS_BETA),
+    val leftFloor: AdaptiveEarFloor = AdaptiveEarFloor(),
+    val rightFloor: AdaptiveEarFloor = AdaptiveEarFloor(),
 )
 
 /**
@@ -113,8 +183,15 @@ internal fun correctEyeBlinkScores(
 ): Pair<List<BlendshapeScore>, EyeBlinkCorrectionState> {
     if (landmarks.isEmpty()) return blendshapes to state
 
-    val leftInstant = earOpenness(eyeAspectRatioFromLandmarks(landmarks, EyeLandmarkIndices.LEFT_EYE))
-    val rightInstant = earOpenness(eyeAspectRatioFromLandmarks(landmarks, EyeLandmarkIndices.RIGHT_EYE))
+    val rawLeft = blendshapes.firstOrNull { it.name == "eyeBlinkLeft" }?.score ?: 0f
+    val rawRight = blendshapes.firstOrNull { it.name == "eyeBlinkRight" }?.score ?: 0f
+    val leftEar = eyeAspectRatioFromLandmarks(landmarks, EyeLandmarkIndices.LEFT_EYE)
+    val rightEar = eyeAspectRatioFromLandmarks(landmarks, EyeLandmarkIndices.RIGHT_EYE)
+    val nextLeftFloor = state.leftFloor.next(leftEar, rawLeft)
+    val nextRightFloor = state.rightFloor.next(rightEar, rawRight)
+
+    val leftInstant = earOpenness(leftEar, closedReference = nextLeftFloor.value)
+    val rightInstant = earOpenness(rightEar, closedReference = nextRightFloor.value)
     val nextLeft = state.left.next(leftInstant, elapsedMs)
     val nextRight = state.right.next(rightInstant, elapsedMs)
     // .value ne peut être nul qu'avant le tout premier appel à .next() -- on vient juste d'en faire
@@ -130,5 +207,5 @@ internal fun correctEyeBlinkScores(
             else -> score
         }
     }
-    return corrected to EyeBlinkCorrectionState(nextLeft, nextRight)
+    return corrected to EyeBlinkCorrectionState(nextLeft, nextRight, nextLeftFloor, nextRightFloor)
 }

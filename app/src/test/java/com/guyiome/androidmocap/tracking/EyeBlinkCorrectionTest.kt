@@ -121,4 +121,55 @@ class EyeBlinkCorrectionTest {
             correctedAtMidpoint > 0.05f,
         )
     }
+
+    // --- AdaptiveEarFloor intégré : régression du clignement droit écrasé à angle de caméra
+    //     inhabituel (revue technique, cas mesuré sur device le 9 août 2026) ---
+
+    private fun rightEyeLandmarksWithGap(openFraction: Float): List<Pair<Float, Float>> {
+        val landmarks = MutableList(500) { 0f to 0f }
+        val indices = EyeLandmarkIndices.RIGHT_EYE
+        landmarks[indices.cornerNear] = 0f to 0.5f
+        landmarks[indices.cornerFar] = 1f to 0.5f
+        landmarks[indices.upperNear] = 0.25f to (0.5f - openFraction)
+        landmarks[indices.lowerNear] = 0.25f to (0.5f + openFraction)
+        landmarks[indices.upperFar] = 0.75f to (0.5f - openFraction)
+        landmarks[indices.lowerFar] = 0.75f to (0.5f + openFraction)
+        return landmarks
+    }
+
+    @Test
+    fun `un clignement droit reel a angle inhabituel s'ameliore apres quelques episodes`() {
+        // Reproduit le cas mesuré sur device : à cet angle, l'EAR d'un œil droit réellement fermé
+        // ne descend qu'à ~0,165 d'ouverture (EAR ~0,33) au lieu des ~0,05 (EAR ~0,10) habituels --
+        // trop proche de la référence "ouvert" (0,175, EAR ~0,35) pour que la référence fixe
+        // laisse passer la correction. Ici, plusieurs clignements identiques doivent faire
+        // converger la correction vers le brut, pas juste le tout premier.
+        var state = EyeBlinkCorrectionState()
+        val closedBlendshapes = listOf(BlendshapeScore("eyeBlinkLeft", 0.05f), BlendshapeScore("eyeBlinkRight", 0.55f))
+        val openBlendshapes = listOf(BlendshapeScore("eyeBlinkLeft", 0.05f), BlendshapeScore("eyeBlinkRight", 0.05f))
+        val closedLandmarks = rightEyeLandmarksWithGap(0.165f)
+        val openLandmarks = rightEyeLandmarksWithGap(0.175f)
+
+        fun blink(): Float {
+            val (corrected, nextState) = correctEyeBlinkScores(closedBlendshapes, closedLandmarks, state, elapsedMs = 150)
+            state = nextState
+            val result = corrected.first { it.name == "eyeBlinkRight" }.score
+            val (_, reopenedState) = correctEyeBlinkScores(openBlendshapes, openLandmarks, state, elapsedMs = 150)
+            state = reopenedState
+            return result
+        }
+
+        val firstBlinkCorrected = blink()
+        repeat(5) { blink() }
+        val laterBlinkCorrected = blink()
+
+        assertTrue(
+            "le tout premier clignement à cet angle doit encore être fortement atténué par la référence fixe de départ, valeur=$firstBlinkCorrected",
+            firstBlinkCorrected < 0.15f,
+        )
+        assertTrue(
+            "après plusieurs clignements identiques, la correction doit nettement s'améliorer, valeur=$laterBlinkCorrected",
+            laterBlinkCorrected > firstBlinkCorrected + 0.15f,
+        )
+    }
 }

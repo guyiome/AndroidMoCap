@@ -120,6 +120,17 @@ reusable utility, see revue technique point 46 for why it was picked over Kalman
 fixed EMA) before being used to damp: without smoothing, a sustained held-shut eye collapsed back to
 "open" within ~9s because MediaPipe's own landmark tracking drifts during a held pose; confirmed on
 device that the filter fixes this (a 9s hold now tracks the raw score with no visible decay).
+The "closed" EAR reference (`EAR_CLOSED_REFERENCE`) is a fixed constant measured face-on, which
+turned out wrong at other camera angles — at a shallow upward angle (phone below the screen), a
+genuine closure's EAR never dropped as low as that constant assumed, so the leak-suppression damping
+was crushing real closures too (confirmed on device, ~0.55 raw corrected down to ~0.03-0.07). Fixed
+by `AdaptiveEarFloor` (same file): tracks the closed reference per eye dynamically, gated on the raw
+blendshape score crossing an activity threshold (an independent signal from EAR) so it only samples
+during a plausible blink episode, taking that episode's EAR minimum (not the last frame's, which
+protects against the same landmark-drift issue as above) and blending it in gradually across
+episodes rather than jumping to the latest one. Confirmed on device: a problem angle's right-eye
+score went from crushed to passing through within a handful of repeated blinks, without leaking to
+the other eye — see revue technique point 48.
 Diagnostic logging (`MainViewModel.EAR_DIAGNOSTIC_LOGGING`, tag `EarDiag`) is off by default, flip it
 back on to debug a
 future blink issue rather than re-deriving this from scratch.

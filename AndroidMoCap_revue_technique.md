@@ -62,7 +62,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 19 | Détection d'anomalie de calibrage (bouton rouge) | **✅ implémenté et vérifié sur device le 7 août 2026** (tous paliers testés), voir section dédiée -- seuils encore non calés sur un corpus d'usage réel, piste de retours utilisateurs notée pour plus tard |
 | 20 | Orientation grand écran / tablette | Constat documenté, aucune décision de mise en œuvre |
 | 21 | Tri en sous-écrans des réglages | **Implémenté sur `main`, voir point 26** (l'index le disait encore "aucun code écrit" par erreur) |
-| 28 | Fiabilisation du clignement des yeux | **✅ clos côté app le 9 août 2026** -- hypothèse lunettes de départ non reproduite, mais fuite gauche/droite et effondrement en tenue longue trouvés et corrigés (`EyeBlinkCorrection.kt`), et faiblesse de l'œil droit tracée à un éclairage physique inégal (pas un bug logiciel). Reste un réglage fin côté VBridger, hors périmètre du dépôt -- voir section dédiée plus bas |
+| 28 | Fiabilisation du clignement des yeux | **✅ clos côté app le 9 août 2026** -- hypothèse lunettes de départ non reproduite, mais fuite gauche/droite, effondrement en tenue longue et écrasement à angle de caméra inhabituel trouvés et corrigés (`EyeBlinkCorrection.kt`), et faiblesse de l'œil droit tracée à un éclairage physique inégal (pas un bug logiciel). Reste un réglage fin côté VBridger, hors périmètre du dépôt -- voir sections dédiées plus bas (points 45/48) |
 | 29 | Validation des traductions FR/EN | **✅ traité le 9 août 2026**, voir point 23 -- relu et validé par l'utilisateur (129 clés, tableau dédié). Pas une relecture par un locuteur natif au sens strict (l'utilisateur n'est natif d'aucune des deux langues), jugé suffisant pour le contexte -- voir la note honnête dans la section point 23 |
 | 30 | Sélecteur de langue dans l'app pour Android 11/12 | **✅ confirmé fonctionnel sur device le 9 août 2026** (`androidx.appcompat` 1.7.1 + `AppCompatDelegate.setApplicationLocales()`), FR/EN vérifiés en direct + persistance après redémarrage complet sur l'appareil Android 11 de test -- voir section dédiée plus bas |
 | 31 | CI cassée depuis le premier run (`gradlew` sans bit exécutable), puis silencieusement bloquée depuis | **✅ entièrement résolu le 7 août 2026** (commit `df640a4` pour `gradlew` ; cause du blocage silencieux trouvée le même jour -- budget Actions à 0 $, "Stop usage" actif -- corrigée et vérifiée par un run CI réussi), voir section dédiée plus bas |
@@ -79,6 +79,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 42 | Résolution caméra adaptée au palier (issue GitHub #7) | **✅ implémenté et issue fermée le 9 août 2026** (`ResolutionSelector`, 640x480, `STANDARD`/`COMPATIBLE`), confirmé appliqué sur device -- ⚠️ test thermique A/B mené sur deux appareils, résultat inconclusif/contradictoire, fermeture actant le code fait, pas un gain démontré, voir section dédiée plus bas |
 | 46 | Lissage générique des signaux (One Euro Filter) | **✅ intégré et confirmé sur device le 9 août 2026** -- remplace `EyeOpennessSmoother` dans `EyeBlinkCorrection.kt`, tenue de 9s testée sans dégradation visible (mieux que l'ancien lissage sur la même durée). Reste ouvert : lissage général des 52 blendshapes bruts, pas traité ici, voir section dédiée plus bas |
 | 47 | Optimisation lumière côté app | En discussion (9 août 2026) -- mis de côté volontairement après le point 28/45 (le vrai problème rencontré était une ombre directionnelle, réglée physiquement ; compensation d'exposition jugée peu utile pour ce cas précis), aucun code écrit |
+| 48 | Robustesse du clignement à l'angle de caméra (suite du 45) | **✅ confirmé sur device le 9 août 2026** -- référence EAR "fermé" désormais auto-adaptative par œil (`AdaptiveEarFloor`), corrige un clin d'œil réel écrasé à un angle de caméra en contre-plongée ; testé sans réintroduire la fuite gauche/droite, voir section dédiée plus bas |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -1891,7 +1892,9 @@ fin côté VBridger, propre à la machine et à l'éclairage de l'utilisateur** 
 ce dépôt (aucun code de l'app n'agit sur cette formule).
 
 **Outillage laissé en place** : `tracking/EyeAspectRatio.kt` et `tracking/EyeBlinkCorrection.kt`
-(purs, testés -- 5 + 13 tests JVM), correction active en permanence dans le pipeline d'envoi. Le
+(ce dernier incluant `AdaptiveEarFloor`, voir point 48) -- purs, testés
+(`EyeAspectRatioTest`/`EyeBlinkCorrectionTest`/`AdaptiveEarFloorTest`, 5 + 10 + 6 tests JVM),
+correction active en permanence dans le pipeline d'envoi. Le
 log de diagnostic (`EarDiag`, `MainViewModel.EAR_DIAGNOSTIC_LOGGING`) désactivé par défaut
 maintenant que l'investigation est close, mais laissé dans le code (une ligne à repasser à `true`)
 pour un futur souci de clignement. La ligne EAR de `DiagnosticsScreen` reste affichée en
@@ -1965,6 +1968,46 @@ atténuée en parallèle. Cohérent avec le raisonnement qui a motivé le choix 
 **Reste ouvert, pas traité maintenant** : lissage général des 52 blendshapes bruts à la source
 (au-delà des seuls yeux) -- plus gros chantier de réglage par catégorie de blendshape, décidé comme
 prochaine étape mais volontairement pas fait dans la foulée.
+
+### 48. Robustesse du clignement à l'angle de caméra (suite du point 45) -- ✅ confirmé sur device
+
+Repris après coup sur le point 45/28 : en repositionnant le téléphone sous l'écran (la position la
+plus pratique disponible chez l'utilisateur -- stable, ne masque pas l'écran, bonne latitude de
+mouvement -- mais en légère contre-plongée), un clin d'œil droit réel et volontaire (brut ~0,55)
+n'était corrigé qu'à hauteur de ~0,03-0,07 -- la correction anti-fuite écrasait l'essentiel d'un
+vrai clignement. Mesuré sur device (`EarDiag`, 9 août 2026), pas supposé.
+
+**Cause identifiée** : `EAR_CLOSED_REFERENCE` (0,10) est une constante mesurée face caméra. À
+l'angle réel du téléphone, l'EAR d'un œil réellement fermé ne descend pas aussi bas (le contour de
+la paupière reste plus visible sous cet angle) -- l'ouverture calculée contre cette référence fixe
+restait donc au-dessus du seuil d'atténuation même œil fermé. Contrairement au problème de tenue
+longue (point 45.2, la référence était trop basse *ponctuellement*, dérive de landmarks), ici c'est
+la référence elle-même qui était fausse pour cet angle, en permanence.
+
+**Décision explicite de l'utilisateur** : plutôt que de chercher un meilleur positionnement caméra
+(comme pour l'éclairage, point 45.3), rendre la détection robuste côté code -- le téléphone ne
+pourra pas toujours être dans une position idéale.
+
+**Corrigé par `AdaptiveEarFloor`** (`tracking/EyeBlinkCorrection.kt`) : la référence "fermé" est
+suivie dynamiquement par œil au lieu d'être fixe. Calée sur le score brut du blendshape (signal
+indépendant de l'EAR) plutôt que sur l'EAR seul : quand ce score dépasse un seuil d'activité
+(0,45), l'EAR minimum observé durant ce "épisode" de clignement est retenu, puis mélangé
+partiellement (30 %) dans la référence une fois l'épisode terminé -- converge sur plusieurs
+clignements plutôt que de sauter au dernier vu (protège d'un épisode isolé pollué, ex. une fuite
+passée au-dessus du seuil par erreur). Retenir le minimum sur tout l'épisode (pas juste la dernière
+frame) protège aussi du bug de tenue longue (point 45.2) : sur une fermeture tenue où l'EAR dérive
+vers l'ouvert en cours d'épisode, c'est la valeur basse du tout début qui compte. La référence
+"ouvert" reste fixe -- aucune mesure device n'indique qu'elle soit en cause.
+
+**✅ confirmé sur device** (9 août 2026, log `EarDiag`) : série de clignements droits, puis gauches,
+puis des deux yeux, à l'angle problématique. Résultat net et propre : la série droite recalibre la
+référence droite (le score droit passe rapidement de fortement écrasé à quasi inchangé), la série
+gauche fait de même côté gauche **sans réintroduire de fuite** (le score droit reste bas pendant que
+seul le gauche cligne), et les clignements des deux yeux passent ensuite proprement et
+symétriquement des deux côtés. Testé aussi en JVM (`AdaptiveEarFloorTest.kt`, 6 tests -- convergence
+sur plusieurs épisodes, résistance à un épisode isolé pollué, non-régression sur la dérive de
+landmarks en tenue longue) et bout-en-bout (`EyeBlinkCorrectionTest.kt`, nouveau test simulant
+l'angle problématique).
 
 ## Automatisation
 
