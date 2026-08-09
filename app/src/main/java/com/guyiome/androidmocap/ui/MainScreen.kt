@@ -21,6 +21,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -81,8 +83,8 @@ fun MainScreen(
     var showExperimentalFeatures by remember { mutableStateOf(false) }
     var showLoggingSettings by remember { mutableStateOf(false) }
     var showBlendshapeSelection by remember { mutableStateOf(false) }
-    var iconRotationDegrees by remember { mutableStateOf(0f) }
-    var batteryPercent by remember { mutableStateOf(100) }
+    var iconRotationDegrees by remember { mutableFloatStateOf(0f) }
+    var batteryPercent by remember { mutableIntStateOf(100) }
     var isCharging by remember { mutableStateOf(true) }
 
     // Panneau blendshapes : pas de rotation continue (illisible pendant la transition), juste un

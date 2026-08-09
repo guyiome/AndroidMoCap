@@ -59,6 +59,12 @@ android {
             // survivent à l'obfuscation -- règles -keep dédiées dans proguard-rules.pro, chacune
             // justifiée, testé réellement sur device avant d'être considéré fiable.
             isMinifyEnabled = true
+            // Ajouté le 9 août 2026 (revue globale, lint NotShrinkingResources) : sans ça, les
+            // ressources inutilisées ne sont pas retirées de l'APK release même avec le minify de
+            // code actif -- les deux réglages sont indépendants. Pas encore revérifié sur un vrai
+            // build release + install device comme le reste de ce bloc (point 8) -- gain de taille
+            // attendu, mais à confirmer avant de le considérer aussi fiable que isMinifyEnabled.
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

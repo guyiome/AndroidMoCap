@@ -1865,6 +1865,15 @@ retombe désormais sur la clé debug (`app/build.gradle.kts`) -- seul moyen d'in
 un build release minifié en local sans les vraies clés ; le workflow de publication
 (`release.yml`) a toujours les vraies variables, ce repli ne s'applique qu'en dev local.
 
+**`isShrinkResources` ajouté le 9 août 2026** (revue globale, lint `NotShrinkingResources`) :
+`isMinifyEnabled` ne suffisait pas à lui seul à retirer les ressources inutilisées de l'APK release,
+les deux réglages sont indépendants. `./gradlew assembleRelease` toujours **✅ réussi** en local
+après ajout (61,01 Mo, contre 61,4 Mo avant -- gain modeste mais réel). **Pas encore réinstallé sur
+device** pour confirmer que rien d'utilisé dynamiquement n'a été retiré à tort (même famille de
+risque que le crash Flogger ci-dessus, bien que le shrinking de ressources soit un mécanisme
+différent du shrinking de code) -- à vérifier avant de le considérer aussi fiable que le reste de ce
+bloc.
+
 ### 45. Fiabilisation du clignement des yeux (point 28) -- ✅ clos côté app, réglage fin restant côté VBridger
 
 Suite complète de la discussion/investigation du point 28 (ouvert le 6 août 2026 sur une hypothèse
