@@ -33,7 +33,9 @@ import com.guyiome.androidmocap.settings.DEFAULT_POWER_SAVE_DELAY_SECONDS
 import com.guyiome.androidmocap.tracking.ArCoreHeadPoseTracker
 import com.guyiome.androidmocap.tracking.BlendshapeScore
 import com.guyiome.androidmocap.tracking.CalibrationAnomalyState
+import com.guyiome.androidmocap.tracking.EyeLandmarkIndices
 import com.guyiome.androidmocap.tracking.FaceLandmarkerHelper
+import com.guyiome.androidmocap.tracking.eyeAspectRatioFromLandmarks
 import com.guyiome.androidmocap.tracking.FaceTrackingResult
 import com.guyiome.androidmocap.tracking.REST_VARIANCE_THRESHOLD
 import com.guyiome.androidmocap.tracking.RotationMath
@@ -201,6 +203,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private companion object {
         private const val TAG = "MainViewModel"
+
+        // Diagnostic TEMPORAIRE (revue technique, point 28) : logue EAR + blendshape eyeBlink brut
+        // à chaque frame où des landmarks sont disponibles, pour comparer les deux signaux pendant
+        // un test manuel (clignement avec/sans lunettes) sans avoir à lire du texte minuscule à
+        // l'écran en même temps qu'on fixe la caméra -- lu via `adb logcat -s EarDiag`. À retirer
+        // une fois le point 28 tranché (garde ou non un vrai correcteur EAR).
+        private const val EAR_DIAGNOSTIC_LOGGING = true
+        private const val EAR_DIAG_TAG = "EarDiag"
 
         // Cadence du sondage de throttling thermique (voir startThermalPolling) -- doit rester
         // cohérente avec ThermalThrottleState.SUSTAINED_THROTTLE_TICKS (12 sondages consécutifs,
@@ -647,6 +657,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         vmcSender?.send(calibrated)
         iFacialMocapSender?.send(calibrated)
         vtubeStudioSender?.send(calibrated)
+
+        // Diagnostic temporaire EAR (voir la constante EAR_DIAGNOSTIC_LOGGING ci-dessus) -- rien à
+        // loguer tant que les landmarks ne sont pas extraits (overlay du mesh désactivé, ou palier
+        // OPTIMAL/ARCore avant le tout premier frame ARCore).
+        if (EAR_DIAGNOSTIC_LOGGING && calibrated.faceLandmarks.isNotEmpty()) {
+            val earGroupA = eyeAspectRatioFromLandmarks(calibrated.faceLandmarks, EyeLandmarkIndices.GROUP_A)
+            val earGroupB = eyeAspectRatioFromLandmarks(calibrated.faceLandmarks, EyeLandmarkIndices.GROUP_B)
+            val blinkLeft = calibrated.blendshapes.firstOrNull { it.name == "eyeBlinkLeft" }?.score ?: 0f
+            val blinkRight = calibrated.blendshapes.firstOrNull { it.name == "eyeBlinkRight" }?.score ?: 0f
+            Log.d(
+                EAR_DIAG_TAG,
+                "EAR A=%.3f B=%.3f | blendshape eyeBlinkLeft=%.3f eyeBlinkRight=%.3f".format(
+                    earGroupA, earGroupB, blinkLeft, blinkRight,
+                ),
+            )
+        }
     }
 
     /**
