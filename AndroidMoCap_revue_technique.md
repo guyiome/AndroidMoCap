@@ -1623,10 +1623,10 @@ sandbox de la routine n'a pas d'accès `gh`/API pour agir directement, seulement
 - **Issue #3** (finaliser la fusion ARCore) fermée -- confirmée fonctionnelle sur device depuis le
   6 août (point 3/13), l'issue décrivait un état antérieur ("non testé sur device", "à ne pas
   merger avant vérification") entièrement dépassé.
-- **Issue #1** (thermal throttling + résolution caméra par palier) volontairement **laissée
-  ouverte** malgré la suggestion initiale de la routine ("probablement à fermer") : l'issue couvre
-  deux sujets distincts, et seul le premier (throttling thermique, point 34) est fait. Le second
-  (`ImageAnalysis.Builder()` ne fixe aucune résolution cible selon le palier) est toujours vrai --
-  vérifié directement dans `CameraController.kt` avant de fermer quoi que ce soit, plutôt que de se
-  fier à la suggestion de la routine. Reste à traiter ou à reformuler pour ne garder que la partie
-  encore ouverte.
+- **Issue #1** (thermal throttling + résolution caméra par palier) : couvrait deux sujets distincts
+  -- vérifié directement dans `CameraController.kt` avant de fermer quoi que ce soit (pas fié à la
+  suggestion initiale de la routine, "probablement à fermer"), seul le premier (throttling
+  thermique, point 34) était fait. **Scindée** (8 août 2026, sur demande) : issue #1 fermée,
+  nouvelle **issue #7** créée pour la partie encore ouverte (résolution caméra adaptée au palier --
+  `ImageAnalysis.Builder()` ne fixe aucune résolution cible selon `COMPATIBLE`/`STANDARD`/`OPTIMAL`),
+  renvoi croisé entre les deux dans les commentaires de fermeture/création.
