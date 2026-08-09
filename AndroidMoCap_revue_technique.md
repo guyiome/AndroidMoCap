@@ -77,6 +77,8 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 40 | Indicateur visuel "connexion en cours" sur l'écran principal | **✅ confirmé fonctionnel sur device le 8 août 2026** pour iFacialMocap et VTube Studio (VMC non observable en pratique -- fenêtre trop brève, comportement attendu, pas un bug) -- bug corrigé au passage (l'icône ne passait jamais au vert pour VTube Studio), voir section dédiée plus bas |
 | 41 | Traduction des blendshapes ARKit pour éviter le remapping manuel (VRM/Blender, VTube Studio) | Backlog, faisabilité étudiée le 8 août 2026 -- Blender/VRM déjà bon (convention "Perfect Sync"), VTube Studio jugé viable avec les formules VBridger (`AdvancedARKitSettings`) comme point de départ, OVR non exploré, voir section dédiée plus bas |
 | 42 | Résolution caméra adaptée au palier (issue GitHub #7) | **✅ implémenté et issue fermée le 9 août 2026** (`ResolutionSelector`, 640x480, `STANDARD`/`COMPATIBLE`), confirmé appliqué sur device -- ⚠️ test thermique A/B mené sur deux appareils, résultat inconclusif/contradictoire, fermeture actant le code fait, pas un gain démontré, voir section dédiée plus bas |
+| 46 | Lissage générique des signaux (One Euro Filter) | Comparatif fait (EMA fixe/One Euro/Kalman/Savitzky-Golay/Half Pound Filter) le 9 août 2026, `tracking/OneEuroFilter.kt` construit et testé -- **outil prêt, intégration (remplacement d'`EyeOpennessSmoother`, lissage général des blendshapes) pas encore faite**, voir section dédiée plus bas |
+| 47 | Optimisation lumière côté app | En discussion (9 août 2026) -- mis de côté volontairement après le point 28/45 (le vrai problème rencontré était une ombre directionnelle, réglée physiquement ; compensation d'exposition jugée peu utile pour ce cas précis), aucun code écrit |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -1901,6 +1903,57 @@ réelle sur device (logcat, avant/après précis) plutôt que par supposition --
 propre de l'hypothèse de départ (lunettes) quand elle ne s'est pas reproduite, et la découverte que
 la cause principale restante était physique (éclairage), pas logicielle. Cohérent avec la
 convention "don't guess" déjà suivie ailleurs dans ce document.
+
+### 46. Lissage générique des signaux (One Euro Filter) -- outil construit, intégration en discussion
+
+Discussion ouverte après coup sur le point 28/45 : `EyeOpennessSmoother` (le lissage
+attaque-rapide/relâchement-lent construit pour corriger la dérive pendant une fermeture tenue,
+point 45) est un bricolage *spécifique* à ce seul symptôme. Question posée : un mécanisme plus
+général aurait-il évité de le découvrir à la dure spécifiquement sur les yeux ?
+
+**Comparatif fait avant de choisir** (pas de saut direct sur la première idée) : EMA fixe (déjà en
+place, compromis figé lissage/retard), **One Euro Filter** (Casiez, Roussel & Vogel, CHI 2012 --
+EMA à coupure adaptative selon la vitesse du signal), filtre de Kalman (estimateur d'état complet,
+fusionne plusieurs mesures indépendantes d'une même quantité avec une incertitude explicite),
+Savitzky-Golay (validé en capture faciale pour du lissage de blendshapes, mais introduit un vrai
+retard -- pas purement streaming), et le très récent "Half Pound Filter" (arxiv 2602.21702, février
+2026 -- vise plutôt le *blending entre états d'animation* que le débruitage continu, trop récent/pas
+assez éprouvé pour ce projet).
+
+**Choix retenu : One Euro Filter**, pour trois raisons qui se sont clarifiées en creusant :
+1. **Nature du problème** -- la correction anti-fuite gauche/droite (`EyeBlinkCorrection.kt`)
+   combine deux signaux indépendants (blendshape ML + EAR géométrique) : c'est un vrai cas de
+   fusion, mais **local et pairwise** (un blendshape faible + son proxy géométrique), pas un besoin
+   de modéliser des corrélations entre de nombreux canaux -- un Kalman centralisé serait
+   disproportionné pour ce que le projet a réellement besoin de résoudre jusqu'ici.
+2. **Futures cascades (points 15/16, langue/joues)** identifiées comme le même patron exact que le
+   clignement (blendshape absent/peu fiable + proxy géométrique construit sur les landmarks) --
+   chacune redeviendrait sa propre petite fusion locale, réutilisant le même outil de lissage
+   générique en dessous, plutôt qu'un state Kalman unique et de plus en plus complexe à mesure que
+   les cascades s'ajoutent.
+3. **Formules composites futures (point 41, traduction ARKit -> paramètres VTube Studio)** : ce
+   sont des combinaisons linéaires de plusieurs blendshapes distincts, pas des estimations
+   multiples d'une même quantité -- ni Kalman ni filtre complémentaire n'ont de prise là-dessus.
+   Ça a clarifié en revanche *où* lisser : à la source (chaque blendshape brut, une seule fois,
+   juste après MediaPipe), pas dans chaque formule dérivée -- pour que tous les consommateurs
+   (formules composites, cascades, envoi réseau, affichage) profitent d'un signal déjà propre au
+   lieu de dupliquer/désynchroniser le lissage à chaque endroit.
+
+**Hypothèse hors sujet écartée en cours de route** : une future détection de main (déclenchement
+"wave" pour VTube Studio) a été envisagée comme cas d'usage -- conclusion : **complètement
+décorrélée**, pas un cas de fusion (aucun second signal existant à combiner, modèle MediaPipe
+distinct, sortie de nature différente -- événement discret plutôt que valeur continue à lisser).
+Resservirait uniquement l'outil de lissage générique par réutilisation de code, pas par fusion de
+données.
+
+**Fait le 9 août 2026** : `tracking/OneEuroFilter.kt` (nouveau, pur, testé -- `OneEuroFilterTest.kt`,
+8 tests) -- implémentation standard de l'algorithme (dérivée lissée à coupure fixe `dCutoff`,
+coupure adaptative `minCutoff + beta·|dérivée lissée|`, coefficient de lissage `r/(r+1)` avec
+`r = 2π·coupure·Δt`), basée sur le temps réel écoulé entre appels comme le reste des filtres du
+projet. **Outil construit et testé, pas encore intégré** -- prochaines étapes (décidées mais pas
+encore faites) : remplacer `EyeOpennessSmoother` par lui dans `EyeBlinkCorrection.kt` (revalider sur
+device), puis étudier un lissage général des 52 blendshapes bruts à la source -- plus gros chantier
+de réglage par catégorie, traité séparément.
 
 ## Automatisation
 
