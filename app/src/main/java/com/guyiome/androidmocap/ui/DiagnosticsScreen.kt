@@ -64,13 +64,12 @@ fun DiagnosticsScreen(
     uiState: MainUiState,
     faceDetected: Boolean,
     inferenceTimeMs: Long,
-    // Diagnostic TEMPORAIRE (revue technique, point 28) : Eye Aspect Ratio calculé à partir du mesh
-    // de landmarks, affiché à côté du blendshape eyeBlink brut (à sélectionner dans le panneau de
-    // blendshapes de l'écran principal pour comparer) -- objectif : voir si EAR décroche plus
-    // proprement que le blendshape MediaPipe pendant un clignement avec lunettes. GROUP_A/GROUP_B
-    // plutôt que gauche/droite tant que la correspondance avec eyeBlinkLeft/Right n'est pas
-    // confirmée en test réel, voir EyeLandmarkIndices. À retirer ou à transformer en vraie
-    // fonctionnalité selon le résultat de ce test -- pas un réglage destiné à durer tel quel.
+    // Diagnostic Eye Aspect Ratio (revue technique, point 28) -- affiché à côté du blendshape
+    // eyeBlink brut (à sélectionner dans le panneau de blendshapes de l'écran principal pour
+    // comparer). A servi à diagnostiquer les correctifs de fiabilisation du clignement
+    // (EyeBlinkCorrection.kt) ; conservé comme outil de diagnostic permanent, utile si un futur
+    // souci de clignement doit être investigué sans repasser par adb logcat. GROUP_A/GROUP_B
+    // désignent les mêmes indices que EyeLandmarkIndices.RIGHT_EYE/LEFT_EYE.
     eyeAspectRatioGroupA: Float,
     eyeAspectRatioGroupB: Float,
     onClose: () -> Unit,

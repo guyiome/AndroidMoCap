@@ -85,7 +85,7 @@
     <string name="diagnostics_inference_latency">Inference latency: %1$d ms</string>
     <!-- Temporary diagnostic (point 28, eye/blink/glasses), see kdoc on DiagnosticsScreen's
          eyeAspectRatioGroupA/B parameters. Not meant to stay as-is long term. -->
-    <string name="diagnostics_ear_debug_label">Eye Aspect Ratio diagnostic (temporary, point 28)</string>
+    <string name="diagnostics_ear_debug_label">Eye Aspect Ratio diagnostic (point 28)</string>
     <string name="diagnostics_ear_debug_value">Group A: %1$s · Group B: %2$s</string>
     <string name="diagnostics_ear_debug_hint">Needs the tracking mesh overlay enabled (Display &amp; comfort) for non-zero values.</string>
     <string name="diagnostics_calibrated">Neutral pose: calibrated</string>

@@ -101,9 +101,25 @@ tested) handling the 90°/270° width/height swap. `tracking/FaceLandmarkerHelpe
 CPU on init failure; its `onLiveStreamResult()` callback builds `FaceTrackingResult` — blendshapes,
 head rotation matrix/euler (via `tracking/RotationMath.kt`), per-eye gaze angles (reconstructed from
 directional blendshapes, MediaPipe doesn't provide gaze natively — `computeEyeGazeDegrees()`, pure,
-tested), the 478-point face mesh (only extracted when an overlay consumer needs it — see
-`setLandmarksNeeded`), and the analyzed image's own pixel dimensions (needed by the projection math
-below).
+tested), the 478-point face mesh (extracted unconditionally since point 28 — previously gated behind
+the mesh overlay setting, now also consumed by the eyeBlink correction below, and MediaPipe computes
+these points internally regardless of whether the app reads them), and the analyzed image's own pixel
+dimensions (needed by the projection math below).
+
+**Eye blink reliability.** `tracking/EyeAspectRatio.kt` computes a geometric Eye Aspect Ratio (EAR)
+per eye from the landmark mesh (`EyeLandmarkIndices.LEFT_EYE`/`RIGHT_EYE`, confirmed against real
+`eyeBlinkLeft`/`eyeBlinkRight` device tests — see revue technique point 28/45, don't trust community
+tutorials' left/right convention blindly, it's inconsistent across sources). MediaPipe's own
+`eyeBlink` blendshape leaks between eyes (a deliberate wink on one side still raises the other eye's
+score) — `tracking/EyeBlinkCorrection.kt` (`correctEyeBlinkScores()`, called from
+`MainViewModel.handleTrackingResult()` before any sender/display consumes the blendshapes) damps a
+blendshape score when its EAR says the eye is still clearly open, confirmed on device to suppress
+cross-eye leakage without touching genuine closures. `EyeOpennessSmoother` adds asymmetric
+attack/release smoothing (instant on closing, ~3s time constant on reopening) — without it, a
+sustained held-shut eye collapsed back to "open" within ~9s because MediaPipe's own landmark tracking
+drifts during a held pose; confirmed on device that the smoothing fixes this. Diagnostic logging
+(`MainViewModel.EAR_DIAGNOSTIC_LOGGING`, tag `EarDiag`) is off by default, flip it back on to debug a
+future blink issue rather than re-deriving this from scratch.
 
 **Hot vs. cold Compose state.** `ui/MainViewModel.kt` deliberately splits state into two flows:
 `MainUiState` (settings/connection/calibration — changes at human interaction speed) and

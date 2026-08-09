@@ -62,7 +62,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 19 | Détection d'anomalie de calibrage (bouton rouge) | **✅ implémenté et vérifié sur device le 7 août 2026** (tous paliers testés), voir section dédiée -- seuils encore non calés sur un corpus d'usage réel, piste de retours utilisateurs notée pour plus tard |
 | 20 | Orientation grand écran / tablette | Constat documenté, aucune décision de mise en œuvre |
 | 21 | Tri en sous-écrans des réglages | **Implémenté sur `main`, voir point 26** (l'index le disait encore "aucun code écrit" par erreur) |
-| 28 | Fiabilisation du clignement des yeux avec lunettes | Toujours en discussion -- recherche EAR (Eye Aspect Ratio) faite le 9 août 2026, diagnostic temporaire ajouté et confirmé fonctionnel sur device, en attente du test réel avec/sans lunettes avant toute logique de fusion, voir section dédiée plus bas |
+| 28 | Fiabilisation du clignement des yeux | **✅ clos côté app le 9 août 2026** -- hypothèse lunettes de départ non reproduite, mais fuite gauche/droite et effondrement en tenue longue trouvés et corrigés (`EyeBlinkCorrection.kt`), et faiblesse de l'œil droit tracée à un éclairage physique inégal (pas un bug logiciel). Reste un réglage fin côté VBridger, hors périmètre du dépôt -- voir section dédiée plus bas |
 | 29 | Validation des traductions FR/EN | **✅ traité le 9 août 2026**, voir point 23 -- relu et validé par l'utilisateur (129 clés, tableau dédié). Pas une relecture par un locuteur natif au sens strict (l'utilisateur n'est natif d'aucune des deux langues), jugé suffisant pour le contexte -- voir la note honnête dans la section point 23 |
 | 30 | Sélecteur de langue dans l'app pour Android 11/12 | **✅ confirmé fonctionnel sur device le 9 août 2026** (`androidx.appcompat` 1.7.1 + `AppCompatDelegate.setApplicationLocales()`), FR/EN vérifiés en direct + persistance après redémarrage complet sur l'appareil Android 11 de test -- voir section dédiée plus bas |
 | 31 | CI cassée depuis le premier run (`gradlew` sans bit exécutable), puis silencieusement bloquée depuis | **✅ entièrement résolu le 7 août 2026** (commit `df640a4` pour `gradlew` ; cause du blocage silencieux trouvée le même jour -- budget Actions à 0 $, "Stop usage" actif -- corrigée et vérifiée par un run CI réussi), voir section dédiée plus bas |
@@ -1846,6 +1846,61 @@ shrinking, pas de l'optimisation désactivée ici.
 retombe désormais sur la clé debug (`app/build.gradle.kts`) -- seul moyen d'installer et de tester
 un build release minifié en local sans les vraies clés ; le workflow de publication
 (`release.yml`) a toujours les vraies variables, ce repli ne s'applique qu'en dev local.
+
+### 45. Fiabilisation du clignement des yeux (point 28) -- ✅ clos côté app, réglage fin restant côté VBridger
+
+Suite complète de la discussion/investigation du point 28 (ouvert le 6 août 2026 sur une hypothèse
+"lunettes", refermé le 9 août après plusieurs allers-retours de mesure réelle -- voir aussi le
+point 43 pour le sélecteur de langue traité juste avant dans la même journée). Trois problèmes
+réels trouvés et corrigés, un quatrième identifié comme n'étant pas un problème logiciel du tout.
+
+**Hypothèse de départ (lunettes) : ni confirmée ni réfutée proprement.** Premier test réel
+avec/sans lunettes (voir plus haut) : le blendshape `eyeBlinkLeft/Right` de MediaPipe répondait
+correctement dans les deux cas -- aucun cas net où les lunettes cassaient la détection. L'hypothèse
+d'origine a été abandonnée faute de reproduction, mais l'investigation a rebondi sur des problèmes
+réels et mesurables trouvés en cours de route, sans rapport direct avec les lunettes.
+
+**1. Fuite du blendshape d'un œil vers l'autre** -- mesuré : pendant un clin d'œil isolé,
+`eyeBlinkRight`/`eyeBlinkLeft` (l'œil censé rester ouvert) montait quand même à ~0,26-0,49, une
+plage qui chevauche les vraies fermetures (~0,43-0,49). Corrigé par `tracking/EyeBlinkCorrection.kt`
+(EAR utilisé comme garde-fou, pas comme remplacement) -- **confirmé sur device**.
+
+**2. Effondrement pendant une fermeture tenue plusieurs secondes** -- mesuré : le blendshape brut
+restait stable en tenant l'œil fermé, mais la correction s'effondrait progressivement vers 0 après
+quelques secondes (dérive du suivi de landmarks de MediaPipe sur une pose tenue, pas un vrai
+réouverture). Corrigé par `EyeOpennessSmoother` (lissage asymétrique attaque rapide/relâchement
+lent, 3s de constante de temps) -- **confirmé sur device**, la tenue résiste largement mieux
+(effondrement repoussé de ~9s à ~25s+ avant le correctif ne suffise plus).
+
+**3. Œil droit "à peine réactif" : pas un bug logiciel.** Sur toute une session de test (~17 min,
+plusieurs positions de caméra essayées), le ratio droit/gauche restait constant à ~0,50-0,60 quelle
+que soit la position -- signe d'un facteur constant, pas d'un problème de posture/angle. Hypothèse
+de l'utilisateur (lampe LED au-dessus, ombre trop marquée) confirmée en ajustant l'éclairage : le
+même relevé après correction montre un ratio ~0,90-1,10, l'asymétrie a disparu. **Aucune ligne de
+code n'a résolu ce point-là** -- c'était un problème d'éclairage physique du poste de
+l'utilisateur, pas de tracking.
+
+**4. Formule VBridger `EyeOpenLeft/Right`** -- trouvaille de l'utilisateur en cours de route :
+`.5 + (eyeBlink_X * -k) + (eyeWide_X * .8)`, qui n'atteint une fermeture complète que si
+`eyeBlink_X >= 0,5/k`. Les coefficients ajustés manuellement pendant la session (`1.0` gauche,
+`1.8` droite) avaient compensé un signal droit affaibli par le mauvais éclairage -- une fois la
+lumière corrigée, ces coefficients sont probablement devenus trop agressifs. **Reste un réglage
+fin côté VBridger, propre à la machine et à l'éclairage de l'utilisateur** -- hors du périmètre de
+ce dépôt (aucun code de l'app n'agit sur cette formule).
+
+**Outillage laissé en place** : `tracking/EyeAspectRatio.kt` et `tracking/EyeBlinkCorrection.kt`
+(purs, testés -- 5 + 13 tests JVM), correction active en permanence dans le pipeline d'envoi. Le
+log de diagnostic (`EarDiag`, `MainViewModel.EAR_DIAGNOSTIC_LOGGING`) désactivé par défaut
+maintenant que l'investigation est close, mais laissé dans le code (une ligne à repasser à `true`)
+pour un futur souci de clignement. La ligne EAR de `DiagnosticsScreen` reste affichée en
+permanence (plus qualifiée de "temporaire" dans les chaînes) -- coût négligeable, utile sans repasser
+par `adb logcat`.
+
+**Méthode de travail notable pour ce point** : quasiment tout le diagnostic s'est fait par mesure
+réelle sur device (logcat, avant/après précis) plutôt que par supposition -- y compris le rejet
+propre de l'hypothèse de départ (lunettes) quand elle ne s'est pas reproduite, et la découverte que
+la cause principale restante était physique (éclairage), pas logicielle. Cohérent avec la
+convention "don't guess" déjà suivie ailleurs dans ce document.
 
 ## Automatisation
 

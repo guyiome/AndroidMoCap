@@ -204,12 +204,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private companion object {
         private const val TAG = "MainViewModel"
 
-        // Diagnostic TEMPORAIRE (revue technique, point 28) : logue EAR + blendshape eyeBlink brut
-        // à chaque frame où des landmarks sont disponibles, pour comparer les deux signaux pendant
-        // un test manuel (clignement avec/sans lunettes) sans avoir à lire du texte minuscule à
-        // l'écran en même temps qu'on fixe la caméra -- lu via `adb logcat -s EarDiag`. À retirer
-        // une fois le point 28 tranché (garde ou non un vrai correcteur EAR).
-        private const val EAR_DIAGNOSTIC_LOGGING = true
+        // Diagnostic du point 28 (fiabilisation eyeBlink) -- logue EAR + blendshape brut/corrigé à
+        // chaque frame, lu via `adb logcat -s EarDiag`. A servi à diagnostiquer et confirmer trois
+        // correctifs réels (fuite gauche/droite, effondrement en tenue longue, et à isoler qu'un
+        // éclairage inégal -- pas le logiciel -- expliquait la faiblesse de l'œil droit, voir revue
+        // technique). Désactivé par défaut maintenant que l'investigation est close : remettre à
+        // `true` ponctuellement si un nouveau souci de clignement doit être diagnostiqué.
+        private const val EAR_DIAGNOSTIC_LOGGING = false
         private const val EAR_DIAG_TAG = "EarDiag"
 
         // Cadence du sondage de throttling thermique (voir startThermalPolling) -- doit rester

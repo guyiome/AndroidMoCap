@@ -48,8 +48,22 @@ fois le résultat MediaPipe reçu pour ce timestamp précis.
 `FaceLandmarkerHelper` tente d'abord le délégué GPU si `TierConfig.preferGpuDelegate`, et retombe
 sur CPU en cas d'échec d'initialisation. Sortie par frame (`FaceTrackingResult`) : liste des
 blendshapes (`BlendshapeScore`), matrice/angles de rotation de tête, angles de regard par œil
-(calculés en fonction pure, `computeEyeGazeDegrees`, testable en JVM), et le mesh de 478 points
-(extrait uniquement si un overlay en a besoin -- voir `setLandmarksNeeded`, coût évité sinon).
+(calculés en fonction pure, `computeEyeGazeDegrees`, testable en JVM), et le mesh de 478 points --
+extrait en permanence depuis le point 28 (avant, uniquement si l'overlay en avait besoin) : consommé
+aussi par la correction du clignement par EAR ci-dessous, et MediaPipe le calcule de toute façon en
+interne, coût de copie négligeable.
+
+**Fiabilisation du clignement (point 28/45)** : `tracking/EyeAspectRatio.kt` calcule un Eye Aspect
+Ratio géométrique par œil à partir du mesh (indices confirmés contre `eyeBlinkLeft`/`eyeBlinkRight`
+par test réel sur device, pas par convention de tutoriel). Le blendshape `eyeBlink` de MediaPipe
+fuyant d'un œil vers l'autre (mesuré sur device), `tracking/EyeBlinkCorrection.kt` atténue le score
+d'un œil quand son EAR indique qu'il est encore largement ouvert -- appliqué dans
+`MainViewModel.handleTrackingResult()` avant tout envoi réseau ou affichage. `EyeOpennessSmoother`
+lisse la remontée de l'EAR (attaque instantanée, relâchement sur ~3s) pour ne pas confondre une
+dérive du suivi de landmarks pendant une fermeture tenue avec une vraie réouverture -- confirmé sur
+device dans les deux cas (fuite atténuée, tenue longue préservée). Une troisième piste (œil droit
+peu réactif) s'est révélée être un problème d'éclairage physique, pas logiciel -- voir revue
+technique, point 45.
 
 Le bouton de calibrage (`MainHud`) se teinte en rouge si une dérive de la pose calibrée est détectée
 (visage au repos mais pose qui ne revient pas près de zéro, ou perte de détection du visage puis
@@ -203,10 +217,11 @@ rotation caméra elle-même. Aucune décision de mise en œuvre prise à ce jour
 
 **Budget batterie/chauffe** -- préoccupation centrale de plusieurs choix d'implémentation : pool de
 bitmaps, throttling du débit par palier, mode économie d'énergie qui coupe l'aperçu affiché sans
-couper le tracking, extraction du mesh 478 points évitée quand l'overlay est inactif. Toute
-fonctionnalité ajoutée (notamment les cascades de détection expérimentales, revue technique points
-15/16) doit être évaluée à cette aune, avec un avertissement utilisateur prévu si l'appareil montre
-des signes de throttling.
+couper le tracking. L'extraction du mesh 478 points est passée à "toujours actif" au point 28 (avant,
+évitée quand l'overlay était inactif) -- jugé négligeable, MediaPipe calculant ces points en interne
+de toute façon. Toute fonctionnalité ajoutée (notamment les cascades de détection expérimentales,
+revue technique points 15/16) doit être évaluée à cette aune, avec un avertissement utilisateur prévu
+si l'appareil montre des signes de throttling.
 
 **Cycle de vie** -- capteurs (orientation, batterie) et initialisation du tracking alignés sur le
 cycle de vie réel de l'Activity (`ON_START`/`ON_STOP`), pas seulement sur la composition Compose,
