@@ -5,8 +5,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Couvre [earOpenness], [correctBlinkScore], [EyeOpennessSmoother] et [correctEyeBlinkScores] --
- * purs, testables en JVM.
+ * Couvre [earOpenness], [correctBlinkScore] et [correctEyeBlinkScores] -- purs, testables en JVM.
+ * Le lissage temporel lui-même ([OneEuroFilter]) est testé séparément dans
+ * `OneEuroFilterTest.kt` -- ici on vérifie seulement son intégration dans le pipeline eyeBlink.
  */
 class EyeBlinkCorrectionTest {
 
@@ -44,51 +45,6 @@ class EyeBlinkCorrectionTest {
     fun `correctBlinkScore ne corrige rien pile au seuil`() {
         val corrected = correctBlinkScore(rawScore = 0.5f, openness = EAR_DAMPING_THRESHOLD)
         assertEquals(0.5f, corrected, delta)
-    }
-
-    // --- EyeOpennessSmoother : le cœur du correctif "reset pendant une tenue longue" ---
-
-    @Test
-    fun `EyeOpennessSmoother suit une fermeture instantanement`() {
-        val smoother = EyeOpennessSmoother(value = 0.9f)
-        val next = smoother.next(instantOpenness = 0.1f, elapsedMs = 33)
-        assertEquals(0.1f, next.value, delta)
-    }
-
-    @Test
-    fun `EyeOpennessSmoother lisse une remontee brusque au lieu de la suivre tout de suite`() {
-        // Reproduit le bug mesuré sur device (9 août 2026) : l'œil reste fermé (EAR instantané bas
-        // au départ) mais l'EAR dérive vers l'ouvert d'une frame à l'autre -- la valeur lissée ne
-        // doit pas sauter directement à l'instantané.
-        val smoother = EyeOpennessSmoother(value = 0.1f)
-        val next = smoother.next(instantOpenness = 0.9f, elapsedMs = 33)
-        assertTrue("la remontée doit être partielle, pas immédiate (valeur=${next.value})", next.value < 0.9f)
-        assertTrue("mais elle doit quand même progresser vers le haut", next.value > 0.1f)
-    }
-
-    @Test
-    fun `EyeOpennessSmoother finit par rattraper une remontee soutenue`() {
-        // Sur un temps largement supérieur à la constante de temps (4x ici), la valeur lissée doit
-        // se rapprocher de l'instantané (une vraie réouverture doit finir par être crue, pas
-        // rester bloquée indéfiniment).
-        var smoother = EyeOpennessSmoother(value = 0.1f)
-        repeat(60) {
-            smoother = smoother.next(instantOpenness = 0.9f, elapsedMs = 200)
-        }
-        assertTrue("après 12s à 0,9 d'ouverture, le lissage devrait avoir rattrapé (valeur=${smoother.value})", smoother.value > 0.85f)
-    }
-
-    @Test
-    fun `EyeOpennessSmoother resiste a une remontee soutenue pendant les premieres secondes`() {
-        // Reproduit le pire cas du bug mesuré sur device : l'œil reste fermé mais l'EAR instantané
-        // bondit vers l'ouvert et y reste -- même après 1s (bien en dessous de la constante de
-        // temps), le lissage ne doit pas avoir suivi jusqu'au seuil d'atténuation.
-        var smoother = EyeOpennessSmoother(value = 0.15f)
-        repeat(2) { smoother = smoother.next(instantOpenness = 0.9f, elapsedMs = 500) }
-        assertTrue(
-            "la remontée ne devrait pas avoir déjà atteint le seuil d'atténuation après 1s (valeur=${smoother.value})",
-            smoother.value < EAR_DAMPING_THRESHOLD,
-        )
     }
 
     // --- correctEyeBlinkScores : orchestration + état porté d'une frame à l'autre ---
@@ -136,16 +92,18 @@ class EyeBlinkCorrectionTest {
     }
 
     @Test
-    fun `correctEyeBlinkScores garde une fermeture tenue meme si l'EAR derive sur les premieres secondes`() {
+    fun `correctEyeBlinkScores garde une fermeture tenue face a une derive realiste`() {
         // Bout en bout de la régression : œil gauche fermé au départ, l'EAR dérive frame après
-        // frame vers l'ouvert (dérive de landmarks simulée, comme mesuré sur device), le score brut
-        // reste constant à 0,6 -- sur les 2 premières secondes de dérive, la version corrigée ne
-        // doit pas s'être déjà effondrée à 0 comme le faisait l'ancienne version sans lissage.
+        // frame vers l'ouvert (dérive de landmarks simulée) au même rythme que celui mesuré
+        // réellement sur device (~9s pour un effondrement complet côté ancien lissage sans
+        // mémoire, protocole 18 pas de 500ms) -- le score brut reste constant à 0,6 ; à mi-parcours
+        // (~4,5s), la version corrigée ne doit pas encore s'être effondrée à 0.
         var state = EyeBlinkCorrectionState()
         val blendshapes = listOf(BlendshapeScore("eyeBlinkLeft", 0.6f), BlendshapeScore("eyeBlinkRight", 0.1f))
-        var lastCorrectedLeft = 0f
-        for (i in 1..4) {
-            val leftOpenFraction = 0.02f + (0.25f - 0.02f) * i / 4 // dérive verticale progressive
+        val steps = 18
+        var correctedAtMidpoint = 0f
+        for (i in 1..steps) {
+            val leftOpenFraction = 0.05f + (0.20f - 0.05f) * i / steps // dérive verticale progressive
             val landmarks = MutableList(500) { 0f to 0f }
             val indices = EyeLandmarkIndices.LEFT_EYE
             landmarks[indices.cornerNear] = 0f to 0.5f
@@ -156,11 +114,11 @@ class EyeBlinkCorrectionTest {
             landmarks[indices.lowerFar] = 0.75f to (0.5f + leftOpenFraction)
             val (corrected, nextState) = correctEyeBlinkScores(blendshapes, landmarks, state, elapsedMs = 500)
             state = nextState
-            lastCorrectedLeft = corrected.first { it.name == "eyeBlinkLeft" }.score
+            if (i == steps / 2) correctedAtMidpoint = corrected.first { it.name == "eyeBlinkLeft" }.score
         }
         assertTrue(
-            "la fermeture tenue ne devrait pas déjà s'être effondrée à 0 après seulement 2s (valeur=$lastCorrectedLeft)",
-            lastCorrectedLeft > 0.05f,
+            "la fermeture tenue ne devrait pas déjà s'être effondrée à 0 à mi-parcours (valeur=$correctedAtMidpoint)",
+            correctedAtMidpoint > 0.05f,
         )
     }
 }

@@ -77,7 +77,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 40 | Indicateur visuel "connexion en cours" sur l'écran principal | **✅ confirmé fonctionnel sur device le 8 août 2026** pour iFacialMocap et VTube Studio (VMC non observable en pratique -- fenêtre trop brève, comportement attendu, pas un bug) -- bug corrigé au passage (l'icône ne passait jamais au vert pour VTube Studio), voir section dédiée plus bas |
 | 41 | Traduction des blendshapes ARKit pour éviter le remapping manuel (VRM/Blender, VTube Studio) | Backlog, faisabilité étudiée le 8 août 2026 -- Blender/VRM déjà bon (convention "Perfect Sync"), VTube Studio jugé viable avec les formules VBridger (`AdvancedARKitSettings`) comme point de départ, OVR non exploré, voir section dédiée plus bas |
 | 42 | Résolution caméra adaptée au palier (issue GitHub #7) | **✅ implémenté et issue fermée le 9 août 2026** (`ResolutionSelector`, 640x480, `STANDARD`/`COMPATIBLE`), confirmé appliqué sur device -- ⚠️ test thermique A/B mené sur deux appareils, résultat inconclusif/contradictoire, fermeture actant le code fait, pas un gain démontré, voir section dédiée plus bas |
-| 46 | Lissage générique des signaux (One Euro Filter) | Comparatif fait (EMA fixe/One Euro/Kalman/Savitzky-Golay/Half Pound Filter) le 9 août 2026, `tracking/OneEuroFilter.kt` construit et testé -- **outil prêt, intégration (remplacement d'`EyeOpennessSmoother`, lissage général des blendshapes) pas encore faite**, voir section dédiée plus bas |
+| 46 | Lissage générique des signaux (One Euro Filter) | **✅ intégré et confirmé sur device le 9 août 2026** -- remplace `EyeOpennessSmoother` dans `EyeBlinkCorrection.kt`, tenue de 9s testée sans dégradation visible (mieux que l'ancien lissage sur la même durée). Reste ouvert : lissage général des 52 blendshapes bruts, pas traité ici, voir section dédiée plus bas |
 | 47 | Optimisation lumière côté app | En discussion (9 août 2026) -- mis de côté volontairement après le point 28/45 (le vrai problème rencontré était une ombre directionnelle, réglée physiquement ; compensation d'exposition jugée peu utile pour ce cas précis), aucun code écrit |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
@@ -1950,10 +1950,21 @@ données.
 8 tests) -- implémentation standard de l'algorithme (dérivée lissée à coupure fixe `dCutoff`,
 coupure adaptative `minCutoff + beta·|dérivée lissée|`, coefficient de lissage `r/(r+1)` avec
 `r = 2π·coupure·Δt`), basée sur le temps réel écoulé entre appels comme le reste des filtres du
-projet. **Outil construit et testé, pas encore intégré** -- prochaines étapes (décidées mais pas
-encore faites) : remplacer `EyeOpennessSmoother` par lui dans `EyeBlinkCorrection.kt` (revalider sur
-device), puis étudier un lissage général des 52 blendshapes bruts à la source -- plus gros chantier
-de réglage par catégorie, traité séparément.
+projet.
+
+**Intégré le même jour** : `EyeOpennessSmoother` retiré, `EyeBlinkCorrectionState` porte désormais
+un `OneEuroFilter` par œil (`minCutoff = 0,5`, `beta = 5` -- point de départ raisonné à partir des
+vitesses mesurées, pas encore affiné plus finement). **✅ confirmé sur device** avec un résultat net
+: sur une tenue de ~9s (le même protocole de test que pour valider l'ancien lissage), le score
+corrigé suit le brut quasiment sans écart du début à la fin -- alors que l'ancien `EyeOpennessSmoother`
+montrait déjà une dégradation visible sur cette même durée. La fuite gauche/droite reste bien
+atténuée en parallèle. Cohérent avec le raisonnement qui a motivé le choix : une dérive lente
+(vitesse faible) reçoit une coupure basse donc un fort lissage résistant, un vrai clignement
+(vitesse élevée) fait remonter la coupure et traverse sans retard.
+
+**Reste ouvert, pas traité maintenant** : lissage général des 52 blendshapes bruts à la source
+(au-delà des seuls yeux) -- plus gros chantier de réglage par catégorie de blendshape, décidé comme
+prochaine étape mais volontairement pas fait dans la foulée.
 
 ## Automatisation
 

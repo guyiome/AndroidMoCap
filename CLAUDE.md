@@ -114,11 +114,14 @@ tutorials' left/right convention blindly, it's inconsistent across sources). Med
 score) — `tracking/EyeBlinkCorrection.kt` (`correctEyeBlinkScores()`, called from
 `MainViewModel.handleTrackingResult()` before any sender/display consumes the blendshapes) damps a
 blendshape score when its EAR says the eye is still clearly open, confirmed on device to suppress
-cross-eye leakage without touching genuine closures. `EyeOpennessSmoother` adds asymmetric
-attack/release smoothing (instant on closing, ~3s time constant on reopening) — without it, a
-sustained held-shut eye collapsed back to "open" within ~9s because MediaPipe's own landmark tracking
-drifts during a held pose; confirmed on device that the smoothing fixes this. Diagnostic logging
-(`MainViewModel.EAR_DIAGNOSTIC_LOGGING`, tag `EarDiag`) is off by default, flip it back on to debug a
+cross-eye leakage without touching genuine closures. The EAR openness signal is smoothed by
+`tracking/OneEuroFilter.kt` (Casiez, Roussel & Vogel, CHI 2012 — adaptive-cutoff low-pass, general
+reusable utility, see revue technique point 46 for why it was picked over Kalman/Savitzky-Golay/a
+fixed EMA) before being used to damp: without smoothing, a sustained held-shut eye collapsed back to
+"open" within ~9s because MediaPipe's own landmark tracking drifts during a held pose; confirmed on
+device that the filter fixes this (a 9s hold now tracks the raw score with no visible decay).
+Diagnostic logging (`MainViewModel.EAR_DIAGNOSTIC_LOGGING`, tag `EarDiag`) is off by default, flip it
+back on to debug a
 future blink issue rather than re-deriving this from scratch.
 
 **Hot vs. cold Compose state.** `ui/MainViewModel.kt` deliberately splits state into two flows:
