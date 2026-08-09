@@ -1614,3 +1614,19 @@ d'abord" de ce document), issues ouvertes, et un audit léger façon "regard ext
 (recherche grossière de secrets committés par erreur). Ne committe ni ne pousse jamais rien --
 seulement un rapport. Le point 31 ci-dessus est sa première trouvaille concrète. Gérée depuis
 https://claude.ai/code/routines (id `trig_01AnKSNF9qEMC3hom1eegjow`), pas depuis ce dépôt.
+
+**Run du 8 août 2026 (soir)** : dépôt sain, aucune divergence local/origin, CI verte, aucun secret
+détecté sur les 25 derniers commits. Deux trouvailles actionnées manuellement le lendemain (le
+sandbox de la routine n'a pas d'accès `gh`/API pour agir directement, seulement pour observer) :
+- **PR #5** (Dependabot, MediaPipe 0.10.35 -> 1.0.0) fermée sans merge -- déjà reproduite localement
+  depuis le 7 août (`mediapipeTasksVision = "1.0.0"`), convention "local d'abord" de ce document.
+- **Issue #3** (finaliser la fusion ARCore) fermée -- confirmée fonctionnelle sur device depuis le
+  6 août (point 3/13), l'issue décrivait un état antérieur ("non testé sur device", "à ne pas
+  merger avant vérification") entièrement dépassé.
+- **Issue #1** (thermal throttling + résolution caméra par palier) volontairement **laissée
+  ouverte** malgré la suggestion initiale de la routine ("probablement à fermer") : l'issue couvre
+  deux sujets distincts, et seul le premier (throttling thermique, point 34) est fait. Le second
+  (`ImageAnalysis.Builder()` ne fixe aucune résolution cible selon le palier) est toujours vrai --
+  vérifié directement dans `CameraController.kt` avant de fermer quoi que ce soit, plutôt que de se
+  fier à la suggestion de la routine. Reste à traiter ou à reformuler pour ne garder que la partie
+  encore ouverte.
