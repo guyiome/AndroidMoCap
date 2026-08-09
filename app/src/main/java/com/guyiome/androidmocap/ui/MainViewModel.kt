@@ -280,10 +280,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var calibrationAnomalyState = CalibrationAnomalyState.INITIAL
     private var previousBlendshapesForAnomaly: List<BlendshapeScore> = emptyList()
     // Correction eyeBlinkLeft/Right par EAR (tracking/EyeBlinkCorrection.kt, revue technique point
-    // 28) -- porte le lissage "attaque rapide / relâchement lent" d'une frame à l'autre.
+    // 28) -- porte le OneEuroFilter (point 46) à coupure adaptative d'une frame à l'autre.
     // eyeBlinkCorrectionLastTimestampMs sert à calculer le temps réellement écoulé entre deux
     // frames (pas un compte de frames) : le lissage doit avoir la même durée réelle quel que soit
-    // le palier/débit courant, voir kdoc de EyeOpennessSmoother.
+    // le palier/débit courant, voir kdoc d'OneEuroFilter.
     private var eyeBlinkCorrectionState = EyeBlinkCorrectionState()
     private var eyeBlinkCorrectionLastTimestampMs: Long? = null
     private var calibrationCountdownJob: Job? = null
@@ -679,8 +679,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // supposé), l'EAR (géométrique, indépendant du classifieur ML) fuit beaucoup moins dans
         // les mêmes conditions -- utilisé ici pour atténuer les fuites plutôt que remplacer le
         // blendshape. Temps écoulé depuis la frame précédente (pas un compte de frames) pour que le
-        // lissage de EyeOpennessSmoother ait la même durée réelle quel que soit le débit courant ;
-        // 0 par défaut pour la toute première frame (pas de remontée à lisser, rien à corriger).
+        // lissage du OneEuroFilter (point 46) ait la même durée réelle quel que soit le débit
+        // courant ; 0 par défaut pour la toute première frame (pas de remontée à lisser, rien à corriger).
         val elapsedMs = eyeBlinkCorrectionLastTimestampMs?.let { calibrated.timestampMs - it } ?: 0L
         eyeBlinkCorrectionLastTimestampMs = calibrated.timestampMs
         val (correctedBlendshapes, nextEyeBlinkCorrectionState) = correctEyeBlinkScores(
