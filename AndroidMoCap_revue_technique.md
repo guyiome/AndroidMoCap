@@ -63,7 +63,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 20 | Orientation grand écran / tablette | Constat documenté, aucune décision de mise en œuvre |
 | 21 | Tri en sous-écrans des réglages | **Implémenté sur `main`, voir point 26** (l'index le disait encore "aucun code écrit" par erreur) |
 | 28 | Fiabilisation du clignement des yeux avec lunettes | Idée de conception ouverte le 6 août 2026, voir section dédiée plus bas -- aucun code écrit |
-| 29 | Validation des traductions FR/EN par locuteurs natifs | Backlog, voir point 23 -- **deux passes de self-review faites** (6 août, commit `1b0030a`, 86 clés ; 7 août, clés des points 32-35, incohérence de style corrigée entre les puces ARCore/GPU et thermique), mais aucune relecture par un locuteur natif à ce jour, ni en français ni en anglais |
+| 29 | Validation des traductions FR/EN | **✅ traité le 9 août 2026**, voir point 23 -- relu et validé par l'utilisateur (129 clés, tableau dédié). Pas une relecture par un locuteur natif au sens strict (l'utilisateur n'est natif d'aucune des deux langues), jugé suffisant pour le contexte -- voir la note honnête dans la section point 23 |
 | 30 | Sélecteur de langue dans l'app pour Android 11/12 | **✅ confirmé fonctionnel sur device le 9 août 2026** (`androidx.appcompat` 1.7.1 + `AppCompatDelegate.setApplicationLocales()`), FR/EN vérifiés en direct + persistance après redémarrage complet sur l'appareil Android 11 de test -- voir section dédiée plus bas |
 | 31 | CI cassée depuis le premier run (`gradlew` sans bit exécutable), puis silencieusement bloquée depuis | **✅ entièrement résolu le 7 août 2026** (commit `df640a4` pour `gradlew` ; cause du blocage silencieux trouvée le même jour -- budget Actions à 0 $, "Stop usage" actif -- corrigée et vérifiée par un run CI réussi), voir section dédiée plus bas |
 | 32 | Panneau de blendshapes du HUD : tongueOut disparaissait, noms masqués par le bandeau système | **✅ corrigés et vérifiés sur device le 7 août 2026**, voir section dédiée plus bas |
@@ -525,6 +525,16 @@ de repli universel. Aucun code bloquant, juste une relecture de contenu.
 
 **Reste ouvert** : la repasse visuelle sur device (les deux langues, sur chaque écran) -- seule étape
 qui dépendait d'un accès device, comme anticipé.
+
+**Mise à jour (9 août 2026) : relecture faite -- par le porteur du projet, pas un locuteur natif.**
+Tableau des 129 clés FR/EN (groupées par écran) généré et transmis pour relecture manuelle ; retour
+de l'utilisateur : chaînes validées. À noter précisément pour ne pas surreprésenter cette étape :
+l'utilisateur n'est natif d'aucune des deux langues (mais a un bon niveau d'anglais, et jugé "pas de
+la littérature, largement suffisant" pour ce contexte) -- ce n'est donc pas la relecture par un
+locuteur natif envisagée à l'origine, plutôt une validation de bon sens par la personne la mieux
+placée pour juger si le ton/la clarté conviennent à l'app. Repasse visuelle sur device (§ ci-dessus)
+faite dans les faits au passage, à plusieurs reprises, lors des sessions de test device de cette
+semaine (points 30, 8...), sans qu'aucune incohérence d'affichage FR/EN n'ait été relevée.
 
 ## Priorités suggérées (mise à jour)
 
