@@ -76,6 +76,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 39 | VTube Studio ne reçoit probablement pas VMC/OSC -- intégration directe via son API Plugin | **✅ Validé de bout en bout sur device le 8 août 2026** (WebSocket/nv-websocket-client + kotlinx.serialization -- OkHttp abandonné, incompatible avec le serveur `websocket-sharp` de VTube Studio) -- connexion, popup d'autorisation, création des paramètres, réception confirmés fonctionnels, voir section dédiée plus bas |
 | 40 | Indicateur visuel "connexion en cours" sur l'écran principal | **✅ confirmé fonctionnel sur device le 8 août 2026** pour iFacialMocap et VTube Studio (VMC non observable en pratique -- fenêtre trop brève, comportement attendu, pas un bug) -- bug corrigé au passage (l'icône ne passait jamais au vert pour VTube Studio), voir section dédiée plus bas |
 | 41 | Traduction des blendshapes ARKit pour éviter le remapping manuel (VRM/Blender, VTube Studio) | Backlog, faisabilité étudiée le 8 août 2026 -- Blender/VRM déjà bon (convention "Perfect Sync"), VTube Studio jugé viable avec les formules VBridger (`AdvancedARKitSettings`) comme point de départ, OVR non exploré, voir section dédiée plus bas |
+| 42 | Résolution caméra adaptée au palier (issue GitHub #7) | **✅ implémenté le 9 août 2026** (`ResolutionSelector`, 640x480, `STANDARD`/`COMPATIBLE`), confirmé appliqué sur device -- ⚠️ test thermique A/B mené sur deux appareils, résultat inconclusif/contradictoire, aucun bénéfice mesurable démontré, voir section dédiée plus bas |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -1257,7 +1258,44 @@ Statut : pas de correctif tenté à l'aveugle. Prochaine étape si ça se reprod
 continue pendant le lag (même méthode que les crashs diagnostiqués au point 13), pour voir si ARCore
 ou le driver GL logge un warning au moment où ça ralentit, plutôt que deviner davantage.
 
-### 41. Traduction des blendshapes ARKit pour éviter le remapping manuel (VRM/Blender, VTube Studio) -- backlog, faisabilité étudiée le 8 août 2026
+### 42. Résolution caméra adaptée au palier (issue GitHub #7) -- ✅ implémenté, bénéfice thermique non confirmé
+
+Scindé de l'issue #1 (voir "Automatisation" plus bas) : `ImageAnalysis.Builder()` ne fixait aucune
+résolution cible, CameraX choisissant sa résolution par défaut quel que soit le palier. Concerne
+uniquement `STANDARD`/`COMPATIBLE` (`CameraController`, CameraX) -- `OPTIMAL` pilote sa propre
+capture via ARCore (`ArCoreHeadPoseTracker`), hors de ce fichier.
+
+**Implémenté** : `ResolutionSelector`/`ResolutionStrategy` (API courante depuis CameraX 1.3, pas
+l'ancien `setTargetResolution()` déprécié) ciblant `640x480`, `FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER`.
+Une seule valeur pour les deux paliers plutôt que différenciée : MediaPipe Face Landmarker recadre
+et redimensionne l'image en interne quelle que soit sa résolution d'entrée (doc officielle) -- au
+délà d'un certain point, plus de pixels n'apporte donc aucune précision de détection
+supplémentaire, seulement du coût de décodage/copie en amont. Aucune source fiable trouvée pour la
+taille d'entrée interne exacte du modèle Android utilisé -- 640x480 choisi comme valeur standard
+généreuse plutôt qu'un chiffre "optimal" inventé.
+
+**Confirmé sur device (9 août 2026)** : résolution `640x480` bien retenue par CameraX en palier
+`STANDARD` (`ImageAnalysis.resolutionInfo`, loggée), correspond exactement à la cible demandée
+(l'appareil de test la supporte nativement, aucun repli déclenché).
+
+**Test thermique A/B mené sur deux appareils en parallèle (téléphone ASUS + tablette XPPen
+MDP1221, celle-ci fonctionnant aussi pour le tracking en palier `STANDARD`)** : `git stash`/`pop`
+pour bâtir "avant" (sans le correctif) et "après" (avec), 5 minutes de tracking actif par
+condition, températures relevées via `dumpsys thermalservice` (capteurs CPU/GPU/NPU/peau/batterie,
+sans root). **Résultat inconclusif, voire contradictoire** : le capteur "peau" (le plus
+représentatif du ressenti utilisateur) s'améliore sur les deux appareils (téléphone : delta
++3,42°C -> +2,45°C ; tablette : +7,13°C -> +3,53°C, net), mais les capteurs CPU/GPU/NPU vont dans
+l'autre sens, parfois franchement sur la tablette (delta quasiment doublé). Incohérence interne
+qui sent la variabilité de mesure (un seul run par condition, pièce non contrôlée, historique
+thermique différent entre les deux runs) plutôt qu'un vrai signal exploitable. Hypothèse
+plausible : ce correctif n'économise que le décodage/copie *avant* MediaPipe, pas l'inférence
+elle-même (le vrai gros du coût CPU/GPU/NPU) -- l'effet réel est peut-être simplement trop petit
+pour ressortir proprement de ce protocole.
+
+**Statut honnête** : le correctif fait ce qu'il annonce (résolution effectivement plus petite,
+confirmé), reste justifié sur le principe (moins de décodage/copie, zéro perte de précision côté
+MediaPipe), mais **aucun bénéfice thermique mesurable démontré** avec ce protocole -- pas présenté
+comme un gain confirmé, contrairement au reste du travail "confirmé sur device" de cette session.
 
 Question posée après validation du point 39 : peut-on traduire les 52 blendshapes ARKit pour
 correspondre exactement à ce qu'attendent différents récepteurs, plutôt que de compter sur un

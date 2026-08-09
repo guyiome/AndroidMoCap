@@ -8,10 +8,13 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.os.SystemClock
 import android.util.Log
+import android.util.Size
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
@@ -47,6 +50,22 @@ class CameraController(
         // quasiment jamais avoir plus d'une frame de retard en LIVE_STREAM, 3 laisse une marge de
         // sécurité sans risquer une file qui grossit indéfiniment si le device peine.
         private const val MAX_TRACKED_BITMAPS = 3
+
+        // Résolution demandée pour l'analyse ImageAnalysis (donc CameraX/MediaPipe -- n'affecte pas
+        // l'aperçu affiché à l'écran, un usage caméra séparé) -- palier STANDARD/COMPATIBLE
+        // uniquement, revue technique issue #7 (OPTIMAL utilise sa propre capture caméra ARCore,
+        // hors de ce fichier). MediaPipe recadre et redimensionne l'image en interne quelle que soit
+        // sa résolution d'entrée (doc officielle Face Landmarker) -- au-delà d'un certain point, plus
+        // de pixels ne rapporte donc aucune précision de détection en plus, seulement du coût pur
+        // (décodage, copie/rotation du bitmap déjà identifiée comme point chaud, mémoire). Valeur
+        // volontairement la même pour les deux paliers plutôt que différenciée -- MediaPipe recadrant
+        // de toute façon, un chiffre plus petit sur COMPATIBLE ne changerait pas la précision, juste
+        // le coût, et une seule valeur reste plus simple. Choix pragmatique : une résolution CameraX
+        // courante et clairement généreuse, pas un chiffre "optimal" -- aucune source fiable trouvée
+        // pour la taille d'entrée interne exacte du modèle Android utilisé ici. Estimation à ajuster
+        // sur device (mesurer le coût par frame avant/après plutôt que deviner plus loin), même
+        // traitement que les autres seuils non calés sur device de ce projet.
+        private val CAMERA_ANALYSIS_TARGET_RESOLUTION = Size(640, 480)
 
         /**
          * Dimensions (largeur, hauteur) du bitmap final une fois la rotation caméra appliquée --
@@ -139,15 +158,29 @@ class CameraController(
     private fun bindImageAnalysis() {
         val provider = cameraProvider ?: return
         if (imageAnalysis != null) return
+        // ResolutionStrategy, pas l'ancien setTargetResolution() (déprécié depuis CameraX 1.3, voir
+        // CAMERA_ANALYSIS_TARGET_RESOLUTION) -- FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER accepte la
+        // résolution supportée la plus proche dans un sens ou l'autre plutôt que d'exiger une
+        // correspondance exacte (rarement disponible telle quelle selon l'appareil).
+        val resolutionSelector = ResolutionSelector.Builder()
+            .setResolutionStrategy(
+                ResolutionStrategy(CAMERA_ANALYSIS_TARGET_RESOLUTION, ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER)
+            )
+            .build()
         val analysis = ImageAnalysis.Builder()
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .setResolutionSelector(resolutionSelector)
             .build()
             .also { it.setAnalyzer(cameraExecutor) { imageProxy -> processFrame(imageProxy) } }
 
         try {
             provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_FRONT_CAMERA, analysis)
             imageAnalysis = analysis
+            // Résolution réellement retenue par CameraX (peut différer de la cible demandée selon
+            // ce que l'appareil supporte, voir FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER ci-dessus) --
+            // logué pour vérifier sur device sans deviner (revue technique, issue #7).
+            Log.i(TAG, "ImageAnalysis lié, résolution retenue : ${analysis.resolutionInfo?.resolution}")
         } catch (e: Exception) {
             Log.e(TAG, "Échec de bind CameraX (analyse)", e)
             onError(context.getString(R.string.error_camera_analysis_bind_failed, e.message ?: ""))
