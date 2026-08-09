@@ -33,6 +33,7 @@ import com.guyiome.androidmocap.settings.DEFAULT_POWER_SAVE_DELAY_SECONDS
 import com.guyiome.androidmocap.tracking.ArCoreHeadPoseTracker
 import com.guyiome.androidmocap.tracking.BlendshapeScore
 import com.guyiome.androidmocap.tracking.CalibrationAnomalyState
+import com.guyiome.androidmocap.tracking.EyeBlinkCorrectionState
 import com.guyiome.androidmocap.tracking.FaceLandmarkerHelper
 import com.guyiome.androidmocap.tracking.correctEyeBlinkScores
 import com.guyiome.androidmocap.tracking.FaceTrackingResult
@@ -268,6 +269,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // blendshapes dans cette classe.
     private var calibrationAnomalyState = CalibrationAnomalyState.INITIAL
     private var previousBlendshapesForAnomaly: List<BlendshapeScore> = emptyList()
+    // Correction eyeBlinkLeft/Right par EAR (tracking/EyeBlinkCorrection.kt, revue technique point
+    // 28) -- porte le lissage "attaque rapide / relâchement lent" d'une frame à l'autre.
+    // eyeBlinkCorrectionLastTimestampMs sert à calculer le temps réellement écoulé entre deux
+    // frames (pas un compte de frames) : le lissage doit avoir la même durée réelle quel que soit
+    // le palier/débit courant, voir kdoc de EyeOpennessSmoother.
+    private var eyeBlinkCorrectionState = EyeBlinkCorrectionState()
+    private var eyeBlinkCorrectionLastTimestampMs: Long? = null
     private var calibrationCountdownJob: Job? = null
     // Minuteur d'inactivité avant bascule automatique en mode éco -- annulé/reprogrammé à chaque
     // toucher de l'écran (voir onUserInteraction) et à chaque changement de réglage.
@@ -623,12 +631,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // fuit d'un œil vers l'autre pendant un clin d'œil isolé (mesuré sur device -- pas
         // supposé), l'EAR (géométrique, indépendant du classifieur ML) fuit beaucoup moins dans
         // les mêmes conditions -- utilisé ici pour atténuer les fuites plutôt que remplacer le
-        // blendshape. Appliquée après la détection d'anomalie de calibrage ci-dessous (qui reste
-        // sur les scores bruts, sans rapport avec cette correction) mais avant tout ce qui
-        // consomme les blendshapes en aval (affichage, envoi réseau).
-        val corrected = calibrated.copy(
-            blendshapes = correctEyeBlinkScores(calibrated.blendshapes, calibrated.faceLandmarks),
+        // blendshape. Temps écoulé depuis la frame précédente (pas un compte de frames) pour que le
+        // lissage de EyeOpennessSmoother ait la même durée réelle quel que soit le débit courant ;
+        // 0 par défaut pour la toute première frame (pas de remontée à lisser, rien à corriger).
+        val elapsedMs = eyeBlinkCorrectionLastTimestampMs?.let { calibrated.timestampMs - it } ?: 0L
+        eyeBlinkCorrectionLastTimestampMs = calibrated.timestampMs
+        val (correctedBlendshapes, nextEyeBlinkCorrectionState) = correctEyeBlinkScores(
+            calibrated.blendshapes,
+            calibrated.faceLandmarks,
+            eyeBlinkCorrectionState,
+            elapsedMs,
         )
+        eyeBlinkCorrectionState = nextEyeBlinkCorrectionState
+        val corrected = calibrated.copy(blendshapes = correctedBlendshapes)
 
         // Détection d'anomalie de calibrage (voir tracking/CalibrationAnomaly.kt, revue technique
         // point 19) -- gardée derrière isCalibrated : avant le tout premier calibrage, "proche de
