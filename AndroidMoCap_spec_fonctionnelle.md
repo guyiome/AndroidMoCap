@@ -4,7 +4,7 @@
 de décisions. Pour le raisonnement derrière chaque choix et les évolutions en cours de réflexion,
 voir `AndroidMoCap_revue_technique.md` (qui garde ce rôle de journal + backlog). Pour l'architecture
 et les choix d'implémentation, voir `AndroidMoCap_spec_technique.md`. Dernière mise à jour :
-8 août 2026.*
+9 août 2026.*
 
 ## 1. Présentation générale
 
@@ -117,10 +117,14 @@ Le téléphone et le PC receveur doivent être sur le même réseau Wi-Fi local 
 - **Navigation** : chaque écran superposé (réglages et ses 4 catégories, sélection des blendshapes)
   se ferme via une flèche retour standard, le bouton retour matériel, ou le geste de balayage
   système (predictive back, Android 13+) -- les trois déclenchent la même action.
-- **Langue** : interface disponible en français (défaut) et anglais, choix via le sélecteur de
-  langue par app du système (réglages Android, Android 13+). Les noms de blendshapes ARKit
-  (`jawOpen`, `mouthSmileLeft`...) restent en anglais technique quelle que soit la langue choisie --
-  ce sont des identifiants de protocole, pas du texte d'affichage.
+- **Langue** : interface disponible en français (défaut) et anglais. Deux façons de la choisir,
+  toutes deux confirmées fonctionnelles sur device : le sélecteur système par app (réglages Android,
+  Android 13+ seulement), ou un sélecteur **dans l'app** (Affichage & confort > "Langue de l'app" --
+  "Suivre le système" / "Français" / "English"), qui fonctionne sur toutes les versions d'Android et
+  mémorise le choix automatiquement d'un lancement à l'autre. Changer la langue depuis ce sélecteur
+  ferme l'écran de réglages en cours (retour à l'écran principal) le temps d'appliquer le changement.
+  Les noms de blendshapes ARKit (`jawOpen`, `mouthSmileLeft`...) restent en anglais technique quelle
+  que soit la langue choisie -- ce sont des identifiants de protocole, pas du texte d'affichage.
 
 ### 3.5 Gestion de l'énergie
 

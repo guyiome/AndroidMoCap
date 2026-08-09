@@ -151,6 +151,17 @@ placeholder) plus `BlendshapeSelectionScreen`, all overlay screens closable via 
 the hardware back button, or the predictive-back gesture (`BackHandler`) — all three trigger the same
 `onClose`.
 
+**In-app language selector** (point 30, `DisplaySettingsScreen` — "Langue de l'app"), confirmed
+working on device including persistence across a full restart. Requires `MainActivity` to extend
+`AppCompatActivity` (not `ComponentActivity`) with a `Theme.AppCompat.*` theme — both load-bearing
+for `AppCompatDelegate.setApplicationLocales()` under Compose, don't revert either without re-reading
+point 30/43. `AndroidManifest.xml`'s `AppLocalesMetadataHolderService` (`autoStoreLocales="true"`)
+makes the choice persist automatically on every Android version, no custom DataStore code needed —
+this is the in-app counterpart to the system per-app language picker (`android:localeConfig`),
+which only exists on Android 13+. Calling `setApplicationLocales()` recreates the Activity (documented
+AppCompat behavior): a settings screen open at that moment closes back to the main screen, a known
+cosmetic quirk, not a bug.
+
 ## Conventions specific to this repo
 
 - **One commit per feature/fix** when a request touches more than one thing, unless the two are

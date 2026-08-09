@@ -4,7 +4,7 @@
 d'historique de décisions. Pour le raisonnement derrière chaque choix, les alternatives écartées et
 les évolutions en cours de réflexion, voir `AndroidMoCap_revue_technique.md`. Pour le périmètre
 fonctionnel côté utilisateur, voir `AndroidMoCap_spec_fonctionnelle.md`. Dernière mise à jour :
-8 août 2026.*
+9 août 2026.*
 
 ## 1. Vue d'ensemble
 
@@ -243,6 +243,10 @@ Studio (`VTubeStudioProtocol.kt`), préféré à `org.json` (déjà présent dan
 dernier n'est qu'un stub sous le runner de tests JVM de ce projet (pas de Robolectric configuré) --
 casserait la convention "fonctions pures testables en JVM" suivie partout ailleurs.
 
+**androidx.appcompat** (1.7.1) -- requis uniquement pour `AppCompatActivity`/`AppCompatDelegate`, le
+sélecteur de langue en-app (point 30, voir §12) ; le reste de l'UI (Compose/Material3) ne s'appuie
+sur aucun composant de support classique.
+
 ## 9. Tests
 
 Suite de tests unitaires JVM pur (`app/src/test/`, aucune dépendance Android/Robolectric),
@@ -288,9 +292,19 @@ Texte utilisateur externalisé en ressources : `res/values/strings.xml` contient
 retombe sur l'anglais -- plus universel) ; `res/values-fr/strings.xml` contient le français, utilisé
 explicitement quand la langue système (ou le choix fait via le sélecteur par app) est le français.
 `android:localeConfig` déclaré dans `AndroidManifest.xml` (`res/xml/locales_config.xml`, ordre
-en/fr) pour le sélecteur de langue par app (réglages système, **Android 13+ seulement** -- sur
-Android 11/12, l'app suit uniquement la langue système, sans possibilité de la forcer autrement dans
-l'app elle-même ; voir revue technique, point 30). Les 52 noms de blendshapes ARKit (`jawOpen`,
+en/fr) pour le sélecteur de langue par app natif du système (réglages système, **Android 13+
+seulement**). Sur les versions antérieures (11/12, le cas des deux appareils de test de ce projet),
+un **sélecteur en-app** couvre le même besoin (`DisplaySettingsScreen`, section "Langue de l'app") :
+`MainActivity` étend `AppCompatActivity` (thème `Theme.AppCompat.DayNight.NoActionBar`, requis --
+`android:Theme.Material.NoActionBar` seul empêcherait `AppCompatDelegate.setApplicationLocales()` de
+fonctionner sous Compose), et le manifeste déclare `AppLocalesMetadataHolderService`
+(`autoStoreLocales="true"`) pour que le choix persiste automatiquement d'un lancement à l'autre sur
+**toutes** les versions (stockage propre à AppCompat sous API 33, délégué au `LocaleManager`
+plateforme au-delà) -- sans DataStore ni code de persistance propre à ce projet. Changer la langue
+recrée l'Activity (comportement AppCompat documenté) : un écran de réglages ouvert au moment du
+changement se ferme et revient à l'écran principal, cosmétique mineur plutôt qu'un bug. **✅ Confirmé
+fonctionnel sur device (Android 11)**, y compris la persistance après redémarrage complet -- voir
+revue technique, point 30/43. Les 52 noms de blendshapes ARKit (`jawOpen`,
 `mouthSmileLeft`...) et les identifiants techniques de protocole (`ConnectionType.IFACIALMOCAP`...)
 ne sont volontairement pas traduits -- vocabulaire de protocole, pas texte d'affichage. Les messages
 d'erreur émis hors `@Composable` (`MainViewModel`, `CameraController`, `FaceLandmarkerHelper`) sont
