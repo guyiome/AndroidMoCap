@@ -54,7 +54,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | --- | --- | --- |
 | 3 / 13 | Fusion ARCore (palier `OPTIMAL`) | **Intégrée sur `main` et testée sur device le 6 août 2026** (réimplémentée à neuf, pas mergée depuis `feature/arcore-fusion`) -- tracking fonctionnel confirmé par l'utilisateur (crash, rotation et perf corrigés en cours de session), voir sa section dédiée pour le détail et les points mineurs restants |
 | 8 | Minify/R8 en release | **✅ activé et confirmé sur device le 9 août 2026** (shrinking + renommage, `-dontoptimize` conservé -- crash confirmé sinon, voir section dédiée) |
-| 14 | Vérification de mise à jour semi-automatique | Backlog, aucun code écrit |
+| 14 | Vérification de mise à jour semi-automatique | Backlog -- **bloqué** tant que le dépôt reste privé (API GitHub Releases exige une authentification), voir section dédiée plus bas |
 | 15 | Détection langue (cascade) | Conception actée, aucun code écrit -- prérequiert le throttling thermique continu (point 3/13). **Confirmé par observation device le 6 août 2026** : le mesh montre que `tongueOut` n'est pas du tout restitué par MediaPipe (pas juste peu fiable), cohérent avec sa présence dans `BlendshapeCatalog.unreliable`. |
 | 16 | Détection joues (cascade allégée) | Conception actée, aucun code écrit. **Confirmé par observation device le 6 août 2026** : le mesh bouge très peu au gonflement des joues -- le signal géométrique disponible pour une cascade risque d'être faible/bruité, point d'attention à garder pour la conception détaillée. |
 | 17 | Indicateur de fiabilité par blendshape | **Implémenté sur `main`, voir point 24** (l'index le disait encore "aucun code écrit" par erreur) |
@@ -80,6 +80,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 46 | Lissage générique des signaux (One Euro Filter) | **✅ intégré et confirmé sur device le 9 août 2026** -- remplace `EyeOpennessSmoother` dans `EyeBlinkCorrection.kt`, tenue de 9s testée sans dégradation visible (mieux que l'ancien lissage sur la même durée). Reste ouvert : lissage général des 52 blendshapes bruts, pas traité ici, voir section dédiée plus bas |
 | 47 | Optimisation lumière côté app | En discussion (9 août 2026) -- mis de côté volontairement après le point 28/45 (le vrai problème rencontré était une ombre directionnelle, réglée physiquement ; compensation d'exposition jugée peu utile pour ce cas précis), aucun code écrit |
 | 48 | Robustesse du clignement à l'angle de caméra (suite du 45) | **✅ confirmé sur device le 9 août 2026** -- référence EAR "fermé" désormais auto-adaptative par œil (`AdaptiveEarFloor`), corrige un clin d'œil réel écrasé à un angle de caméra en contre-plongée ; testé sans réintroduire la fuite gauche/droite, voir section dédiée plus bas |
+| 49 | Canal de release beta | **✅ mis en place (9 août 2026)** -- tag `-beta` publie une Release GitHub en prerelease (`release.yml`), voir section dédiée plus bas |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -378,16 +379,29 @@ sur confirmation explicite de l'utilisateur) :
 device dans ce sandbox) -- gain de perf non mesuré, cohérent avec le reste des optimisations de
 cette session qui restent "prêtes pour test device" plutôt que "validées".
 
-### 14. Vérification de mise à jour semi-automatique -- à faire (backlog)
+### 14. Vérification de mise à jour semi-automatique -- backlog, bloqué par la visibilité du dépôt
 
 Discuté suite au point 12 (distribution GitHub Releases) : pas de mise à jour automatique possible
 hors store (Android exige une confirmation manuelle d'installation pour tout APK sideloadé, protection
 système, pas une limite contournable côté code). Piste retenue : l'app interroge périodiquement
-l'API GitHub (`GET /repos/guyiome/AndroidMoCap/releases/latest`), compare le `versionCode` reçu au
-sien, et affiche une bannière non intrusive ("Mise à jour disponible") avec un lien direct vers l'APK
-si une version plus récente existe -- l'utilisateur garde la main, un ou deux taps suffisent ensuite.
-Logique de comparaison de version + parsing de la réponse JSON sont de bons candidats à extraire en
-fonction pure et à couvrir en TDD le moment venu, avant de toucher à l'appel réseau/UI qui les entoure.
+l'API GitHub (`GET /repos/guyiome/AndroidMoCap/releases`), compare la version reçue à la sienne, et
+affiche une bannière non intrusive ("Mise à jour disponible") avec un lien direct vers la Release si
+une version plus récente existe sur le canal choisi -- l'utilisateur garde la main, un ou deux taps
+suffisent ensuite. Déclencheurs envisagés : au démarrage, une fois/jour, plus un bouton "Vérifier
+maintenant". Réglage de canal (release/beta, voir point 49) persisté comme le reste des réglages de
+l'app. Logique de comparaison de version + parsing de la réponse JSON sont de bons candidats à
+extraire en fonction pure et à couvrir en TDD le moment venu, avant de toucher à l'appel réseau/UI
+qui les entoure.
+
+**Bloqué (9 août 2026, constat de l'utilisateur, confirmé)** : `guyiome/AndroidMoCap` est un dépôt
+**privé** -- l'API GitHub Releases exige une authentification pour un dépôt privé, aucun accès
+anonyme possible côté app. Un token embarqué dans l'APK est explicitement écarté (extractible par
+décompilation, à l'opposé de la discipline déjà suivie pour la clé de signature -- jamais commitée,
+jamais distribuée). Décision de l'utilisateur : garder le dépôt privé pour le moment (relecture du
+contenu visible, doc à traduire en anglais en vue d'une diffusion plus large), objectif de passer
+public à court terme -- pas de solution de contournement temporaire construite (ex. manifest public
+via GitHub Pages/second dépôt), ce serait du travail jetable pour un état transitoire. **Ce point
+reste en pause jusqu'au passage du dépôt en public.**
 
 ### 15. Navigation retour des écrans superposés -- ✅ corrigé
 
@@ -2008,6 +2022,24 @@ symétriquement des deux côtés. Testé aussi en JVM (`AdaptiveEarFloorTest.kt`
 sur plusieurs épisodes, résistance à un épisode isolé pollué, non-régression sur la dérive de
 landmarks en tenue longue) et bout-en-bout (`EyeBlinkCorrectionTest.kt`, nouveau test simulant
 l'angle problématique).
+
+### 49. Canal de release beta -- ✅ mis en place
+
+Discuté en préparation du point 14 (checker de mise à jour in-app) : l'utilisateur teste très
+souvent l'app via `adb install` de builds de dev, sans rapport avec les vraies Releases GitHub
+(seul un tag `git tag`/`push` en déclenche une), mais voulait éviter par anticipation qu'un futur
+outil de suivi de release (Obtainium ou similaire) le sollicite à chaque tag, y compris pour des
+builds destinés à être testés plus largement plutôt qu'à être "LA" version recommandée.
+
+**Mis en place** : un tag contenant `-beta` (convention `v0.3.0-beta.1`) suit exactement le même
+`release.yml` qu'un tag stable, mais publie la Release GitHub avec le flag `prerelease: true`
+(`softprops/action-gh-release`, `prerelease: ${{ contains(github.ref_name, '-beta') }}`) --
+ignoré par défaut par les outils de suivi de release respectant ce flag, sans changer le
+déclencheur ni le contenu du build. Documenté dans `README.md`, section "Publier une version".
+
+Indépendant de la visibilité du dépôt (contrairement au point 14 ci-dessus, qui lui reste bloqué
+tant que le dépôt est privé) -- ne dépend d'aucun accès à l'API GitHub, uniquement du comportement
+de publication du workflow.
 
 ## Automatisation
 

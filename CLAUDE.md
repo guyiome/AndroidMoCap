@@ -65,6 +65,11 @@ key (see build.gradle.kts) instead of failing. CI (`.github/workflows/`) mirrors
 `testDebugUnitTest assembleDebug` on every PR/push to `main` (no secrets, safe on external/Dependabot
 PRs); `release.yml` only builds+signs+publishes a GitHub Release on a `vX.Y.Z` tag push, reconstituting
 the keystore from a base64 GitHub secret — always has the real env vars, never uses the local fallback.
+A tag containing `-beta` (e.g. `v0.3.0-beta.1`) publishes as a GitHub prerelease instead — same build,
+just flagged so update-tracking tools (Obtainium etc.) skip it by default — see revue technique point 49.
+The repo is currently **private**, which blocks the in-app update checker (point 14 — GitHub Releases
+API needs auth for a private repo, and an embedded token is a rejected approach, decompilable) —
+that point stays parked until the repo goes public, don't build a throwaway workaround for it.
 
 ## Architecture
 

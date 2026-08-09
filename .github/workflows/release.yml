@@ -1,7 +1,8 @@
 name: Release
 
 # Se déclenche uniquement sur un tag de version (ex. v0.2.0) poussé sur le dépôt --
-# voir la section "Distribution" du README pour la procédure complète.
+# voir la section "Publier une version" du README pour la procédure complète. Un tag contenant
+# "-beta" (ex. v0.3.0-beta.1) publie une Release marquée "prerelease" -- canal beta, voir plus bas.
 on:
   push:
     tags:
@@ -48,3 +49,7 @@ jobs:
         with:
           files: app/build/outputs/apk/release/*.apk
           generate_release_notes: true
+          # Canal beta : un tag contenant "-beta" (ex. v0.3.0-beta.1) publie une prerelease --
+          # ignorée par défaut par les outils de suivi de release (Obtainium et similaires) sauf
+          # activation explicite, sans changer le déclencheur ni le contenu du build lui-même.
+          prerelease: ${{ contains(github.ref_name, '-beta') }}

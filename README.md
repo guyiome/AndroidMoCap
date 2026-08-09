@@ -161,3 +161,13 @@ git push origin v0.2.0
 
 Le workflow (`.github/workflows/release.yml`) construit l'APK (téléchargement du modèle MediaPipe
 inclus), le signe, et crée une Release GitHub avec l'APK en pièce jointe.
+
+**Canal beta** : un tag contenant `-beta` (ex. `v0.3.0-beta.1`) suit exactement le même chemin, mais
+la Release est publiée comme *prerelease* GitHub -- ignorée par défaut par les outils de suivi de
+mise à jour (Obtainium et similaires) sauf activation explicite du côté de qui l'installe. Pratique
+pour partager un build à tester sans que ça remonte comme "mise à jour recommandée".
+
+```
+git tag v0.3.0-beta.1
+git push origin v0.3.0-beta.1
+```
