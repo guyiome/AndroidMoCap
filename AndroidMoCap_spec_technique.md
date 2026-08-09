@@ -261,9 +261,13 @@ qui n'est volontairement pas couvert, dans `AndroidMoCap_tests_unitaires.md`.
 Signature release lue depuis des variables d'environnement (jamais commitées), workflow GitHub
 Actions (`.github/workflows/release.yml`) déclenché par un tag `vX.Y.Z` : build, téléchargement du
 modèle MediaPipe, signature, publication d'une Release GitHub avec l'APK en pièce jointe. Pas de
-Play Store à ce jour. `isMinifyEnabled = false` en configuration release (R8/ProGuard désactivés
-volontairement tant que les tests sur device ne sont pas de nouveau possibles -- revue technique
-point 8).
+Play Store à ce jour. `isMinifyEnabled = true` en configuration release depuis le 9 août 2026 (R8
+activé, confirmé sur device -- voir revue technique point 8) : shrinking + renommage actifs,
+`-dontoptimize` conservé délibérément (voir `proguard-rules.pro`) suite à un crash confirmé au
+lancement causé par l'optimiseur R8 perturbant la détection d'appelant de Guava Flogger (dépendance
+transitive de MediaPipe). Sans variables d'environnement de signature release, `assembleRelease`
+retombe sur la signature debug -- seulement pour permettre de tester un build release minifié en
+local (`adb install`), le workflow de publication a toujours les vraies variables.
 
 Second workflow (`.github/workflows/ci.yml`) déclenché sur chaque pull request et chaque push sur
 `main` : build debug (non signé, aucun secret nécessaire) + tests unitaires, pour donner un signal
@@ -278,8 +282,9 @@ Licence : PolyForm Shield 1.0.0 (voir `LICENSE`), CLA en place pour les contribu
 ## 11. Dette technique et limites connues
 
 Liste vivante tenue dans `AndroidMoCap_revue_technique.md`, pas dupliquée ici. Points ouverts
-principaux au moment de la rédaction : minify désactivé (point 8), vérification de mise à jour non
-implémentée (point 14), comportement non défini sur grand écran/tablette (point 20). La
+principaux au moment de la rédaction : vérification de mise à jour non implémentée (point 14),
+comportement non défini sur grand écran/tablette (point 20). Le minify release (point 8) est traité
+-- voir §10. La
 localisation de l'UI (point 23) est traitée -- voir §12. La fusion ARCore (point 3/13) est intégrée
 sur `main` et confirmée fonctionnelle sur device -- voir §4. Le throttling thermique dynamique (point 34)
 est branché et vérifié sur device via mock (point 35) -- le capteur thermique réel reste non exercé,

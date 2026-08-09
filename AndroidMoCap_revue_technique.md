@@ -53,7 +53,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | Point | Sujet | Statut |
 | --- | --- | --- |
 | 3 / 13 | Fusion ARCore (palier `OPTIMAL`) | **Intégrée sur `main` et testée sur device le 6 août 2026** (réimplémentée à neuf, pas mergée depuis `feature/arcore-fusion`) -- tracking fonctionnel confirmé par l'utilisateur (crash, rotation et perf corrigés en cours de session), voir sa section dédiée pour le détail et les points mineurs restants |
-| 8 | Minify/R8 en release | Désactivé volontairement, en attente de tests device |
+| 8 | Minify/R8 en release | **✅ activé et confirmé sur device le 9 août 2026** (shrinking + renommage, `-dontoptimize` conservé -- crash confirmé sinon, voir section dédiée) |
 | 14 | Vérification de mise à jour semi-automatique | Backlog, aucun code écrit |
 | 15 | Détection langue (cascade) | Conception actée, aucun code écrit -- prérequiert le throttling thermique continu (point 3/13). **Confirmé par observation device le 6 août 2026** : le mesh montre que `tongueOut` n'est pas du tout restitué par MediaPipe (pas juste peu fiable), cohérent avec sa présence dans `BlendshapeCatalog.unreliable`. |
 | 16 | Détection joues (cascade allégée) | Conception actée, aucun code écrit. **Confirmé par observation device le 6 août 2026** : le mesh bouge très peu au gonflement des joues -- le signal géométrique disponible pour une cascade risque d'être faible/bruité, point d'attention à garder pour la conception détaillée. |
@@ -1725,6 +1725,59 @@ langue) avant d'être confirmé comme un aller-retour Activity attendu plutôt q
 `FATAL EXCEPTION` associé. Cosmétique mineur (retour à l'écran principal au lieu de rester dans
 Réglages), pas fonctionnellement bloquant ; pourrait être amélioré plus tard en sauvegardant l'écran
 de réglages ouvert dans `rememberSaveable` si ça gêne à l'usage.
+
+### 44. Minify/R8 en configuration release (point 8) -- ✅ activé et confirmé sur device
+
+Resté désactivé depuis le début du projet (voir note originale ci-dessus, "attendre une vraie mise
+en distribution") faute d'appareil pour vérifier que MediaPipe/ARCore/OSC/kotlinx.serialization
+survivent à l'obfuscation sans casser de la réflexion. Ce blocage n'existe plus (deux appareils de
+test opérationnels), traité dans le cadre de la préparation d'une première release publique.
+
+**Règles -keep ajoutées** (`proguard-rules.pro`), une par bibliothèque à risque, chacune justifiée
+plutôt que copiée en l'air : `com.google.mediapipe.**`/`com.google.protobuf.**` (réflexion + JNI),
+`com.google.ar.core.**` (JNI natif, recommandation officielle ARCore), `com.illposed.osc.**`
+(prudence après le crash réflexif déjà rencontré une fois sur cette bibliothèque, point 38), et le
+jeu de règles officiellement recommandé par kotlinx.serialization pour R8 (sérialiseurs générés
+`$serializer`/`Companion.serializer()` résolus par nom à l'exécution).
+
+**Premier `assembleRelease` minifié : échec de compilation R8**, pas un crash silencieux -- deux
+classes protobuf optionnelles (`CalculatorProfileProto$CalculatorProfile`,
+`GraphTemplateProto$CalculatorGraphTemplate`, profiling/templates de graphe MediaPipe, jamais
+utilisés en mode `LIVE_STREAM` simple) absentes de l'artefact `tasks-vision` mais référencées par le
+code interne de MediaPipe. Résolu avec les `-dontwarn` exacts générés par R8 lui-même dans
+`missing_rules.txt` -- pas une supposition.
+
+**Une fois la compilation réussie, crash confirmé au tout premier lancement sur device** (téléphone
+Android 11) : `ExceptionInInitializerError` dans `com.google.mediapipe.framework.Graph.<clinit>`,
+cause racine `IllegalStateException: no caller found on the stack for: fk0`. Diagnostiqué sans
+supposer -- déobfuscation de la trace via `app/build/outputs/mapping/release/mapping.txt` :
+- `fk0` = `com.google.common.flogger.FluentLogger` (Guava Flogger, dépendance transitive de
+  MediaPipe, utilisée pour son logging interne).
+- Le reste de la pile (`ih0`, `fa1`, `ca1`, `fl`, `ca0`...) déobfusque en code parfaitement banal :
+  `FaceLandmarkerHelper`, `MainViewModel.initializeTracking()`, et la machinerie standard des
+  coroutines Kotlin (`BaseContinuationImpl`, `DispatchedTask`).
+
+Cause réelle : Flogger détecte sa classe appelante en parcourant la pile d'appels à l'exécution --
+l'optimiseur R8 (inlining/fusion de méthodes, une transformation par ailleurs correcte et sans
+risque en soi) a réorganisé les frames de coroutine autour du point d'appel, privant Flogger d'une
+frame "appelant" reconnaissable. Un `-keep` sur les classes Flogger elles-mêmes n'aurait rien changé
+(le problème n'est pas leur renommage, mais la restructuration des frames *autour* d'elles).
+
+**Correctif retenu** : `-dontoptimize` dans `proguard-rules.pro` -- désactive spécifiquement les
+transformations de bytecode (inlining, fusion de classes) responsables de ce genre de rupture, tout
+en gardant le shrinking (classes mortes supprimées, l'essentiel du gain de taille) et le renommage
+(obfuscation). Nouveau build : **✅ confirmé sur device**, plus de crash, MediaPipe s'initialise
+normalement (modèle chargé, graphe démarré, délégué GPU/OpenCL actif), écran Réglages fonctionnel,
+palier OPTIMAL/ARCore actif (visage détecté pendant le test).
+
+**Taille d'APK** : 127,6 Mo (debug) -> 61,4 Mo (release minifié, `-dontoptimize`) -- comparé à 59,0
+Mo avec l'optimisation complète (avant le crash trouvé), confirmant que l'essentiel du gain vient du
+shrinking, pas de l'optimisation désactivée ici.
+
+**Signature locale** : `assembleRelease` sans les variables d'environnement de signature release
+retombe désormais sur la clé debug (`app/build.gradle.kts`) -- seul moyen d'installer et de tester
+un build release minifié en local sans les vraies clés ; le workflow de publication
+(`release.yml`) a toujours les vraies variables, ce repli ne s'applique qu'en dev local.
 
 ## Automatisation
 

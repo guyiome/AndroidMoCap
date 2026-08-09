@@ -43,8 +43,9 @@ device via the JVM unit test suite.
 # Debug build (unsigned)
 ./gradlew assembleDebug
 
-# Release build — only meaningful with signing env vars set (see below); otherwise produces an
-# unsigned release APK
+# Release build — minified (R8, see point 8). Signed with the real release key if the env vars
+# below are set, otherwise falls back to the debug key so the minified APK can still be installed
+# and tested locally (adb install) — the real publish workflow always has the env vars.
 ./gradlew assembleRelease
 ```
 
@@ -59,10 +60,11 @@ curl -fL -o app/src/main/assets/face_landmarker.task \
 
 Release signing is via environment variables only, never committed files: `RELEASE_KEYSTORE_PATH`,
 `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`. Absent in normal dev
-(`assembleDebug`/`installDebug`) — no error, just an unsigned build. CI (`.github/workflows/`) mirrors
-this: `ci.yml` runs `testDebugUnitTest assembleDebug` on every PR/push to `main` (no secrets, safe on
-external/Dependabot PRs); `release.yml` only builds+signs+publishes a GitHub Release on a `vX.Y.Z` tag
-push, reconstituting the keystore from a base64 GitHub secret.
+(`assembleDebug`/`installDebug`) — no error, `assembleRelease` just falls back to the debug signing
+key (see build.gradle.kts) instead of failing. CI (`.github/workflows/`) mirrors this: `ci.yml` runs
+`testDebugUnitTest assembleDebug` on every PR/push to `main` (no secrets, safe on external/Dependabot
+PRs); `release.yml` only builds+signs+publishes a GitHub Release on a `vX.Y.Z` tag push, reconstituting
+the keystore from a base64 GitHub secret — always has the real env vars, never uses the local fallback.
 
 ## Architecture
 

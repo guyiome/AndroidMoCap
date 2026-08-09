@@ -53,17 +53,26 @@ android {
 
     buildTypes {
         release {
-            // Toujours désactivé pour l'instant (voir AndroidMoCap_revue_technique.md, point 8) :
-            // activer R8 sans pouvoir vérifier sur device que MediaPipe/OSC (réflexion) survivent
-            // à l'obfuscation serait risqué tant que le testeur habituel n'a pas d'appareil sous la
-            // main -- à revisiter une fois les tests device possibles à nouveau.
-            isMinifyEnabled = false
+            // Activé le 9 août 2026 (voir AndroidMoCap_revue_technique.md, point 8) : resté
+            // désactivé tant qu'aucun appareil n'était disponible pour vérifier sur device que
+            // MediaPipe/ARCore/OSC/kotlinx.serialization (réflexion, JNI, sérialiseurs générés)
+            // survivent à l'obfuscation -- règles -keep dédiées dans proguard-rules.pro, chacune
+            // justifiée, testé réellement sur device avant d'être considéré fiable.
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            if (hasReleaseSigningEnv) {
-                signingConfig = signingConfigs.getByName("release")
+            signingConfig = if (hasReleaseSigningEnv) {
+                signingConfigs.getByName("release")
+            } else {
+                // Repli sur la signature debug uniquement en l'absence des variables d'environnement
+                // de signature release -- permet de construire et d'installer un APK release minifié
+                // en local pour le tester (adb install), sans quoi un release non signé ne peut pas
+                // s'installer du tout sur un appareil réel. Le workflow CI de publication
+                // (release.yml) fournit toujours les vraies variables : ce repli ne s'applique qu'en
+                // dev local, jamais à un build publié.
+                signingConfigs.getByName("debug")
             }
         }
     }
