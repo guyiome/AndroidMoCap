@@ -37,6 +37,7 @@
     <string name="cd_calibrate_anomaly_detected">Recenter (pose drift detected)</string>
     <string name="settings_title">Settings</string>
     <string name="cd_low_battery">Low battery</string>
+    <string name="cd_tongue_performance_warning">Tongue-out detection is straining the device -- tap to open the setting</string>
 
     <!-- Camera permission -->
     <string name="camera_permission_rationale">The front camera is required for facial capture.</string>

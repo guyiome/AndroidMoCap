@@ -368,6 +368,10 @@ fun MainScreen(
             if (batteryPercent <= uiState.lowBatteryThresholdPercent && !isCharging) {
                 LowBatteryAlert()
             }
+
+            if (uiState.tongueOutDetectionEnabled && (uiState.isThermalThrottling || uiState.inferenceRunningHigh)) {
+                TonguePerformanceWarning(onClick = { showExperimentalFeatures = true })
+            }
         } else {
             Column(
                 modifier = Modifier

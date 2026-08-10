@@ -35,6 +35,7 @@
     <string name="cd_calibrate_anomaly_detected">Mise à zéro (dérive détectée)</string>
     <string name="settings_title">Réglages</string>
     <string name="cd_low_battery">Batterie faible</string>
+    <string name="cd_tongue_performance_warning">La détection de langue tirée sollicite l\'appareil -- toucher pour ouvrir le réglage</string>
 
     <!-- Permission caméra -->
     <string name="camera_permission_rationale">La caméra frontale est nécessaire pour la capture faciale.</string>
