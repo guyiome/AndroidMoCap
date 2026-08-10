@@ -267,6 +267,19 @@ class CameraController(
         synchronized(poolLock) { freeBitmaps.addLast(bitmap) }
     }
 
+    /**
+     * Lecture seule d'un bitmap encore "en vol" dans le pool, SANS le retirer (contrairement à
+     * [releaseFrame]) -- destiné à un accès pixel synchrone et de courte durée (cascade de
+     * détection de la langue tirée, étage 2, revue technique point 15) pendant la fenêtre garantie
+     * où ce frame n'a pas encore été recyclé : `FaceLandmarkerHelper.onLiveStreamResult()` appelle
+     * `onResult(...)` (= `MainViewModel.handleTrackingResult()`) *avant* `onFrameProcessed(...)` (=
+     * `releaseFrame()`), de façon synchrone sur le même thread -- appeler exclusivement depuis
+     * `handleTrackingResult()`. Ne JAMAIS conserver la référence retournée au-delà de cet appel
+     * synchrone (aucune coroutine, aucun état Compose) : le bitmap peut être réécrit dès que
+     * `releaseFrame()` a été appelé pour ce timestamp.
+     */
+    fun peekPooledBitmap(frameTimeMs: Long): Bitmap? = synchronized(poolLock) { inFlightBitmaps[frameTimeMs] }
+
     private fun acquirePooledBitmap(width: Int, height: Int): Bitmap? = synchronized(poolLock) {
         val match = freeBitmaps.firstOrNull { it.width == width && it.height == height }
         if (match != null) {
