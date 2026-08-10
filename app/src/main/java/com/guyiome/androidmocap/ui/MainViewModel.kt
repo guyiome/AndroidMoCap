@@ -229,11 +229,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val EAR_DIAGNOSTIC_LOGGING = false
         private const val EAR_DIAG_TAG = "EarDiag"
 
-        // Diagnostic temporaire sourcils (9 août 2026, suite discussion pipeline RTX VTube Studio) --
-        // même patron que EAR_DIAGNOSTIC_LOGGING ci-dessus, voir tracking/BrowRaise.kt. Indices
-        // gauche/droite pas encore confirmés sur device (déduits par analogie avec l'inversion déjà
-        // démontrée pour les yeux) -- ce diagnostic sert justement à vérifier ça avant toute correction.
-        private const val BROW_DIAGNOSTIC_LOGGING = true
+        // Diagnostic temporaire sourcils (9-10 août 2026, suite discussion pipeline RTX VTube
+        // Studio) -- même patron que EAR_DIAGNOSTIC_LOGGING ci-dessus, voir tracking/BrowRaise.kt.
+        // Indices gauche/droite toujours pas confirmés sur device : premier test (10 août) non
+        // concluant -- pas de marqueurs par étape cette fois-là, et L reste au-dessus de R sur
+        // quasi toute la capture y compris au repos, signe d'une asymétrie de fond (angle caméra ?
+        // morphologie ?) qui pollue la mesure plutôt qu'une confirmation/infirmation du mapping.
+        // Désactivé en attendant un retest propre (marqueurs start/stop par étape) -- remettre à
+        // `true` à ce moment-là. Investigation mise en pause, pas close.
+        private const val BROW_DIAGNOSTIC_LOGGING = false
         private const val BROW_DIAG_TAG = "BrowDiag"
 
         // Diagnostic temporaire cohérence rotation tête / regard gauche / regard droit (9 août
