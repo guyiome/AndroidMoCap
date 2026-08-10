@@ -137,7 +137,9 @@
 
     <!-- Experimental features screen -->
     <string name="experimental_features_title">Experimental features</string>
-    <string name="experimental_features_placeholder">No experimental feature available yet -- reserved for tongue-out and cheek-puff detection (see the technical review).</string>
+    <string name="experimental_features_placeholder">Cheek-puff detection is not implemented yet (see the technical review).</string>
+    <string name="experimental_tongue_detection_title">Tongue-out detection (diagnostic)</string>
+    <string name="experimental_tongue_detection_description">Off by default. Phase 1 only: logs whether the mouth-opening and color heuristics fire, without changing the actual tongueOut value sent (still always 0). No effect on network output yet.</string>
 
     <!-- Logging settings screen -->
     <string name="logging_settings_title">Logging</string>

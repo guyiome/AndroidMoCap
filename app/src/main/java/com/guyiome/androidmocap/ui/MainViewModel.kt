@@ -41,8 +41,12 @@ import com.guyiome.androidmocap.tracking.CalibrationAnomalyState
 import com.guyiome.androidmocap.tracking.EyeBlinkCorrectionState
 import com.guyiome.androidmocap.tracking.FaceLandmarkerHelper
 import com.guyiome.androidmocap.tracking.browRaiseRatioFromLandmarks
+import com.guyiome.androidmocap.tracking.colorGateOpen
 import com.guyiome.androidmocap.tracking.correctEyeBlinkScores
+import com.guyiome.androidmocap.tracking.jawOpenGateOpen
 import com.guyiome.androidmocap.tracking.mirrorFaceTrackingResult
+import com.guyiome.androidmocap.tracking.mouthCropRegion
+import com.guyiome.androidmocap.tracking.tonguePixelRatio
 import com.guyiome.androidmocap.tracking.FaceTrackingResult
 import com.guyiome.androidmocap.tracking.REST_VARIANCE_THRESHOLD
 import com.guyiome.androidmocap.tracking.RotationMath
@@ -188,6 +192,11 @@ data class MainUiState(
     // ci-dessus) : mirrore ensemble tête + blendshapes gauche/droite avant envoi. Activé par
     // défaut (voir AppSettingsStore.mirrorModeEnabled pour le pourquoi), désactivable.
     val mirrorModeEnabled: Boolean = true,
+    // Détection expérimentale de la langue tirée (point 15) -- collecté en continu, effet immédiat.
+    // Désactivée par défaut, rangée dans "Fonctionnalités expérimentales". Phase 1 : purement
+    // diagnostique (voir AppSettingsStore.tongueOutDetectionEnabled), aucune injection de
+    // tongueOut tant que l'étage 3 n'existe pas.
+    val tongueOutDetectionEnabled: Boolean = false,
     val errorMessage: String? = null,
 )
 
@@ -248,6 +257,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // produit bien le même signe de yaw sur les trois signaux, avant de conclure quoi que ce soit.
         private const val ROTATION_DIAGNOSTIC_LOGGING = false
         private const val ROTATION_DIAG_TAG = "RotationDiag"
+
+        // Diagnostic phase 1 de la cascade de détection de la langue tirée (revue technique,
+        // point 15) -- logue l'état des étages 1 (porte jawOpen) et 2 (ratio couleur du recadrage
+        // buccal) à chaque frame quand tongueOutDetectionEnabled est actif, indépendamment de ce
+        // flag. Purement diagnostique : sert à valider DEFAULT_JAW_OPEN_GATE_THRESHOLD,
+        // DEFAULT_COLOR_RATIO_THRESHOLD et l'hypothèse LipLandmarkIndices sur device avant
+        // d'envisager l'étage 3 (classification, phase 2) -- aucune injection de tongueOut tant que
+        // ce diagnostic n'a pas confirmé les deux premiers étages.
+        private const val TONGUE_DIAGNOSTIC_LOGGING = false
+        private const val TONGUE_DIAG_TAG = "TongueDiag"
 
         // Cadence du sondage de throttling thermique (voir startThermalPolling) -- doit rester
         // cohérente avec ThermalThrottleState.SUSTAINED_THROTTLE_TICKS (12 sondages consécutifs,
@@ -438,6 +457,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             appSettingsStore.mirrorModeEnabled.collect { enabled ->
                 _uiState.update { it.copy(mirrorModeEnabled = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            appSettingsStore.tongueOutDetectionEnabled.collect { enabled ->
+                _uiState.update { it.copy(tongueOutDetectionEnabled = enabled) }
             }
         }
         viewModelScope.launch {
@@ -815,6 +839,54 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 ),
             )
         }
+
+        // Cascade de détection de la langue tirée, phase 1 (revue technique, point 15) -- étages 1
+        // (porte jawOpen) + 2 (ratio couleur du recadrage buccal), gatée par le réglage
+        // expérimental. Purement diagnostique pour l'instant : aucune injection dans
+        // "final"/corrected.blendshapes, tongueOut reste absent (donc à 0 côté BlendshapeCatalog)
+        // tant que l'étage 3 (classification, phase 2) n'existe pas -- injecter une valeur non
+        // fiable serait pire que l'honnêteté actuelle du signal à 0.
+        if (_uiState.value.tongueOutDetectionEnabled) {
+            val jawOpen = corrected.blendshapes.firstOrNull { it.name == "jawOpen" }?.score ?: 0f
+            if (jawOpenGateOpen(jawOpen)) {
+                val ratio = sampleMouthTonguePixelRatio(
+                    corrected.timestampMs,
+                    corrected.faceLandmarks,
+                    corrected.imageWidthPx,
+                    corrected.imageHeightPx,
+                )
+                val colorFired = ratio != null && colorGateOpen(ratio)
+                if (TONGUE_DIAGNOSTIC_LOGGING) {
+                    AppLog.d(
+                        TONGUE_DIAG_TAG,
+                        "jawOpen=%.3f etage1=OK ratio=%s etage2=%s".format(jawOpen, ratio, colorFired),
+                    )
+                }
+            } else if (TONGUE_DIAGNOSTIC_LOGGING) {
+                AppLog.d(TONGUE_DIAG_TAG, "jawOpen=%.3f etage1=NON".format(jawOpen))
+            }
+        }
+    }
+
+    /**
+     * Étage 2 de la cascade langue tirée (point 15) : recadre la région buccale à partir des
+     * landmarks puis calcule la fraction de pixels "couleur langue" ([tonguePixelRatio]). `null` si
+     * le recadrage est impossible (landmarks insuffisants) ou si le bitmap du frame correspondant
+     * n'est plus disponible dans le pool (ex. palier OPTIMAL/ARCore, qui n'a pas de pool de bitmap
+     * -- voir [CameraController.peekPooledBitmap]). Glue Android non testée (accès direct à un
+     * `Bitmap`), même catégorie que le reste de `CameraController` touchant `Bitmap`/`Canvas`.
+     */
+    private fun sampleMouthTonguePixelRatio(
+        frameTimeMs: Long,
+        landmarks: List<Pair<Float, Float>>,
+        imageWidthPx: Int,
+        imageHeightPx: Int,
+    ): Float? {
+        val region = mouthCropRegion(landmarks, imageWidthPx, imageHeightPx) ?: return null
+        val bitmap = cameraController?.peekPooledBitmap(frameTimeMs) ?: return null
+        val pixels = IntArray(region.width * region.height)
+        bitmap.getPixels(pixels, 0, region.width, region.x, region.y, region.width, region.height)
+        return tonguePixelRatio(pixels)
     }
 
     /**
@@ -938,6 +1010,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun setMirrorModeEnabled(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setMirrorModeEnabled(enabled) }
+    }
+
+    /**
+     * Détection expérimentale de la langue tirée (point 15) -- persisté, réglable depuis
+     * `ExperimentalFeaturesScreen`, effet immédiat (voir le collecteur
+     * `appSettingsStore.tongueOutDetectionEnabled` dans init{}). Désactivé par défaut.
+     */
+    fun setTongueOutDetectionEnabled(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setTongueOutDetectionEnabled(enabled) }
     }
 
     /**

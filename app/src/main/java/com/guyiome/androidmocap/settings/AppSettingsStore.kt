@@ -41,6 +41,7 @@ class AppSettingsStore(private val context: Context) {
         val DEBUG_FORCE_GPU_UNAVAILABLE = booleanPreferencesKey("debug_force_gpu_unavailable")
         val LOG_LEVEL = stringPreferencesKey("log_level")
         val MIRROR_MODE = booleanPreferencesKey("mirror_mode_enabled")
+        val TONGUE_OUT_DETECTION = booleanPreferencesKey("tongue_out_detection_enabled")
     }
 
     val lowBatteryThresholdPercent: Flow<Int> = context.appSettingsDataStore.data.map { prefs ->
@@ -211,5 +212,21 @@ class AppSettingsStore(private val context: Context) {
 
     suspend fun setMirrorModeEnabled(enabled: Boolean) {
         context.appSettingsDataStore.edit { prefs -> prefs[Keys.MIRROR_MODE] = enabled }
+    }
+
+    /**
+     * Détection expérimentale de la langue tirée (revue technique, point 15) -- **désactivée par
+     * défaut**, rangée dans "Fonctionnalités expérimentales". Phase 1 (étages 1+2 de la cascade,
+     * porte `jawOpen` + analyse couleur) : purement diagnostique, `tongueOut` n'est jamais injecté
+     * tant que l'étage 3 (classification par embedding) n'existe pas -- ce réglage ne fait
+     * qu'activer le calcul et le logging (`TONGUE_DIAGNOSTIC_LOGGING`, `MainViewModel`), aucun
+     * changement de la donnée réellement envoyée en phase 1.
+     */
+    val tongueOutDetectionEnabled: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[Keys.TONGUE_OUT_DETECTION] ?: false
+    }
+
+    suspend fun setTongueOutDetectionEnabled(enabled: Boolean) {
+        context.appSettingsDataStore.edit { prefs -> prefs[Keys.TONGUE_OUT_DETECTION] = enabled }
     }
 }

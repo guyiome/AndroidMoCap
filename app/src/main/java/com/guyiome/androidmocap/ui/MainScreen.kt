@@ -331,7 +331,11 @@ fun MainScreen(
             }
 
             if (showExperimentalFeatures) {
-                ExperimentalFeaturesScreen(onClose = { showExperimentalFeatures = false })
+                ExperimentalFeaturesScreen(
+                    uiState = uiState,
+                    onClose = { showExperimentalFeatures = false },
+                    onSetTongueOutDetectionEnabled = { enabled -> viewModel.setTongueOutDetectionEnabled(enabled) },
+                )
             }
 
             if (showLoggingSettings) {
