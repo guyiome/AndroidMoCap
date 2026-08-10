@@ -43,6 +43,8 @@ import com.guyiome.androidmocap.tracking.FaceLandmarkerHelper
 import com.guyiome.androidmocap.tracking.browRaiseRatioFromLandmarks
 import com.guyiome.androidmocap.tracking.colorGateOpen
 import com.guyiome.androidmocap.tracking.correctEyeBlinkScores
+import com.guyiome.androidmocap.tracking.InferenceLoadState
+import com.guyiome.androidmocap.tracking.isRunningHigh
 import com.guyiome.androidmocap.tracking.jawOpenGateOpen
 import com.guyiome.androidmocap.tracking.mirrorFaceTrackingResult
 import com.guyiome.androidmocap.tracking.mouthCropRegion
@@ -165,6 +167,11 @@ data class MainUiState(
     // purement informatif affiché en diagnostic, à côté du sélecteur de palier manuel : jamais
     // appliqué automatiquement, rétrograder le palier reste un choix explicite de l'utilisateur.
     val thermalDowngradeSuggested: Boolean = false,
+    // Charge d'inférence live (voir InferenceLoadMonitor.kt, point 15) -- moyenne mobile de
+    // inferenceTimeMs mesurablement au-dessus du budget frame du débit courant. Signal live (pas
+    // sticky comme thermalDowngradeSuggested) : redevient faux dès que la charge redescend, pensé
+    // pour un avertissement à l'écran qui doit disparaître quand la situation redevient normale.
+    val inferenceRunningHigh: Boolean = false,
     // Mocks de debug (panneau caché de DiagnosticsScreen, voir revue technique point 35) --
     // permettent d'exercer des chemins de code qu'un appareil de test donné (ex. haut de gamme,
     // thermiquement irréprochable) ne peut pas naturellement déclencher.
@@ -343,6 +350,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // chaque sondage thermique (voir ThermalThrottleState.next), constant pour toute la session.
     private var nominalTargetFps: Int = 0
     private var thermalThrottleState = ThermalThrottleState.initial(nominalFps = 0)
+    // Moyenne mobile de inferenceTimeMs (voir InferenceLoadMonitor.kt, point 15) -- alimente
+    // MainUiState.inferenceRunningHigh, mise à jour à chaque frame dans handleTrackingResult().
+    private var inferenceLoadState = InferenceLoadState()
     // Garde contre un double appel à initializeTracking() (ex. permission caméra révoquée puis
     // ré-accordée sans destruction de l'Activity) -- sans cette garde, un second appel recréait un
     // FaceLandmarkerHelper et un CameraController complets par-dessus les précédents, sans jamais
@@ -774,6 +784,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // défaut (voir AppSettingsStore.mirrorModeEnabled) -- désactiver ce réglage envoie
         // "corrected" tel quel, sortie native/anatomique.
         val final = if (_uiState.value.mirrorModeEnabled) mirrorFaceTrackingResult(corrected) else corrected
+
+        // Charge d'inférence live (point 15) -- budget suit le débit courant, potentiellement déjà
+        // réduit par le throttling thermique (thermalThrottleState.currentFps), pour ne pas signaler
+        // une fausse alerte de charge quand c'est juste le débit qui a été volontairement abaissé.
+        inferenceLoadState = inferenceLoadState.next(final.inferenceTimeMs)
+        val frameBudgetMs = 1000L / thermalThrottleState.currentFps.coerceAtLeast(1)
+        val runningHigh = inferenceLoadState.isRunningHigh(frameBudgetMs)
+        if (runningHigh != _uiState.value.inferenceRunningHigh) {
+            _uiState.update { it.copy(inferenceRunningHigh = runningHigh) }
+        }
 
         _trackingFrame.update {
             it.copy(
