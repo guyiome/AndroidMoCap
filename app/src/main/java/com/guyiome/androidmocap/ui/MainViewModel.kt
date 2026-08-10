@@ -36,10 +36,13 @@ import com.guyiome.androidmocap.settings.DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT
 import com.guyiome.androidmocap.settings.DEFAULT_POWER_SAVE_DELAY_SECONDS
 import com.guyiome.androidmocap.tracking.ArCoreHeadPoseTracker
 import com.guyiome.androidmocap.tracking.BlendshapeScore
+import com.guyiome.androidmocap.tracking.BrowLandmarkIndices
 import com.guyiome.androidmocap.tracking.CalibrationAnomalyState
 import com.guyiome.androidmocap.tracking.EyeBlinkCorrectionState
 import com.guyiome.androidmocap.tracking.FaceLandmarkerHelper
+import com.guyiome.androidmocap.tracking.browRaiseRatioFromLandmarks
 import com.guyiome.androidmocap.tracking.correctEyeBlinkScores
+import com.guyiome.androidmocap.tracking.mirrorFaceTrackingResult
 import com.guyiome.androidmocap.tracking.FaceTrackingResult
 import com.guyiome.androidmocap.tracking.REST_VARIANCE_THRESHOLD
 import com.guyiome.androidmocap.tracking.RotationMath
@@ -181,6 +184,10 @@ data class MainUiState(
     // technique point 50) -- collecté en continu (pas juste au lancement) : un changement
     // s'applique immédiatement, contrairement à tierOverride/debugForce* ci-dessus.
     val logLevel: LogLevel = LogLevel.ERROR,
+    // Mode miroir (point 51) -- collecté en continu, effet immédiat (même patron que logLevel
+    // ci-dessus) : mirrore ensemble tête + blendshapes gauche/droite avant envoi. Activé par
+    // défaut (voir AppSettingsStore.mirrorModeEnabled pour le pourquoi), désactivable.
+    val mirrorModeEnabled: Boolean = true,
     val errorMessage: String? = null,
 )
 
@@ -221,6 +228,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // `true` ponctuellement si un nouveau souci de clignement doit être diagnostiqué.
         private const val EAR_DIAGNOSTIC_LOGGING = false
         private const val EAR_DIAG_TAG = "EarDiag"
+
+        // Diagnostic temporaire sourcils (9 août 2026, suite discussion pipeline RTX VTube Studio) --
+        // même patron que EAR_DIAGNOSTIC_LOGGING ci-dessus, voir tracking/BrowRaise.kt. Indices
+        // gauche/droite pas encore confirmés sur device (déduits par analogie avec l'inversion déjà
+        // démontrée pour les yeux) -- ce diagnostic sert justement à vérifier ça avant toute correction.
+        private const val BROW_DIAGNOSTIC_LOGGING = true
+        private const val BROW_DIAG_TAG = "BrowDiag"
+
+        // Diagnostic temporaire cohérence rotation tête / regard gauche / regard droit (9 août
+        // 2026, doute de l'utilisateur : la tête semble en "mode miroir" pas les yeux) -- les trois
+        // sont calculés indépendamment (RotationMath.toEulerDegrees pour la tête, deux formules
+        // séparées dans FaceLandmarkerHelper pour les yeux), jamais croisés entre eux jusqu'ici.
+        // Sert à vérifier si un même mouvement anatomique (ex. "je tourne la tête vers ma droite")
+        // produit bien le même signe de yaw sur les trois signaux, avant de conclure quoi que ce soit.
+        private const val ROTATION_DIAGNOSTIC_LOGGING = false
+        private const val ROTATION_DIAG_TAG = "RotationDiag"
 
         // Cadence du sondage de throttling thermique (voir startThermalPolling) -- doit rester
         // cohérente avec ThermalThrottleState.SUSTAINED_THROTTLE_TICKS (12 sondages consécutifs,
@@ -406,6 +429,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             appSettingsStore.logLevel.collect { level ->
                 _uiState.update { it.copy(logLevel = level) }
                 AppLog.setMinimumPersistedLevel(level)
+            }
+        }
+        viewModelScope.launch {
+            appSettingsStore.mirrorModeEnabled.collect { enabled ->
+                _uiState.update { it.copy(mirrorModeEnabled = enabled) }
             }
         }
         viewModelScope.launch {
@@ -712,19 +740,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         previousBlendshapesForAnomaly = result.blendshapes
 
+        // Mode miroir (point 51) : mirrore ensemble tête + blendshapes gauche/droite + regard par
+        // œil, appliqué en tout dernier -- après la correction EAR, jamais avant (EAR travaille sur
+        // l'identité anatomique réelle des landmarks, indépendante de ce réglage). Activé par
+        // défaut (voir AppSettingsStore.mirrorModeEnabled) -- désactiver ce réglage envoie
+        // "corrected" tel quel, sortie native/anatomique.
+        val final = if (_uiState.value.mirrorModeEnabled) mirrorFaceTrackingResult(corrected) else corrected
+
         _trackingFrame.update {
             it.copy(
-                faceDetected = corrected.faceDetected,
-                allBlendshapes = corrected.blendshapes,
-                inferenceTimeMs = corrected.inferenceTimeMs,
-                faceLandmarks = corrected.faceLandmarks,
-                imageWidthPx = corrected.imageWidthPx,
-                imageHeightPx = corrected.imageHeightPx,
+                faceDetected = final.faceDetected,
+                allBlendshapes = final.blendshapes,
+                inferenceTimeMs = final.inferenceTimeMs,
+                faceLandmarks = final.faceLandmarks,
+                imageWidthPx = final.imageWidthPx,
+                imageHeightPx = final.imageHeightPx,
             )
         }
-        vmcSender?.send(corrected)
-        iFacialMocapSender?.send(corrected)
-        vtubeStudioSender?.send(corrected)
+        vmcSender?.send(final)
+        iFacialMocapSender?.send(final)
+        vtubeStudioSender?.send(final)
 
         // Diagnostic temporaire EAR (voir la constante EAR_DIAGNOSTIC_LOGGING ci-dessus) -- brut ET
         // corrigé côte à côte pour vérifier sur device que la correction atténue bien les fuites
@@ -739,6 +774,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 EAR_DIAG_TAG,
                 "eyeBlinkLeft brut=%.3f corrige=%.3f | eyeBlinkRight brut=%.3f corrige=%.3f".format(
                     blinkLeftRaw, blinkLeftCorrected, blinkRightRaw, blinkRightCorrected,
+                ),
+            )
+        }
+
+        // Diagnostic temporaire sourcils (voir BROW_DIAGNOSTIC_LOGGING ci-dessus) -- score brut de
+        // chaque côté à côté du ratio géométrique calculé avec la correspondance gauche/droite
+        // hypothétique (BrowLandmarkIndices) : sert à confirmer ou infirmer cette correspondance,
+        // pas encore à corriger quoi que ce soit.
+        if (BROW_DIAGNOSTIC_LOGGING && calibrated.faceLandmarks.isNotEmpty()) {
+            val browOuterUpLeftRaw = calibrated.blendshapes.firstOrNull { it.name == "browOuterUpLeft" }?.score ?: 0f
+            val browOuterUpRightRaw = calibrated.blendshapes.firstOrNull { it.name == "browOuterUpRight" }?.score ?: 0f
+            val browDownLeftRaw = calibrated.blendshapes.firstOrNull { it.name == "browDownLeft" }?.score ?: 0f
+            val browDownRightRaw = calibrated.blendshapes.firstOrNull { it.name == "browDownRight" }?.score ?: 0f
+            val browRaiseLeft = browRaiseRatioFromLandmarks(calibrated.faceLandmarks, BrowLandmarkIndices.LEFT_EYEBROW)
+            val browRaiseRight = browRaiseRatioFromLandmarks(calibrated.faceLandmarks, BrowLandmarkIndices.RIGHT_EYEBROW)
+            AppLog.d(
+                BROW_DIAG_TAG,
+                "L outerUp=%.3f down=%.3f ratio=%.3f | R outerUp=%.3f down=%.3f ratio=%.3f".format(
+                    browOuterUpLeftRaw, browDownLeftRaw, browRaiseLeft,
+                    browOuterUpRightRaw, browDownRightRaw, browRaiseRight,
+                ),
+            )
+        }
+
+        // Diagnostic temporaire cohérence rotation (voir ROTATION_DIAGNOSTIC_LOGGING ci-dessus) --
+        // sur "final" (donc après mode miroir éventuel) : ce qui est réellement envoyé, pas la
+        // valeur intermédiaire pré-miroir.
+        if (ROTATION_DIAGNOSTIC_LOGGING && final.faceDetected) {
+            AppLog.d(
+                ROTATION_DIAG_TAG,
+                "tete yaw=%.1f | oeil gauche yaw=%.1f | oeil droit yaw=%.1f".format(
+                    final.headEulerDegrees.getOrElse(1) { 0f },
+                    final.leftEyeEulerDegrees.getOrElse(1) { 0f },
+                    final.rightEyeEulerDegrees.getOrElse(1) { 0f },
                 ),
             )
         }
@@ -857,6 +926,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun setLogLevel(level: LogLevel) {
         viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setLogLevel(level) }
+    }
+
+    /**
+     * Mode miroir (point 51) -- persisté, réglable dans les réglages, effet immédiat (voir le
+     * collecteur `appSettingsStore.mirrorModeEnabled` dans init{}).
+     */
+    fun setMirrorModeEnabled(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setMirrorModeEnabled(enabled) }
     }
 
     /**

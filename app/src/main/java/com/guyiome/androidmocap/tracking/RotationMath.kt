@@ -49,19 +49,36 @@ object RotationMath {
     }
 
     /**
-     * [pitch (X), yaw (Y), roll (Z)] en degrés depuis une matrice de rotation 3x3 row-major.
+     * [pitch (X), yaw (Y), roll (Z)] en degrés depuis une matrice de rotation 3x3 row-major --
+     * formule brute, SANS inversion de signe : yaw/roll anatomiquement natifs (pas mirrorés), voir
+     * [mirrorEulerDegrees] pour le mode miroir explicite.
      *
-     * Yaw inversé par rapport à la formule brute atan2(r02, r22) -- confirmé empiriquement sur
-     * device pour la pose de tête brute. Appliqué une seule fois, sur la matrice finale déjà
-     * composée (tête + compensation téléphone + calibration) : pas besoin de deviner si la
-     * rotation du téléphone a besoin du même signe, la matrice résultante encode tout.
+     * Historique (revue technique, point 51) : le yaw était auparavant inversé ici même
+     * (`-atan2(...)`) suite à une validation empirique sur device qui, avec le recul, validait en
+     * réalité un comportement mirroré (tête vue "comme dans un miroir") sans que ce soit nommé ni
+     * choisi comme tel -- découvert le 10 août 2026 en croisant tête/regard/clignement : la tête
+     * partait mirrorée alors que tous les autres blendshapes gauche/droite (regard, clignement...)
+     * partaient en convention anatomique, jamais les deux ensemble de façon cohérente. Remis en
+     * formule brute ici ; le mode miroir, quand activé, mirrore tête ET blendshapes ensemble, au
+     * même endroit ([com.guyiome.androidmocap.ui.MainViewModel]), plutôt que la tête toute seule.
      */
     fun toEulerDegrees(m: FloatArray): FloatArray {
         val pitch = Math.toDegrees(Math.asin((-m[5]).toDouble().coerceIn(-1.0, 1.0))).toFloat()
-        val yaw = -Math.toDegrees(Math.atan2(m[2].toDouble(), m[8].toDouble())).toFloat()
+        val yaw = Math.toDegrees(Math.atan2(m[2].toDouble(), m[8].toDouble())).toFloat()
         val roll = Math.toDegrees(Math.atan2(m[3].toDouble(), m[4].toDouble())).toFloat()
         return floatArrayOf(pitch, yaw, roll)
     }
+
+    /**
+     * Applique le mode miroir aux angles d'Euler de la tête -- une vraie réflexion gauche-droite
+     * (plan vertical) inverse le yaw (tourner la tête) et le roll (l'incliner d'une épaule à
+     * l'autre), mais préserve le pitch (hocher la tête) : conséquence géométrique standard d'une
+     * réflexion, pas un choix arbitraire. À appliquer uniquement en même temps que
+     * [mirrorBlendshapes] sur les blendshapes -- jamais l'un sans l'autre, voir revue technique
+     * point 51.
+     */
+    fun mirrorEulerDegrees(pitchYawRoll: FloatArray): FloatArray =
+        floatArrayOf(pitchYawRoll[0], -pitchYawRoll[1], -pitchYawRoll[2])
 
     /**
      * Convertit un quaternion (x, y, z, w) en matrice de rotation 3x3 row-major -- même format que

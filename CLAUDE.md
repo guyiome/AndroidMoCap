@@ -111,6 +111,16 @@ the mesh overlay setting, now also consumed by the eyeBlink correction below, an
 these points internally regardless of whether the app reads them), and the analyzed image's own pixel
 dimensions (needed by the projection math below).
 
+**Brow raise geometry.** `tracking/BrowRaise.kt` (`browRaiseRatio()`, same shape as EAR below: two
+landmark distances normalized by eye width) — a first cut at applying the same principle to
+`browOuterUpLeft/Right`/`browDownLeft/Right`, prompted by comparing against NVIDIA Broadcast's
+face-tracking pipeline (which does the same landmark-derived-expression approach, just with more
+targeted training). `BrowLandmarkIndices` L/R mapping is a **hypothesis, not yet device-confirmed**
+— inferred by analogy with the already-confirmed eye L/R inversion from the same source blog, not
+measured directly. A temporary diagnostic (`MainViewModel.BROW_DIAGNOSTIC_LOGGING`, tag `BrowDiag`)
+is in place to verify it before wiring any actual correction — don't treat the mapping as trustworthy
+until that's done.
+
 **Eye blink reliability.** `tracking/EyeAspectRatio.kt` computes a geometric Eye Aspect Ratio (EAR)
 per eye from the landmark mesh (`EyeLandmarkIndices.LEFT_EYE`/`RIGHT_EYE`, confirmed against real
 `eyeBlinkLeft`/`eyeBlinkRight` device tests — see revue technique point 28/45, don't trust community
@@ -176,6 +186,22 @@ are still unknown, e.g. before the first frame). This must stay in sync with wha
 `FaceLandmarkerHelper` reports as `imageWidthPx`/`imageHeightPx` — get it wrong and the mesh
 overlay silently drifts from the face on any device whose camera aspect ratio differs from its screen
 (see revue technique point 27 for the device bug this fixed).
+
+**Mirror mode** (revue technique point 51, `tracking/Mirroring.kt` + `RotationMath.mirrorEulerDegrees`,
+`AppSettingsStore.mirrorModeEnabled`, on by default). `RotationMath.toEulerDegrees` used to negate head
+yaw unconditionally — an old, undocumented "worked on device" fix that, in hindsight, silently baked in
+mirrored head behavior, while every left/right blendshape (`eyeBlinkLeft/Right`, gaze, brows, mouth...)
+kept shipping anatomically — confirmed on device (10 Aug 2026) as an incoherence: turn your head to show
+one side + wink that side's eye, and the two disagreed on VBridger. Fixed at the root: `toEulerDegrees`
+is raw/native now (no hidden flip); `mirrorEulerDegrees()` (negates yaw+roll, preserves pitch — the
+actual geometry of a left-right reflection, roll was never mirrored even under the old behavior) and
+`mirrorFaceTrackingResult()` (blendshapes + head + **both eye gaze arrays, swapped between L/R slots
+AND mirrored individually**) apply together, in one place, at the very end of
+`MainViewModel.handleTrackingResult()`, after EAR correction (which stays anatomy-based, untouched by
+this setting). Don't ever mirror the head alone again — same bug, just moved. The on-screen
+preview/mesh mirroring (`FaceMeshOverlay`, always on, CameraX's own selfie-view convention) is
+deliberately **not** wired to this setting — different concern (the user's own self-monitoring comfort
+vs. what the avatar receives), conflating them was considered and rejected.
 
 **Network senders.** Three mutually-exclusive senders, all driven off the same `FaceTrackingResult`:
 `network/VmcOscSender.kt` batches an entire frame's blendshapes into a single `OSCBundle`

@@ -119,6 +119,8 @@
     <string name="display_mesh_overlay_title">Overlay du mesh de tracking</string>
     <string name="display_mesh_overlay_description">Superpose les points détectés par MediaPipe sur l\'aperçu caméra -- pratique pour vérifier la qualité du tracking sans dépendre de VTube Studio/Blender.</string>
     <string name="display_keep_mesh_overlay_in_power_save_label">Garder l\'overlay du mesh visible en mode économie d\'énergie</string>
+    <string name="display_mirror_mode_title">Mode miroir</string>
+    <string name="display_mirror_mode_description">Activé par défaut (cohérent avec l\'aperçu caméra toujours mirroré ci-dessous) : la tête, le regard et tous les blendshapes gauche/droite sont mirorés ensemble, comme te voir dans un miroir. Désactive ce réglage pour envoyer ta vraie anatomie à la place (tourne la tête à droite, l\'avatar tourne sa propre droite).</string>
     <string name="display_power_save_title">Mode économie d\'énergie</string>
     <string name="display_power_save_description">Après le délai ci-dessous sans toucher l\'écran : écran assombri, aperçu caméra masqué (le tracking et l\'envoi continuent normalement). Un simple toucher de l\'écran en ressort.</string>
     <string name="display_power_save_delay">Délai d\'inactivité : %1$d s</string>

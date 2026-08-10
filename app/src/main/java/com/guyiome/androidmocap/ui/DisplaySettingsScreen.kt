@@ -48,6 +48,7 @@ fun DisplaySettingsScreen(
     onSetPowerSaveDelay: (Int) -> Unit,
     onSetFaceMeshOverlay: (Boolean) -> Unit,
     onSetKeepMeshOverlayInPowerSave: (Boolean) -> Unit,
+    onSetMirrorMode: (Boolean) -> Unit,
     onSetAppLanguage: (AppLanguage) -> Unit,
 ) {
     BackHandler(onBack = onClose)
@@ -129,6 +130,19 @@ fun DisplaySettingsScreen(
                     modifier = Modifier.weight(1f),
                 )
                 Switch(checked = uiState.keepMeshOverlayInPowerSave, onCheckedChange = onSetKeepMeshOverlayInPowerSave)
+            }
+
+            Spacer(Modifier.height(24.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.display_mirror_mode_title), color = Color.White, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.display_mirror_mode_description),
+                        color = Color.White.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Switch(checked = uiState.mirrorModeEnabled, onCheckedChange = onSetMirrorMode)
             }
 
             Spacer(Modifier.height(24.dp))

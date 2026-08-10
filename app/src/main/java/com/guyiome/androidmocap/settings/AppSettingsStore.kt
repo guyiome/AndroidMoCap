@@ -40,6 +40,7 @@ class AppSettingsStore(private val context: Context) {
         val DEBUG_FORCE_ARCORE_UNAVAILABLE = booleanPreferencesKey("debug_force_arcore_unavailable")
         val DEBUG_FORCE_GPU_UNAVAILABLE = booleanPreferencesKey("debug_force_gpu_unavailable")
         val LOG_LEVEL = stringPreferencesKey("log_level")
+        val MIRROR_MODE = booleanPreferencesKey("mirror_mode_enabled")
     }
 
     val lowBatteryThresholdPercent: Flow<Int> = context.appSettingsDataStore.data.map { prefs ->
@@ -193,5 +194,22 @@ class AppSettingsStore(private val context: Context) {
 
     suspend fun setLogLevel(level: LogLevel) {
         context.appSettingsDataStore.edit { prefs -> prefs[Keys.LOG_LEVEL] = level.name }
+    }
+
+    /**
+     * Mode miroir (revue technique, point 51) : mirrore ensemble la tête et tous les blendshapes
+     * gauche/droite avant envoi ([com.guyiome.androidmocap.tracking.mirrorFaceTrackingResult]) --
+     * **activé par défaut** : l'aperçu caméra/mesh à l'écran est déjà mirroré en permanence
+     * (indépendant de ce réglage, voir `FaceMeshOverlay`), donc avoir la donnée réseau mirorée par
+     * défaut évite un décalage day-one entre ce que l'utilisateur voit et ce que fait l'avatar --
+     * cohérent aussi avec la convention la plus répandue côté VTubing (VBridger et consorts).
+     * Toujours réglable : désactiver ce switch envoie la sortie native/anatomique à la place.
+     */
+    val mirrorModeEnabled: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[Keys.MIRROR_MODE] ?: true
+    }
+
+    suspend fun setMirrorModeEnabled(enabled: Boolean) {
+        context.appSettingsDataStore.edit { prefs -> prefs[Keys.MIRROR_MODE] = enabled }
     }
 }

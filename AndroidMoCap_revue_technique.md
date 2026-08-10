@@ -82,6 +82,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 48 | Robustesse du clignement à l'angle de caméra (suite du 45) | **✅ confirmé sur device le 9 août 2026** -- référence EAR "fermé" désormais auto-adaptative par œil (`AdaptiveEarFloor`), corrige un clin d'œil réel écrasé à un angle de caméra en contre-plongée ; testé sans réintroduire la fuite gauche/droite, voir section dédiée plus bas |
 | 49 | Canal de release beta | **✅ mis en place (9 août 2026)** -- tag `-beta` publie une Release GitHub en prerelease (`release.yml`), voir section dédiée plus bas |
 | 50 | Journalisation uniformisée + partage utilisateur | **✅ confirmé sur device (9 août 2026)** -- un bug réel trouvé et corrigé en cours de validation (niveau INFO vide sur le palier ARCore), couverture étendue à 4 nouveaux logs `INFO`, voir section dédiée plus bas |
+| 51 | Cohérence miroir tête / regard / blendshapes | **✅ corrigé et confirmé sur device (10 août 2026)** -- la tête était mirrorée mais aucun blendshape gauche/droite ne l'était ; sortie native (anatomique) et mode miroir désormais tous deux cohérents, mode miroir activé par défaut (cohérent avec l'aperçu écran déjà mirroré), voir section dédiée plus bas |
 
 Points 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 22, 23 : traités ou correctement à l'état de backlog priorisé
 (point 23), rien à corriger côté statut. Les sections détaillées des points 15/16/19/20, qui
@@ -2124,6 +2125,71 @@ retenu et pourquoi) et deux implémentés mais pas encore exercés en conditions
 déconnexion réussie des trois émetteurs réseau -- nécessite une vraie cible PC ; changement de débit
 réellement appliqué par le throttling thermique -- nécessite un appareil qui chauffe réellement,
 même limite que le point 37 de ce document).
+
+### 51. Cohérence miroir tête / regard / blendshapes -- ✅ corrigé et confirmé sur device
+
+Repris d'une remarque de l'utilisateur en pleine discussion du point 15 (langue tirée) : "on a un
+souci de cohérence sur ce qu'on envoie, les yeux gauche/droite sont inversés par rapport à la
+rotation de la tête (la tête est en mode 'miroir' pas les yeux)". Investigation menée avec le même
+protocole que le point 28 (marqueurs start/stop, mouvements tenus, logs de diagnostic temporaires)
+avant de toucher au code -- deux faux départs (mesures trop bruitées, tracking pas encore démarré
+au début d'un test) avant d'obtenir des données propres.
+
+**Cause racine confirmée** : `RotationMath.toEulerDegrees` inversait le yaw de la tête
+(`-atan2(...)`) depuis l'origine du projet -- une validation empirique passée avait bien confirmé
+que ça "marchait" sur device, mais validait en réalité un comportement **mirroré** sans que ce soit
+jamais nommé ni voulu comme tel. Aucun autre blendshape gauche/droite (`eyeBlinkLeft/Right`,
+`eyeLookIn/OutLeft/Right`, et par extension tous les autres blendshapes latéralisés du catalogue --
+sourcils, bouche, joues, nez) n'était mirroré. Donc : la tête suivait une convention, tous les
+blendshapes latéralisés en suivaient une autre -- cohérent chacun avec soi-même isolément, mais pas
+entre eux dès qu'on combine un mouvement de tête et un blendshape latéralisé (typiquement une
+expression complexe, exactement ce qui avait mis la puce à l'oreille de l'utilisateur).
+
+**Confirmé sur device en 2 temps** :
+1. D'abord via les logs (`RotationDiag`/`EarDiag`, diagnostics temporaires) : tête tournée à droite
+   + clin d'œil droit combinés montre bien `eyeBlinkRight` qui monte (pas une inversion gauche/
+   droite du blendshape lui-même) -- mais sans conclusion possible sur le sens de la tête, faute de
+   VBridger connecté pendant ce test.
+2. Puis directement sur l'avatar VBridger (VBridger reconnecté) : confirmé explicitement --
+   "la rota visage est en mirroir, le sens du regard et le côté de clignement ne le sont pas".
+
+**Décision de conception de l'utilisateur** : plutôt que de mirrorer tout le reste pour rejoindre la
+tête (rafistolage), la sortie **native** de l'app ne doit pas être mirorée -- comportement
+anatomique natif, avec une option de mode miroir explicite (le "point 51" du backlog personnel,
+"option d'inversion des blendshapes", pointait déjà vers ce même chantier).
+
+**Implémenté** :
+- `RotationMath.toEulerDegrees` : yaw remis en formule brute (non inversée) -- retiré en TDD, avec
+  des matrices de rotation connues construites à la main (pas recopiées de l'implémentation), voir
+  `RotationMathTest.kt`. Nouvelle fonction `RotationMath.mirrorEulerDegrees()` : inverse yaw ET roll,
+  préserve le pitch -- conséquence géométrique d'une vraie réflexion gauche-droite (pas un choix
+  arbitraire), le roll n'était jusque-là jamais mirroré même à l'époque de l'ancien comportement.
+- `tracking/Mirroring.kt` (nouveau, pur, testé) : `mirrorBlendshapeName()`/`mirrorBlendshapes()`
+  échangent les scores entre paires gauche/droite, dérivées du suffixe du nom (pas une liste tenue à
+  la main) -- couvre automatiquement toute paire présente dans `BlendshapeCatalog`, test dédié qui
+  parcourt le vrai catalogue pour attraper une régression si une future paire est mal nommée.
+  `mirrorFaceTrackingResult()` : mirrore tête + blendshapes + regard par œil (échangés entre eux ET
+  chacun mirroré individuellement) en un seul appel, point d'entrée unique pour `MainViewModel`.
+- `AppSettingsStore.mirrorModeEnabled` : **activé par défaut** -- décidé après coup avec
+  l'utilisateur, l'aperçu caméra/mesh à l'écran étant déjà mirroré en permanence (indépendant de ce
+  réglage, voir `FaceMeshOverlay`) et la convention VTubing la plus répandue penchant déjà vers un
+  comportement miroir par défaut ; désactivable pour la sortie native/anatomique.
+- Appliqué en tout dernier dans `MainViewModel.handleTrackingResult()`, après la correction EAR
+  (qui reste basée sur l'identité anatomique réelle des landmarks, indépendante de ce réglage) --
+  jamais l'un sans l'autre.
+- UI : interrupteur "Mode miroir" dans `DisplaySettingsScreen`, volontairement **pas lié** à
+  l'aperçu caméra/mesh (déjà mirroré en permanence, sert au confort de positionnement de
+  l'utilisateur -- un besoin différent de la convention des données envoyées, les lier risquerait de
+  désorienter quelqu'un qui veut un aperçu naturel avec une sortie anatomique).
+
+**Tests** : `RotationMathTest.kt` (2 nouveaux -- `mirrorEulerDegrees` inverse yaw/roll pas le pitch,
+appliqué deux fois redonne l'original -- plus le test existant sur la rotation Y mis à jour pour la
+formule brute), `MirroringTest.kt` (8 tests -- échange de noms, blendshapes sans paire inchangés,
+`FaceTrackingResult` complet, couverture du vrai catalogue, involution).
+
+**✅ confirmé sur device le 10 août 2026, les deux modes** : natif (anatomique) validé "nickel" par
+l'utilisateur avec VBridger connecté ; mode miroir revalidé séparément par l'utilisateur comme
+reproduisant l'ancien comportement, cette fois cohérent sur toute la chaîne.
 
 **Vérification nocturne GitHub (Claude Code cloud, routine planifiée)** -- créée le 6 août 2026,
 tous les jours à 19:00 UTC (~21h Paris en été, ~20h en hiver -- le cron reste fixe en UTC). Lecture

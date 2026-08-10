@@ -91,9 +91,12 @@ class RotationMathTest {
     }
 
     @Test
-    fun `une rotation pure autour de Y ne donne que du yaw, signe inverse`() {
-        // Régression : le yaw est documenté comme inversé par rapport à la formule brute
-        // atan2(r02, r22), confirmé empiriquement sur device -- ce test fige ce comportement.
+    fun `une rotation pure autour de Y ne donne que du yaw, formule brute non inversee`() {
+        // Point 53 (revue technique) : le yaw n'est plus inversé ici -- valeur native/anatomique,
+        // pas mirrorée. L'ancienne version de ce test figeait -15° (inversé) ; l'inversion vivait en
+        // réalité un comportement mirroré jamais nommé comme tel, découvert en croisant tête/regard/
+        // clignement sur device le 10 août 2026 -- voir mirrorEulerDegrees() pour le mode miroir
+        // désormais explicite.
         val theta = Math.toRadians(15.0)
         val c = cos(theta).toFloat()
         val s = sin(theta).toFloat()
@@ -104,8 +107,23 @@ class RotationMathTest {
         )
         val (pitch, yaw, roll) = RotationMath.toEulerDegrees(rotationY)
         assertEquals(0f, pitch, delta)
-        assertEquals(-15f, yaw, delta)
+        assertEquals(15f, yaw, delta)
         assertEquals(0f, roll, delta)
+    }
+
+    @Test
+    fun `mirrorEulerDegrees inverse yaw et roll mais pas le pitch`() {
+        val result = RotationMath.mirrorEulerDegrees(floatArrayOf(12f, 34f, 56f))
+        assertEquals(12f, result[0], delta)
+        assertEquals(-34f, result[1], delta)
+        assertEquals(-56f, result[2], delta)
+    }
+
+    @Test
+    fun `mirrorEulerDegrees applique deux fois redonne l'original`() {
+        val original = floatArrayOf(7f, -22f, 41f)
+        val mirroredTwice = RotationMath.mirrorEulerDegrees(RotationMath.mirrorEulerDegrees(original))
+        for (i in 0 until 3) assertEquals(original[i], mirroredTwice[i], delta)
     }
 
     @Test
