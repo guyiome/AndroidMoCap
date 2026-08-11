@@ -3,11 +3,15 @@ package com.guyiome.androidmocap.settings
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.guyiome.androidmocap.logging.LogLevel
+import com.guyiome.androidmocap.tracking.DEFAULT_CALIBRATION_RECORDING_DURATION_MS
+import com.guyiome.androidmocap.tracking.DEFAULT_CLASSIFICATION_MARGIN
 import com.guyiome.androidmocap.tracking.TrackingTier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -42,6 +46,9 @@ class AppSettingsStore(private val context: Context) {
         val LOG_LEVEL = stringPreferencesKey("log_level")
         val MIRROR_MODE = booleanPreferencesKey("mirror_mode_enabled")
         val TONGUE_OUT_DETECTION = booleanPreferencesKey("tongue_out_detection_enabled")
+        val TONGUE_REFERENCES_CALIBRATED = booleanPreferencesKey("tongue_references_calibrated")
+        val TONGUE_CALIBRATION_RECORDING_DURATION_MS = longPreferencesKey("tongue_calibration_recording_duration_ms")
+        val TONGUE_CLASSIFICATION_MARGIN = floatPreferencesKey("tongue_classification_margin")
     }
 
     val lowBatteryThresholdPercent: Flow<Int> = context.appSettingsDataStore.data.map { prefs ->
@@ -228,5 +235,45 @@ class AppSettingsStore(private val context: Context) {
 
     suspend fun setTongueOutDetectionEnabled(enabled: Boolean) {
         context.appSettingsDataStore.edit { prefs -> prefs[Keys.TONGUE_OUT_DETECTION] = enabled }
+    }
+
+    /**
+     * Miroir UI-only de l'état réel de la calibration de l'étage 3 (revue technique, point 15) --
+     * la source de vérité reste `TongueCalibrationStore.load() != null` (fichier `filesDir`, pas
+     * DataStore : deux vecteurs de floats n'ont pas leur place dans des préférences scalaires).
+     * Ce flag évite juste une lecture disque réactive à chaque recomposition de l'écran de
+     * calibration -- mis à jour juste après un `TongueCalibrationStore.save()` réussi.
+     */
+    val tongueReferencesCalibrated: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[Keys.TONGUE_REFERENCES_CALIBRATED] ?: false
+    }
+
+    suspend fun setTongueReferencesCalibrated(calibrated: Boolean) {
+        context.appSettingsDataStore.edit { prefs -> prefs[Keys.TONGUE_REFERENCES_CALIBRATED] = calibrated }
+    }
+
+    /**
+     * Durée d'enregistrement par phase de calibration ("langue dehors"/"langue rentrée") --
+     * réglable depuis un panneau debug plutôt que codée en dur (voir
+     * `TongueCalibrationRecordingState.DEFAULT_CALIBRATION_RECORDING_DURATION_MS`) : les étages 1/2
+     * ont demandé sept sessions de réglage sur device, éviter le même cycle rebuild+reinstall pour
+     * chaque essai ici.
+     */
+    val tongueCalibrationRecordingDurationMs: Flow<Long> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[Keys.TONGUE_CALIBRATION_RECORDING_DURATION_MS] ?: DEFAULT_CALIBRATION_RECORDING_DURATION_MS
+    }
+
+    suspend fun setTongueCalibrationRecordingDurationMs(durationMs: Long) {
+        context.appSettingsDataStore.edit { prefs -> prefs[Keys.TONGUE_CALIBRATION_RECORDING_DURATION_MS] = durationMs }
+    }
+
+    /** Marge de classification de l'étage 3 -- même rationale que la durée ci-dessus, voir
+     *  `TongueEmbeddingClassifier.DEFAULT_CLASSIFICATION_MARGIN`. */
+    val tongueClassificationMargin: Flow<Float> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[Keys.TONGUE_CLASSIFICATION_MARGIN] ?: DEFAULT_CLASSIFICATION_MARGIN
+    }
+
+    suspend fun setTongueClassificationMargin(margin: Float) {
+        context.appSettingsDataStore.edit { prefs -> prefs[Keys.TONGUE_CLASSIFICATION_MARGIN] = margin }
     }
 }
