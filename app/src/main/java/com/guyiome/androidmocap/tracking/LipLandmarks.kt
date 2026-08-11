@@ -40,15 +40,17 @@ internal data class MouthCropRegion(val x: Int, val y: Int, val width: Int, val 
  * Taille minimale (largeur ET hauteur, px) sous laquelle un recadrage est considéré dégénéré plutôt
  * que fiable -- trouvé sur device le 11 août 2026 (revue technique, point 15quater) : bouche fermée
  * + lèvre inférieure mordue/rentrée produit un recadrage de 7-14px de large (la ligne de contact
- * entre les lèvres pressées, pas l'intérieur de la bouche), contre 17-63px pour une bouche
+ * entre les lèvres pressées, pas l'intérieur de la bouche), contre 27-63px pour une bouche
  * réellement ouverte sur les mêmes sessions -- lu comme "100% couleur langue" à tort par l'étage 2
  * ET l'étage 3, alors que jawOpen (blendshape ML) restait élevé malgré une bouche géométriquement
- * fermée (mouthOpennessRatio proche de 0). Valeur provisoire, pas finement calée -- choisie pour
- * séparer nettement les deux groupes observés, à réviser si de futures données montrent un
- * chevauchement (même esprit que InferenceLoadMonitor.marginRatio, "garde-fou conservateur non
- * validé" documenté comme tel plutôt que présenté comme définitif).
+ * fermée (mouthOpennessRatio proche de 0). Un premier seuil à 15px a réduit le problème sans le
+ * résoudre -- 67% des faux `TONGUE_OUT` restants tombaient à 15-17px, juste au-dessus de ce seuil
+ * trop juste -- remonté à 25px, nettement au-dessus de ce groupe résiduel. Valeur provisoire, pas
+ * finement calée -- à réviser si de futures données montrent un chevauchement (même esprit que
+ * InferenceLoadMonitor.marginRatio, "garde-fou conservateur non validé" documenté comme tel plutôt
+ * que présenté comme définitif).
  */
-internal const val MIN_CROP_DIMENSION_PX = 15
+internal const val MIN_CROP_DIMENSION_PX = 25
 
 /**
  * Ratio d'ouverture de bouche dérivé des landmarks (distance lèvre sup./inf. internes, normalisée
