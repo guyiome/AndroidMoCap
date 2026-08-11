@@ -56,6 +56,7 @@ import com.guyiome.androidmocap.tracking.DEFAULT_CLASSIFICATION_MARGIN
 import com.guyiome.androidmocap.tracking.TongueEmbeddingClassification
 import com.guyiome.androidmocap.tracking.TongueOutDisplayState
 import com.guyiome.androidmocap.tracking.jawOpenGateOpen
+import com.guyiome.androidmocap.tracking.mouthGeometricGateOpen
 import com.guyiome.androidmocap.tracking.mirrorFaceTrackingResult
 import com.guyiome.androidmocap.tracking.mouthCropRegion
 import com.guyiome.androidmocap.tracking.mouthOpennessRatio
@@ -1045,7 +1046,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // perturbe le suivi des landmarks mâchoire) ou un vrai relâchement de la bouche.
             val mouthGeometric = mouthOpennessRatio(corrected.faceLandmarks)
             var tongueOutClassification: TongueEmbeddingClassification? = null
-            if (jawOpenGateOpen(jawOpen)) {
+            // jawOpen (ML) ET mouthGeometric (géométrique) requis ensemble depuis le 11 août 2026 --
+            // jawOpen seul peut être trompé (bouche pressée/lèvre mordue lit un jawOpen élevé malgré
+            // une bouche géométriquement fermée), reproduit deux fois sur device le même jour (revue
+            // technique, point 15quinquies). Voir kdoc de mouthGeometricGateOpen (TongueOutGate.kt).
+            if (jawOpenGateOpen(jawOpen) && mouthGeometricGateOpen(mouthGeometric)) {
                 val ratio = sampleMouthTonguePixelRatio(
                     corrected.timestampMs,
                     corrected.faceLandmarks,
@@ -1111,7 +1116,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             } else if (TONGUE_DIAGNOSTIC_LOGGING) {
-                AppLog.d(TONGUE_DIAG_TAG, "jawOpen=%.3f mouthGeo=%.3f etage1=NON".format(jawOpen, mouthGeometric))
+                AppLog.d(
+                    TONGUE_DIAG_TAG,
+                    "jawOpen=%.3f mouthGeo=%.3f etage1=NON (jawOpenOk=%s mouthGeoOk=%s)".format(
+                        jawOpen, mouthGeometric, jawOpenGateOpen(jawOpen), mouthGeometricGateOpen(mouthGeometric),
+                    ),
+                )
             }
 
             // Valorisation LOCALE uniquement (panneau de blendshapes de l'app) -- demande explicite
