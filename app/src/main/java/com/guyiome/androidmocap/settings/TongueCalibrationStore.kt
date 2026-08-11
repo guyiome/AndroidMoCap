@@ -3,6 +3,7 @@ package com.guyiome.androidmocap.settings
 import com.guyiome.androidmocap.logging.AppLog
 import com.guyiome.androidmocap.tracking.TongueCalibrationResult
 import java.io.File
+import java.util.Locale
 
 /**
  * Stockage des deux vecteurs de référence de l'étage 3 de la cascade langue tirée (revue technique,
@@ -44,9 +45,16 @@ internal class TongueCalibrationStore(private val filesDir: File) {
         runCatching {
             filesDir.mkdirs()
             val file = File(filesDir, FILE_NAME)
+            // Locale.ROOT explicite, pas la locale par défaut de l'appareil -- "%.8f" en français
+            // écrit une virgule décimale ("-0,00334370"), qui collisionne avec le séparateur CSV et
+            // coupe chaque nombre en deux à la relecture. Bug réel trouvé sur device le 11 août 2026 :
+            // un vecteur de ~1024 valeurs se relisait à 2048, la comparaison de similarité tombait à
+            // 0.0 en permanence (incompatibilité de taille dans cosineSimilarity) -- silencieux, sans
+            // exception, donc jamais détecté par `load()`. Voir TongueCalibrationStoreTest pour le
+            // test de non-régression sous locale française.
             val text = buildString {
-                appendLine(result.tongueOutReference.joinToString(",") { "%.8f".format(it) })
-                appendLine(result.tongueInReference.joinToString(",") { "%.8f".format(it) })
+                appendLine(result.tongueOutReference.joinToString(",") { "%.8f".format(Locale.ROOT, it) })
+                appendLine(result.tongueInReference.joinToString(",") { "%.8f".format(Locale.ROOT, it) })
             }
             file.writeText(text)
         }.onFailure {
