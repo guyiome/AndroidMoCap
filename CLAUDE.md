@@ -225,16 +225,42 @@ parameter. UI-facing naming for iFacialMocap was deliberately decoupled from its
 app — don't propagate that rename into the protocol-level identifiers (`ConnectionType.IFACIALMOCAP`,
 class name, handshake constants), which are intentionally left as-is.
 
+**Tongue-out detection cascade** (revue technique point 15, phase 1 confirmed on device 11 Aug 2026).
+MediaPipe's face mesh can't see inside the mouth, so `tongueOut` is always 0 — a 3-stage cascade
+reads the camera pixels directly instead. Stage 1 (`tracking/TongueOutGate.kt`, `jawOpenGateOpen()`)
+gates on the existing `jawOpen` blendshape, confirmed reliable on both CameraX and ARCore. Stage 2
+(`tracking/LipLandmarks.kt` for the mouth crop region, `tracking/MouthColorAnalysis.kt` for the
+color heuristic) reads real pixels via `CameraController.peekPooledBitmap()` (CameraX) or
+`ArCoreHeadPoseTracker.peekLastBitmap()` (ARCore, added this session — ARCore allocates a fresh,
+unpooled `Bitmap` per frame already, so this just retains the last one an extra beat rather than
+building a real pool). **`LipLandmarkIndices` mapping is now device-confirmed** (raw coordinates
+logged and compared — the initial hypothesis had corners/lip-center swapped, fixed). Stage 2's own
+color classifier, however, is **not reliable** even with an adaptive baseline
+(`tracking/TongueColorBaseline.kt`, same `next()`/gated-update shape as `AdaptiveEarFloor`) — a
+fixed threshold drifts too much session-to-session, and on the CameraX tier the raw ratio barely
+separates tongue-out from mouth-open-only at all. This isn't a tuning gap, it's confirmation that
+color alone can't carry the decision — stage 3 (embedding classification + personal calibration,
+not yet built) is genuinely required, exactly as the original design assumed; stage 2 only exists to
+filter obviously-negative frames before it. `tongueOut` is therefore never injected in phase 1 —
+`TONGUE_DIAGNOSTIC_LOGGING` (off by default) is the only way to see any of this cascade's output.
+Separately, while debugging stage 2's crop, a full-frame debug image (`saveTongueDebugCrop()`)
+revealed the ARCore camera bitmap is rotated ~90° counter-clockwise from reality — confirmed by the
+user looking at the image, not just inferred — a pre-existing bug in
+`ArCoreHeadPoseTracker`'s rotation formula (already flagged in its own kdoc as "never visually
+verified"), independent of point 15 and potentially affecting OPTIMAL-tier tracking accuracy more
+broadly. Not yet fixed — noted in the private backlog.
+
 **Settings persistence.** `settings/AppSettingsStore.kt` and `settings/ConnectionSettingsStore.kt`
 wrap Jetpack DataStore Preferences. Blendshape selection persistence across sessions is opt-in
 (`persistBlendshapeSelectionEnabled`, default off — historic reset-on-launch behavior preserved
 unless the user turns it on).
 
 **UI navigation.** `SettingsScreen.kt` is a 5-category menu (`DiagnosticsScreen`,
-`ConnectionSettingsScreen`, `DisplaySettingsScreen`, `ExperimentalFeaturesScreen` — currently a
-placeholder, `LoggingSettingsScreen`) plus `BlendshapeSelectionScreen`, all overlay screens closable
-via a standard back arrow, the hardware back button, or the predictive-back gesture (`BackHandler`) —
-all three trigger the same `onClose`.
+`ConnectionSettingsScreen`, `DisplaySettingsScreen`, `ExperimentalFeaturesScreen` — a toggle for the
+tongue-out detection diagnostic (point 15) plus a placeholder for cheek-puff detection (point 16),
+`LoggingSettingsScreen`) plus `BlendshapeSelectionScreen`, all overlay screens closable via a
+standard back arrow, the hardware back button, or the predictive-back gesture (`BackHandler`) — all
+three trigger the same `onClose`.
 
 **In-app language selector** (point 30, `DisplaySettingsScreen` — "Langue de l'app"), confirmed
 working on device including persistence across a full restart. Requires `MainActivity` to extend

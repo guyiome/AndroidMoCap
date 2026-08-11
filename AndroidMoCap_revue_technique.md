@@ -55,7 +55,7 @@ trois qui se trouvent être déjà implémentés sur `main`.
 | 3 / 13 | Fusion ARCore (palier `OPTIMAL`) | **Intégrée sur `main` et testée sur device le 6 août 2026** (réimplémentée à neuf, pas mergée depuis `feature/arcore-fusion`) -- tracking fonctionnel confirmé par l'utilisateur (crash, rotation et perf corrigés en cours de session), voir sa section dédiée pour le détail et les points mineurs restants |
 | 8 | Minify/R8 en release | **✅ activé et confirmé sur device le 9 août 2026** (shrinking + renommage, `-dontoptimize` conservé -- crash confirmé sinon, voir section dédiée) |
 | 14 | Vérification de mise à jour semi-automatique | Backlog -- **bloqué** tant que le dépôt reste privé (API GitHub Releases exige une authentification), voir section dédiée plus bas |
-| 15 | Détection langue (cascade) | Conception actée, aucun code écrit -- prérequiert le throttling thermique continu (point 3/13). **Confirmé par observation device le 6 août 2026** : le mesh montre que `tongueOut` n'est pas du tout restitué par MediaPipe (pas juste peu fiable), cohérent avec sa présence dans `BlendshapeCatalog.unreliable`. |
+| 15 | Détection langue (cascade) | **Phase 1 (étages 1+2) implémentée et confirmée sur device le 11 août 2026** -- étage 1 (porte jawOpen) fiable sur CameraX + ARCore ; étage 2 (couleur) fonctionnel mécaniquement mais son classifieur non fiable sur les deux chemins caméra testés, seuil fixe ou adaptatif -- étage 3 (embedding + calibration) nécessaire pour une vraie détection, voir section dédiée plus bas. `tongueOut` toujours à 0 côté réception (aucune injection tant que l'étage 3 n'existe pas). |
 | 16 | Détection joues (cascade allégée) | Conception actée, aucun code écrit. **Confirmé par observation device le 6 août 2026** : le mesh bouge très peu au gonflement des joues -- le signal géométrique disponible pour une cascade risque d'être faible/bruité, point d'attention à garder pour la conception détaillée. |
 | 17 | Indicateur de fiabilité par blendshape | **Implémenté sur `main`, voir point 24** (l'index le disait encore "aucun code écrit" par erreur) |
 | 18 | Persistance sélection blendshapes + valeur brute/ajustée | **Persistance implémentée sur `main`, voir point 25** -- le volet "valeur brute à côté de la valeur ajustée" reste en attente (dépend d'une pondération par blendshape jamais construite) |
@@ -856,9 +856,67 @@ frames où les deux premiers étages ont déjà donné un indice positif -- cont
 budget déjà mesuré par `inferenceTimeMs`, à vérifier concrètement une fois implémenté plutôt qu'estimé
 ici.
 
-Statut : idée de conception actée suite à discussion, aucun code écrit. Prochaine étape naturelle :
-brancher réellement la surveillance thermique en continu (point 3/13) avant de commencer l'étage 3,
-puisque l'avertissement en dépend directement.
+Statut : conception actée le 6 août. **Phase 1 (étages 1+2) implémentée et confirmée sur device le
+11 août 2026** -- voir section détaillée juste après. Le prérequis initial (throttling thermique
+continu, point 3/13) était déjà levé entre-temps par le point 34 (7 août), sans qu'on ait fait le
+lien avant de commencer.
+
+### 15bis. Phase 1 de la cascade langue tirée (étages 1+2) -- ✅ implémentée, confirmée sur device le 11 août 2026
+
+**Étage 1 (porte `jawOpen`)** : `tracking/TongueOutGate.kt`, seuil par défaut 0,3. Confirmé fiable
+sur device, **CameraX et ARCore** : porte fermée au repos (jawOpen ~0,01), ouverte de façon
+cohérente bouche ouverte (jawOpen 0,3-0,5+), sur les deux paliers testés.
+
+**Étage 2 (analyse couleur)** : `tracking/LipLandmarks.kt` (recadrage buccal) +
+`tracking/MouthColorAnalysis.kt` (conversion HSV, ratio de pixels "couleur langue") +
+`tracking/TongueColorBaseline.kt` (référence adaptative, voir plus bas). Mécanique confirmée
+fonctionnelle : accès pixel opérationnel sur les deux chemins caméra (`CameraController.peekPooledBitmap`
+pour CameraX, `ArCoreHeadPoseTracker.peekLastBitmap` -- nouveau, ajouté ce jour-là -- pour ARCore),
+recadrage confirmé visuellement centré sur la bouche (image complète + rectangle de debug envoyée à
+l'utilisateur pour validation directe).
+
+**Mais le classifieur couleur de l'étage 2 n'est pas fiable**, ni comme seuil absolu ni comme
+référence adaptative :
+- Un seuil couleur fixe (`DEFAULT_COLOR_RATIO_THRESHOLD`) dérive trop d'une session à l'autre (même
+  geste "bouche ouverte, langue rentrée", quelques minutes d'écart, palier ARCore : ratio 0,81-0,93
+  puis 0,95-0,99 -- chevauche la plage "langue tirée" mesurée séparément). Probablement exposition
+  auto/angle caméra, pas un vrai changement physique.
+- Une référence adaptative (`TongueColorBaseline`, même principe qu'`AdaptiveEarFloor` du point 48)
+  améliore les choses par moments (jusqu'à 99% de détection correcte sur un essai ARCore) mais reste
+  instable d'un essai à l'autre (29% sur un autre essai, même geste, marge élargie) -- sur au moins un
+  essai, les valeurs brutes "langue tirée"/"sans langue" se chevauchaient tout court, aucun seuil ne
+  pouvait les séparer.
+- **Sur palier CameraX/STANDARD, le signal ne discrimine quasiment rien** (0/110 détections correctes
+  sur un essai "langue tirée" complet, les trois phases du protocole se chevauchant presque totalement).
+
+**Bug de rotation ARCore découvert en marge de cette investigation** (indépendant du point 15,
+voir ci-dessous) : le bitmap ARCore envoyé à MediaPipe est tourné ~90° anti-horaire par rapport à la
+réalité, confirmé par observation directe de l'utilisateur sur une image de debug -- la formule de
+rotation (`ArCoreHeadPoseTracker.readCameraSensorOrientation`/`rotateBitmap`) était déjà documentée
+comme "jamais vérifiée visuellement" ; c'est fait, et le résultat est négatif. N'empêche pas le
+recadrage buccal de fonctionner (landmarks et bitmap restent cohérents entre eux dans le même
+référentiel tourné) mais reste un problème plus large, potentiellement significatif pour la
+précision de tout le tracking sur ce palier -- noté séparément dans le backlog privé, pas encore de
+piste de correction actée.
+
+**Conclusion, pas devinée** : le ratio couleur moyen d'un recadrage fixe porte un signal réel (la
+langue tirée élève systématiquement le ratio en moyenne, sur presque tous les essais) mais trop
+bruyant pour servir de classifieur autonome, quel que soit le réglage. Ça confirme plutôt
+qu'infirme la conception d'origine : l'étage 3 (classification par embedding + calibration
+personnelle) n'est pas une amélioration optionnelle, c'est ce qui doit réellement trancher --
+l'étage 2 ne sert qu'à filtrer les cas clairement négatifs avant lui, jamais censé être parfait seul.
+
+`tongueOut` reste absent de `corrected.blendshapes` (donc à 0 côté réception) -- aucune injection
+tant que l'étage 3 n'existe pas, décision explicite pour ne pas envoyer un signal connu peu fiable.
+`TONGUE_DIAGNOSTIC_LOGGING` repassé à `false` en attendant l'étage 3.
+
+Tests : `TongueOutGateTest.kt` (5), `LipLandmarksTest.kt` (8), `MouthColorAnalysisTest.kt` (20),
+`InferenceLoadMonitorTest.kt` (6), `TongueColorBaselineTest.kt` (6) -- 45 tests au total pour la
+phase 1, tous purs/JVM.
+
+Prochaine étape : étage 3 (nouvelle dépendance `ImageEmbedder`, déjà présente dans `tasks-vision`
+sans coût de dépendance additionnel -- voir plan détaillé au moment de l'implémentation ; flux de
+calibration personnelle à concevoir).
 
 ### 16. Détection expérimentale de `cheekPuff` (joues gonflées) -- même famille que le point 15, cascade allégée
 

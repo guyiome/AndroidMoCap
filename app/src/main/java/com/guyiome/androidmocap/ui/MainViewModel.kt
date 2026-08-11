@@ -277,12 +277,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         // Diagnostic phase 1 de la cascade de détection de la langue tirée (revue technique,
         // point 15) -- logue l'état des étages 1 (porte jawOpen) et 2 (ratio couleur du recadrage
-        // buccal) à chaque frame quand tongueOutDetectionEnabled est actif, indépendamment de ce
-        // flag. Purement diagnostique : sert à valider DEFAULT_JAW_OPEN_GATE_THRESHOLD,
-        // DEFAULT_COLOR_RATIO_THRESHOLD et l'hypothèse LipLandmarkIndices sur device avant
-        // d'envisager l'étage 3 (classification, phase 2) -- aucune injection de tongueOut tant que
-        // ce diagnostic n'a pas confirmé les deux premiers étages.
-        private const val TONGUE_DIAGNOSTIC_LOGGING = true
+        // buccal, brut ET adaptatif) à chaque frame quand tongueOutDetectionEnabled est actif.
+        // Investigation phase 1 close le 11 août 2026 (voir revue technique) : étage 1 confirmé
+        // fiable (CameraX + ARCore), étage 2 confirmé fonctionnel mécaniquement mais son
+        // classifieur couleur jugé non fiable sur les deux chemins caméra testés -- étage 3
+        // (embedding + calibration) nécessaire pour une vraie détection, pas juste un réglage de
+        // seuil. Désactivé en attendant l'étage 3 -- remettre à `true` si ce diagnostic redevient
+        // utile (ex. calibration de l'étage 3 elle-même).
+        private const val TONGUE_DIAGNOSTIC_LOGGING = false
         private const val TONGUE_DIAG_TAG = "TongueDiag"
 
         // Cadence du sondage de throttling thermique (voir startThermalPolling) -- doit rester
