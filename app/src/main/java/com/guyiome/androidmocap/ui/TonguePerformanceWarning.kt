@@ -27,7 +27,11 @@ import com.guyiome.androidmocap.R
  * teinte ambre (`0xFFFFB74D`, même couleur que les autres avertissements de performance de l'app --
  * `DiagnosticsScreen`, `MainHud`) au lieu de rouge -- catégorie moins sévère qu'une batterie basse.
  * Contrairement à [LowBatteryAlert], **cliquable** : amène directement au réglage pour couper la
- * fonctionnalité si besoin, plutôt que de forcer l'utilisateur à retrouver le chemin dans les menus.
+ * fonctionnalité si besoin. **Important** : la zone cliquable est bornée à l'icône elle-même, PAS
+ * à tout l'écran -- une première version utilisait `Modifier.fillMaxSize().clickable(...)` sur la
+ * `Box` entière, ce qui interceptait tous les touchers de l'écran (switch, boutons retour...) tant
+ * que l'avertissement restait affiché, bloquant l'utilisateur hors de ses propres réglages
+ * (confirmé sur device le 11 août 2026). Ne jamais réélargir la zone cliquable au-delà de l'icône.
  */
 @Composable
 fun TonguePerformanceWarning(onClick: () -> Unit) {
@@ -42,15 +46,12 @@ fun TonguePerformanceWarning(onClick: () -> Unit) {
         label = "tonguePerformanceAlpha",
     )
 
-    Box(
-        modifier = Modifier.fillMaxSize().clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Icon(
             imageVector = Icons.Outlined.Warning,
             contentDescription = stringResource(R.string.cd_tongue_performance_warning),
             tint = Color(0xFFFFB74D).copy(alpha = alpha),
-            modifier = Modifier.size(220.dp),
+            modifier = Modifier.size(220.dp).clickable(onClick = onClick),
         )
     }
 }
