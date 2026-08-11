@@ -85,6 +85,10 @@ problème) -- entièrement à l'initiative de l'utilisateur, qui choisit la dest
    Si le lien a changé, repartir de la page officielle
    [Face landmark detection guide for Android](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker/android)
    (section "Model").
+   - **Optionnel** : pour la détection expérimentale de la langue tirée (étage 3, désactivée par
+     défaut), un second modèle, `app/src/main/assets/image_embedder.tflite` :
+     `https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_small/float32/latest/mobilenet_v3_small.tflite`.
+     L'app compile et fonctionne normalement sans -- seule cette fonctionnalité expérimentale en a besoin.
 2. Ouvrir le dossier dans Android Studio (`File > Open`). Le premier sync Gradle télécharge AGP,
    Kotlin et les dépendances ARCore/CameraX/MediaPipe/JavaOSC/nv-websocket-client/kotlinx.serialization
    listées dans `gradle/libs.versions.toml`.

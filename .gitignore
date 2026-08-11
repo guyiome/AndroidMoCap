@@ -16,8 +16,9 @@ local.properties
 app/release/
 app/debug/
 
-# Modèle MediaPipe téléchargé manuellement (voir README) : trop volumineux pour être versionné tel quel.
+# Modèles MediaPipe téléchargés manuellement (voir README) : trop volumineux pour être versionnés tels quels.
 app/src/main/assets/*.task
+app/src/main/assets/*.tflite
 
 # Clé de signature release -- ne doit JAMAIS être commitée (voir README section Distribution).
 # Le workflow CI la reconstruit à la volée depuis un secret GitHub, ce fichier n'existe qu'en local.

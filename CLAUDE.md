@@ -58,6 +58,16 @@ curl -fL -o app/src/main/assets/face_landmarker.task \
   https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task
 ```
 
+A second model, `image_embedder.tflite`, is only needed to exercise the tongue-out detection
+cascade's stage 3 (point 15, off by default, opt-in via the experimental toggle) — the app builds
+and runs fine without it, `TongueEmbeddingHelper.setup()` just fails at runtime (logged, caught) if
+the file is absent and the toggle is enabled. Same manual-download convention:
+
+```bash
+curl -fL -o app/src/main/assets/image_embedder.tflite \
+  https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_small/float32/latest/mobilenet_v3_small.tflite
+```
+
 Release signing is via environment variables only, never committed files: `RELEASE_KEYSTORE_PATH`,
 `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`. Absent in normal dev
 (`assembleDebug`/`installDebug`) — no error, `assembleRelease` just falls back to the debug signing

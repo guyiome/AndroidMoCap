@@ -182,4 +182,5 @@
     <!-- Erreurs MediaPipe (FaceLandmarkerHelper, non-@Composable) -->
     <string name="error_mediapipe_init_failed">Impossible d\'initialiser MediaPipe Face Landmarker (CPU et GPU en échec).</string>
     <string name="error_mediapipe_unknown">Erreur MediaPipe inconnue</string>
+    <string name="error_tongue_embedder_init_failed">Impossible d\'initialiser le modèle de détection de langue tirée (CPU et GPU en échec).</string>
 </resources>

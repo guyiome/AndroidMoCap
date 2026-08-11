@@ -184,4 +184,5 @@
     <!-- MediaPipe errors (FaceLandmarkerHelper, non-@Composable) -->
     <string name="error_mediapipe_init_failed">Could not initialize MediaPipe Face Landmarker (both CPU and GPU failed).</string>
     <string name="error_mediapipe_unknown">Unknown MediaPipe error</string>
+    <string name="error_tongue_embedder_init_failed">Could not initialize the tongue-out detection model (both CPU and GPU failed).</string>
 </resources>
