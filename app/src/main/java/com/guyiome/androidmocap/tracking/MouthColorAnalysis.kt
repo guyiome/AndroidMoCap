@@ -65,6 +65,31 @@ internal fun tonguePixelRatio(pixelsArgb: IntArray): Float {
     return matching.toFloat() / pixelsArgb.size
 }
 
+/**
+ * Teinte/saturation/valeur moyennes du recadrage -- `[0,0,0]` si le tableau est vide. Diagnostic
+ * ajouté le 11 août 2026 : `tonguePixelRatio` restait à 0.0 sur device malgré un étage 1 sain
+ * (mouth ouverte confirmée par ailleurs), sans indiquer si c'est le recadrage qui ne tombe pas sur
+ * la bouche ou les seuils couleur qui sont mal calés -- ces moyennes permettent de faire la
+ * différence (ex. valeur très basse = zone sombre, probablement hors visage).
+ */
+internal fun averageHsv(pixelsArgb: IntArray): FloatArray {
+    if (pixelsArgb.isEmpty()) return floatArrayOf(0f, 0f, 0f)
+    var hueSum = 0f
+    var saturationSum = 0f
+    var valueSum = 0f
+    for (argb in pixelsArgb) {
+        val r = (argb shr 16) and 0xFF
+        val g = (argb shr 8) and 0xFF
+        val b = argb and 0xFF
+        val hsv = rgbToHsv(r, g, b)
+        hueSum += hsv[0]
+        saturationSum += hsv[1]
+        valueSum += hsv[2]
+    }
+    val n = pixelsArgb.size
+    return floatArrayOf(hueSum / n, saturationSum / n, valueSum / n)
+}
+
 /** Seuil provisoire, à affiner sur device. */
 internal const val DEFAULT_COLOR_RATIO_THRESHOLD = 0.12f
 

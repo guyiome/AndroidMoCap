@@ -3,6 +3,7 @@ package com.guyiome.androidmocap.ui
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.opengl.GLSurfaceView
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.camera.view.PreviewView
@@ -46,6 +47,7 @@ import com.guyiome.androidmocap.tracking.correctEyeBlinkScores
 import com.guyiome.androidmocap.tracking.InferenceLoadState
 import com.guyiome.androidmocap.tracking.isRunningHigh
 import com.guyiome.androidmocap.tracking.jawOpenGateOpen
+import com.guyiome.androidmocap.tracking.averageHsv
 import com.guyiome.androidmocap.tracking.mirrorFaceTrackingResult
 import com.guyiome.androidmocap.tracking.mouthCropRegion
 import com.guyiome.androidmocap.tracking.mouthOpennessRatio
@@ -70,6 +72,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.FileOutputStream
 import java.net.InetAddress
 
 /**
@@ -890,6 +893,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             jawOpen, mouthGeometric, ratio, colorFired,
                         ),
                     )
+                    // Diagnostic ponctuel (11 août 2026) : ratio restait à 0.0 sur device malgré un
+                    // étage 1 sain -- sauvegarde le recadrage réel + logue sa teinte/saturation/
+                    // valeur moyennes pour distinguer "mauvais recadrage" de "seuils couleur mal
+                    // calés", plutôt que de deviner. Code jetable, à retirer une fois la cause confirmée.
+                    saveTongueDebugCrop(corrected.timestampMs, corrected.faceLandmarks, corrected.imageWidthPx, corrected.imageHeightPx)
                 }
             } else if (TONGUE_DIAGNOSTIC_LOGGING) {
                 AppLog.d(TONGUE_DIAG_TAG, "jawOpen=%.3f mouthGeo=%.3f etage1=NON".format(jawOpen, mouthGeometric))
@@ -922,6 +930,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val pixels = IntArray(region.width * region.height)
         bitmap.getPixels(pixels, 0, region.width, region.x, region.y, region.width, region.height)
         return tonguePixelRatio(pixels)
+    }
+
+    /**
+     * Diagnostic ponctuel (point 15, 11 août 2026) : sauvegarde le dernier recadrage buccal en PNG
+     * (`filesDir/tongue_debug_crop.png`, écrasé à chaque appel -- seul le dernier compte pour une
+     * inspection visuelle manuelle) et logue sa teinte/saturation/valeur moyennes ([averageHsv]) --
+     * `tonguePixelRatio` restait obstinément à 0.0 sur device malgré un étage 1 sain (bouche
+     * confirmée ouverte par ailleurs), sans dire si c'est le recadrage qui ne tombe pas sur la
+     * bouche ou les seuils couleur qui sont mal calés. Duplique volontairement la logique de
+     * recadrage/lecture pixel de [sampleMouthTonguePixelRatio] plutôt que de la modifier -- code
+     * jetable, à retirer une fois la cause confirmée, ne doit pas complexifier le chemin de prod.
+     */
+    private fun saveTongueDebugCrop(
+        frameTimeMs: Long,
+        landmarks: List<Pair<Float, Float>>,
+        imageWidthPx: Int,
+        imageHeightPx: Int,
+    ) {
+        val region = mouthCropRegion(landmarks, imageWidthPx, imageHeightPx) ?: return
+        val bitmap = cameraController?.peekPooledBitmap(frameTimeMs)
+            ?: arCoreHeadPoseTracker?.peekLastBitmap(frameTimeMs)
+            ?: return
+        val pixels = IntArray(region.width * region.height)
+        bitmap.getPixels(pixels, 0, region.width, region.x, region.y, region.width, region.height)
+        val hsv = averageHsv(pixels)
+        AppLog.d(
+            TONGUE_DIAG_TAG,
+            "recadrage x=%d y=%d w=%d h=%d imgW=%d imgH=%d hueAvg=%.1f satAvg=%.3f valAvg=%.3f".format(
+                region.x, region.y, region.width, region.height, imageWidthPx, imageHeightPx,
+                hsv[0], hsv[1], hsv[2],
+            ),
+        )
+        try {
+            val cropped = Bitmap.createBitmap(bitmap, region.x, region.y, region.width, region.height)
+            val file = File(getApplication<Application>().filesDir, "tongue_debug_crop.png")
+            FileOutputStream(file).use { out -> cropped.compress(Bitmap.CompressFormat.PNG, 100, out) }
+        } catch (e: Exception) {
+            AppLog.w(TONGUE_DIAG_TAG, "Échec sauvegarde recadrage debug langue", e)
+        }
     }
 
     /**
