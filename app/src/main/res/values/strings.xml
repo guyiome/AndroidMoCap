@@ -141,6 +141,18 @@
     <string name="experimental_features_placeholder">Cheek-puff detection is not implemented yet (see the technical review).</string>
     <string name="experimental_tongue_detection_title">Tongue-out detection (diagnostic)</string>
     <string name="experimental_tongue_detection_description">Off by default. Phase 1 only: logs whether the mouth-opening and color heuristics fire, without changing the actual tongueOut value sent (still always 0). No effect on network output yet.</string>
+    <string name="experimental_tongue_calibration_button">Calibrate detection…</string>
+
+    <!-- Tongue calibration screen -->
+    <string name="tongue_calibration_title">Tongue-out calibration</string>
+    <string name="tongue_calibration_explanation">Records two short samples -- tongue out, then tongue in -- used to personally calibrate stage 3 of the detection cascade. Still diagnostic only: the result is not sent over the network yet.</string>
+    <string name="tongue_calibration_status_never">Never calibrated yet.</string>
+    <string name="tongue_calibration_status_calibrated">Calibrated ✓</string>
+    <string name="tongue_calibration_status_recording_out">Stick your tongue out and hold…</string>
+    <string name="tongue_calibration_status_recording_in">Tongue in, mouth relaxed…</string>
+    <string name="tongue_calibration_button_start">Start calibration</string>
+    <string name="tongue_calibration_button_recalibrate">Recalibrate</string>
+    <string name="tongue_calibration_button_cancel">Cancel</string>
 
     <!-- Logging settings screen -->
     <string name="logging_settings_title">Logging</string>

@@ -7,7 +7,9 @@ package com.guyiome.androidmocap.tracking
  * (temps écoulé + embedding optionnel de la frame) depuis `MainViewModel` plutôt que d'implémenter
  * cette logique de comptage directement dans le ViewModel.
  */
-internal enum class TongueCalibrationPhase { IDLE, RECORDING_TONGUE_OUT, RECORDING_TONGUE_IN, DONE }
+/** Publique (pas `internal`) : exposée dans `MainUiState`, elle-même publique -- même précédent que
+ *  `TrackingTier`. */
+enum class TongueCalibrationPhase { IDLE, RECORDING_TONGUE_OUT, RECORDING_TONGUE_IN, DONE }
 
 internal data class TongueCalibrationRecordingState(
     val phase: TongueCalibrationPhase = TongueCalibrationPhase.IDLE,
@@ -21,8 +23,10 @@ internal data class TongueCalibrationRecordingState(
  *  vu le nombre de sessions de réglage qu'ont demandé les étages 1/2. */
 internal const val DEFAULT_CALIBRATION_RECORDING_DURATION_MS = 3000L
 
-/** Démarre l'enregistrement -- toujours par la phase "langue dehors" en premier. */
-internal fun startTongueCalibration(): TongueCalibrationRecordingState =
+/** Démarre l'enregistrement -- toujours par la phase "langue dehors" en premier. Nommée
+ *  différemment de `MainViewModel.startTongueCalibration()` (qui l'appelle) pour éviter une
+ *  collision de noms qui bouclerait sur la méthode membre plutôt que cette fonction top-level. */
+internal fun newTongueCalibrationRecording(): TongueCalibrationRecordingState =
     TongueCalibrationRecordingState(phase = TongueCalibrationPhase.RECORDING_TONGUE_OUT)
 
 /**

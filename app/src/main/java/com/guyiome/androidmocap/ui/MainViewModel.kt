@@ -38,6 +38,7 @@ import com.guyiome.androidmocap.settings.ConnectionType
 import com.guyiome.androidmocap.settings.appLanguageFromTag
 import com.guyiome.androidmocap.settings.DEFAULT_LOW_BATTERY_THRESHOLD_PERCENT
 import com.guyiome.androidmocap.settings.DEFAULT_POWER_SAVE_DELAY_SECONDS
+import com.guyiome.androidmocap.settings.TongueCalibrationStore
 import com.guyiome.androidmocap.tracking.ArCoreHeadPoseTracker
 import com.guyiome.androidmocap.tracking.BlendshapeScore
 import com.guyiome.androidmocap.tracking.BrowLandmarkIndices
@@ -50,13 +51,22 @@ import com.guyiome.androidmocap.tracking.correctEyeBlinkScores
 import com.guyiome.androidmocap.tracking.InferenceLoadState
 import com.guyiome.androidmocap.tracking.isRunningHigh
 import com.guyiome.androidmocap.tracking.isElevated
+import com.guyiome.androidmocap.tracking.DEFAULT_CALIBRATION_RECORDING_DURATION_MS
+import com.guyiome.androidmocap.tracking.DEFAULT_CLASSIFICATION_MARGIN
 import com.guyiome.androidmocap.tracking.jawOpenGateOpen
 import com.guyiome.androidmocap.tracking.LipLandmarkIndices
 import com.guyiome.androidmocap.tracking.averageHsv
 import com.guyiome.androidmocap.tracking.mirrorFaceTrackingResult
 import com.guyiome.androidmocap.tracking.mouthCropRegion
 import com.guyiome.androidmocap.tracking.mouthOpennessRatio
+import com.guyiome.androidmocap.tracking.newTongueCalibrationRecording
+import com.guyiome.androidmocap.tracking.result
+import com.guyiome.androidmocap.tracking.tick
+import com.guyiome.androidmocap.tracking.TongueCalibrationPhase
+import com.guyiome.androidmocap.tracking.TongueCalibrationRecordingState
+import com.guyiome.androidmocap.tracking.TongueCalibrationResult
 import com.guyiome.androidmocap.tracking.TongueColorBaseline
+import com.guyiome.androidmocap.tracking.TongueEmbeddingHelper
 import com.guyiome.androidmocap.tracking.tonguePixelRatio
 import com.guyiome.androidmocap.tracking.FaceTrackingResult
 import com.guyiome.androidmocap.tracking.REST_VARIANCE_THRESHOLD
@@ -214,6 +224,17 @@ data class MainUiState(
     // diagnostique (voir AppSettingsStore.tongueOutDetectionEnabled), aucune injection de
     // tongueOut tant que l'étage 3 n'existe pas.
     val tongueOutDetectionEnabled: Boolean = false,
+    // Étage 3 (point 15) : calibration personnelle par embedding. Phase de la machine à état
+    // (IDLE hors calibration), poussée dans _uiState seulement aux transitions (pas à chaque
+    // frame, même discipline que calibrationAnomalyFlagged) -- voir handleTrackingResult().
+    val tongueCalibrationPhase: TongueCalibrationPhase = TongueCalibrationPhase.IDLE,
+    // Miroir UI-only (voir AppSettingsStore.tongueReferencesCalibrated) -- source de vérité réelle :
+    // tongueCalibrationResult (privé, chargé depuis TongueCalibrationStore).
+    val tongueReferencesCalibrated: Boolean = false,
+    // Réglables depuis le panneau debug (ExperimentalFeaturesScreen), voir
+    // AppSettingsStore.tongueCalibrationRecordingDurationMs/tongueClassificationMargin.
+    val tongueCalibrationRecordingDurationMs: Long = DEFAULT_CALIBRATION_RECORDING_DURATION_MS,
+    val tongueClassificationMargin: Float = DEFAULT_CLASSIFICATION_MARGIN,
     val errorMessage: String? = null,
 )
 
@@ -319,6 +340,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var deviceOrientationTracker: DeviceOrientationTracker? = null
     private val connectionSettingsStore = ConnectionSettingsStore(application)
     private val appSettingsStore = AppSettingsStore(application)
+    private val tongueCalibrationStore = TongueCalibrationStore(application.filesDir)
+
+    // Étage 3 (point 15) : construit seulement quand tongueOutDetectionEnabled est actif (voir le
+    // collecteur dans init{}), pas de façon inconditionnelle comme faceLandmarkerHelper -- éviter
+    // de charger un second modèle/réserver un délégué GPU-CPU pour qui ne touche jamais cette
+    // fonctionnalité expérimentale.
+    private var tongueEmbeddingHelper: TongueEmbeddingHelper? = null
+    // Mémorisé lors d'initializeTracking() -- nécessaire pour construire tongueEmbeddingHelper à
+    // la demande si le toggle est activé après le lancement (tierConfig lui-même n'est qu'une
+    // variable locale d'initializeTracking(), jamais stocké ailleurs jusqu'ici).
+    private var currentTierConfig: TierConfig? = null
+    private var currentDebugForceGpuUnavailable: Boolean = false
+    // Chargée une fois (paresseusement, au premier besoin) puis gardée en mémoire -- pas relue à
+    // chaque frame, seulement mise à jour après un enregistrement de calibration réussi.
+    private var tongueCalibrationResult: TongueCalibrationResult? = null
+    private var tongueCalibrationRecordingState = TongueCalibrationRecordingState()
+    private var tongueCalibrationLastTimestampMs: Long? = null
 
     // Calibration de la pose de tête neutre. Tout se compose en espace matriciel (voir
     // RotationMath) plutôt qu'en soustrayant des angles d'Euler déjà décomposés -- une simple
@@ -488,7 +526,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             appSettingsStore.tongueOutDetectionEnabled.collect { enabled ->
                 _uiState.update { it.copy(tongueOutDetectionEnabled = enabled) }
+                if (enabled) {
+                    ensureTongueEmbeddingHelper()
+                } else {
+                    tongueEmbeddingHelper?.close()
+                    tongueEmbeddingHelper = null
+                }
             }
+        }
+        viewModelScope.launch {
+            appSettingsStore.tongueReferencesCalibrated.collect { calibrated ->
+                _uiState.update { it.copy(tongueReferencesCalibrated = calibrated) }
+            }
+        }
+        viewModelScope.launch {
+            appSettingsStore.tongueCalibrationRecordingDurationMs.collect { durationMs ->
+                _uiState.update { it.copy(tongueCalibrationRecordingDurationMs = durationMs) }
+            }
+        }
+        viewModelScope.launch {
+            appSettingsStore.tongueClassificationMargin.collect { margin ->
+                _uiState.update { it.copy(tongueClassificationMargin = margin) }
+            }
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            // Chargée une seule fois au lancement -- pas de relecture disque réactive à chaque
+            // frame, seulement mise à jour en mémoire après un enregistrement réussi (voir
+            // handleTrackingResult()).
+            tongueCalibrationResult = tongueCalibrationStore.load()
         }
         viewModelScope.launch {
             // Chargée une seule fois au lancement (first(), pas collect en continu comme les
@@ -541,6 +606,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         nominalTargetFps = tierConfig.targetFps
         thermalThrottleState = ThermalThrottleState.initial(nominalFps = tierConfig.targetFps)
+        currentTierConfig = tierConfig
+        currentDebugForceGpuUnavailable = debugForceGpuUnavailable
 
         _uiState.update {
             it.copy(
@@ -876,6 +943,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
+        // Calibration de l'étage 3 (point 15) -- tourne indépendamment des étages 1/2 : l'utilisateur
+        // tient le geste sur commande (TongueCalibrationScreen), gater sur jawOpen/couleur ici serait
+        // contre-productif. Temps écoulé depuis le tick précédent (pas un compte de frames), même
+        // discipline que eyeBlinkCorrectionLastTimestampMs plus haut.
+        if (tongueCalibrationRecordingState.phase != TongueCalibrationPhase.IDLE &&
+            tongueCalibrationRecordingState.phase != TongueCalibrationPhase.DONE
+        ) {
+            val calibrationElapsedMs = tongueCalibrationLastTimestampMs?.let { corrected.timestampMs - it } ?: 0L
+            tongueCalibrationLastTimestampMs = corrected.timestampMs
+            val embedding = sampleMouthTongueEmbedding(
+                corrected.timestampMs,
+                corrected.faceLandmarks,
+                corrected.imageWidthPx,
+                corrected.imageHeightPx,
+            )
+            val previousPhase = tongueCalibrationRecordingState.phase
+            tongueCalibrationRecordingState = tongueCalibrationRecordingState.tick(
+                calibrationElapsedMs,
+                embedding,
+                _uiState.value.tongueCalibrationRecordingDurationMs,
+            )
+            if (tongueCalibrationRecordingState.phase != previousPhase) {
+                if (tongueCalibrationRecordingState.phase == TongueCalibrationPhase.DONE) {
+                    val result = tongueCalibrationRecordingState.result()
+                    if (result != null) {
+                        tongueCalibrationResult = result
+                        tongueCalibrationStore.save(result)
+                        viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setTongueReferencesCalibrated(true) }
+                    }
+                    // Repart directement à IDLE -- une nouvelle calibration remplace entièrement
+                    // l'ancienne (même principe que performCalibration(), pas de fusion partielle).
+                    tongueCalibrationRecordingState = TongueCalibrationRecordingState()
+                    tongueCalibrationLastTimestampMs = null
+                }
+                _uiState.update { it.copy(tongueCalibrationPhase = tongueCalibrationRecordingState.phase) }
+            }
+        }
+
         // Cascade de détection de la langue tirée, phase 1 (revue technique, point 15) -- étages 1
         // (porte jawOpen) + 2 (ratio couleur du recadrage buccal), gatée par le réglage
         // expérimental. Purement diagnostique pour l'instant : aucune injection dans
@@ -952,6 +1057,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val pixels = IntArray(region.width * region.height)
         bitmap.getPixels(pixels, 0, region.width, region.x, region.y, region.width, region.height)
         return tonguePixelRatio(pixels)
+    }
+
+    /**
+     * Calcule l'embedding du recadrage buccal courant pour l'étage 3 (point 15) -- réutilise le
+     * même accès bitmap synchrone que [sampleMouthTonguePixelRatio]/[saveTongueDebugCrop]. `null`
+     * si le recadrage est impossible, si aucun bitmap n'est disponible, ou si
+     * [tongueEmbeddingHelper] n'est pas prêt (toggle expérimental éteint, ou pas encore de frame
+     * traitée depuis son activation).
+     */
+    private fun sampleMouthTongueEmbedding(
+        frameTimeMs: Long,
+        landmarks: List<Pair<Float, Float>>,
+        imageWidthPx: Int,
+        imageHeightPx: Int,
+    ): FloatArray? {
+        val helper = tongueEmbeddingHelper ?: return null
+        val region = mouthCropRegion(landmarks, imageWidthPx, imageHeightPx) ?: return null
+        val bitmap = cameraController?.peekPooledBitmap(frameTimeMs)
+            ?: arCoreHeadPoseTracker?.peekLastBitmap(frameTimeMs)
+            ?: return null
+        val cropped = Bitmap.createBitmap(bitmap, region.x, region.y, region.width, region.height)
+        return helper.embed(cropped)
     }
 
     /**
@@ -1163,6 +1290,50 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun setTongueOutDetectionEnabled(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setTongueOutDetectionEnabled(enabled) }
+    }
+
+    /**
+     * Crée [tongueEmbeddingHelper] à la demande (voir kdoc de son champ) -- no-op s'il existe déjà
+     * ou si [currentTierConfig] n'est pas encore connu (le toggle a été activé avant la fin
+     * d'`initializeTracking()`, cas limite non géré finement pour l'instant : le prochain
+     * changement du toggle réessaiera).
+     */
+    private fun ensureTongueEmbeddingHelper() {
+        if (tongueEmbeddingHelper != null) return
+        val tierConfig = currentTierConfig ?: return
+        tongueEmbeddingHelper = TongueEmbeddingHelper(
+            context = getApplication(),
+            tierConfig = tierConfig,
+            forceGpuUnavailable = currentDebugForceGpuUnavailable,
+            onError = { message -> AppLog.w(TAG, "Échec d'initialisation de TongueEmbeddingHelper : $message") },
+        ).also { it.setup() }
+    }
+
+    /**
+     * Bouton "Démarrer" de `TongueCalibrationScreen` -- lance la première phase ("langue dehors").
+     * `tongueCalibrationLastTimestampMs` remis à `null` : la toute première frame de calibration
+     * n'a pas de delta de temps significatif, voir son usage dans `handleTrackingResult()`.
+     */
+    fun startTongueCalibration() {
+        tongueCalibrationRecordingState = newTongueCalibrationRecording()
+        tongueCalibrationLastTimestampMs = null
+        _uiState.update { it.copy(tongueCalibrationPhase = tongueCalibrationRecordingState.phase) }
+    }
+
+    /** Annule une calibration en cours -- remet la machine à IDLE, ne touche pas à une calibration déjà sauvegardée. */
+    fun cancelTongueCalibration() {
+        tongueCalibrationRecordingState = TongueCalibrationRecordingState()
+        tongueCalibrationLastTimestampMs = null
+        _uiState.update { it.copy(tongueCalibrationPhase = TongueCalibrationPhase.IDLE) }
+    }
+
+    /** Réglages debug (durée d'enregistrement / marge de classification), voir `AppSettingsStore`. */
+    fun setTongueCalibrationRecordingDurationMs(durationMs: Long) {
+        viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setTongueCalibrationRecordingDurationMs(durationMs) }
+    }
+
+    fun setTongueClassificationMargin(margin: Float) {
+        viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setTongueClassificationMargin(margin) }
     }
 
     /**
@@ -1472,6 +1643,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         arCoreHeadPoseTracker?.stop()
         arCoreHeadPoseTracker?.close()
         faceLandmarkerHelper?.close()
+        tongueEmbeddingHelper?.close()
         vmcSender?.close()
         iFacialMocapSender?.stopListening()
         vtubeStudioSender?.close()

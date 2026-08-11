@@ -81,6 +81,7 @@ fun MainScreen(
     var showConnectionSettings by remember { mutableStateOf(false) }
     var showDisplaySettings by remember { mutableStateOf(false) }
     var showExperimentalFeatures by remember { mutableStateOf(false) }
+    var showTongueCalibration by remember { mutableStateOf(false) }
     var showLoggingSettings by remember { mutableStateOf(false) }
     var showBlendshapeSelection by remember { mutableStateOf(false) }
     var iconRotationDegrees by remember { mutableFloatStateOf(0f) }
@@ -335,6 +336,17 @@ fun MainScreen(
                     uiState = uiState,
                     onClose = { showExperimentalFeatures = false },
                     onSetTongueOutDetectionEnabled = { enabled -> viewModel.setTongueOutDetectionEnabled(enabled) },
+                    onOpenTongueCalibration = { showTongueCalibration = true },
+                )
+            }
+
+            if (showTongueCalibration) {
+                TongueCalibrationScreen(
+                    phase = uiState.tongueCalibrationPhase,
+                    isCalibrated = uiState.tongueReferencesCalibrated,
+                    onStartCalibration = { viewModel.startTongueCalibration() },
+                    onCancel = { viewModel.cancelTongueCalibration() },
+                    onClose = { showTongueCalibration = false },
                 )
             }
 
