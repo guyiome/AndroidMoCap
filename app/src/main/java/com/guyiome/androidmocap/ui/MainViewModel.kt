@@ -220,9 +220,10 @@ data class MainUiState(
     // défaut (voir AppSettingsStore.mirrorModeEnabled pour le pourquoi), désactivable.
     val mirrorModeEnabled: Boolean = true,
     // Détection expérimentale de la langue tirée (point 15) -- collecté en continu, effet immédiat.
-    // Désactivée par défaut, rangée dans "Fonctionnalités expérimentales". Phase 1 : purement
-    // diagnostique (voir AppSettingsStore.tongueOutDetectionEnabled), aucune injection de
-    // tongueOut tant que l'étage 3 n'existe pas.
+    // Désactivée par défaut, rangée dans "Fonctionnalités expérimentales" (voir
+    // AppSettingsStore.tongueOutDetectionEnabled). Valeur affichée localement uniquement (panneau
+    // de blendshapes, si tongueOut est coché) -- jamais injectée dans "final"/corrected.blendshapes
+    // ni envoyée aux protocoles réseau tant que la fiabilité de l'étage 3 n'est pas confirmée.
     val tongueOutDetectionEnabled: Boolean = false,
     // Étage 3 (point 15) : calibration personnelle par embedding. Phase de la machine à état
     // (IDLE hors calibration), poussée dans _uiState seulement aux transitions (pas à chaque
@@ -299,15 +300,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val ROTATION_DIAGNOSTIC_LOGGING = false
         private const val ROTATION_DIAG_TAG = "RotationDiag"
 
-        // Diagnostic phase 1 de la cascade de détection de la langue tirée (revue technique,
-        // point 15) -- logue l'état des étages 1 (porte jawOpen) et 2 (ratio couleur du recadrage
-        // buccal, brut ET adaptatif) à chaque frame quand tongueOutDetectionEnabled est actif.
-        // Investigation phase 1 close le 11 août 2026 (voir revue technique) : étage 1 confirmé
-        // fiable (CameraX + ARCore), étage 2 confirmé fonctionnel mécaniquement mais son
-        // classifieur couleur jugé non fiable sur les deux chemins caméra testés -- étage 3
-        // (embedding + calibration) nécessaire pour une vraie détection, pas juste un réglage de
-        // seuil. Désactivé en attendant l'étage 3 -- remettre à `true` si ce diagnostic redevient
-        // utile (ex. calibration de l'étage 3 elle-même).
+        // Diagnostic de la cascade de détection de la langue tirée (revue technique, point 15) --
+        // logue l'état des trois étages (porte jawOpen+mouthGeometric, ratio couleur brut/adaptatif,
+        // classification par embedding simOut/simIn) à chaque frame quand tongueOutDetectionEnabled
+        // est actif. Phase 1 (étages 1+2) close le 11 août 2026 : étage 1 confirmé fiable, étage 2
+        // fonctionnel mécaniquement mais son classifieur couleur seul jugé non fiable. Étage 3
+        // (embedding + calibration) implémenté le même jour, encore activement débogué (locale de
+        // calibration, faux positif "bouche pressée" -- voir points 15ter à 15quinquies) -- laisser
+        // à `true` tant que cette investigation n'est pas close, repasser à `false` une fois
+        // l'étage 3 confirmé fiable en usage normal.
         private const val TONGUE_DIAGNOSTIC_LOGGING = true
         private const val TONGUE_DIAG_TAG = "TongueDiag"
 
@@ -348,16 +349,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Étage 3 (point 15) : construit seulement quand tongueOutDetectionEnabled est actif (voir le
     // collecteur dans init{}), pas de façon inconditionnelle comme faceLandmarkerHelper -- éviter
     // de charger un second modèle/réserver un délégué GPU-CPU pour qui ne touche jamais cette
-    // fonctionnalité expérimentale.
-    private var tongueEmbeddingHelper: TongueEmbeddingHelper? = null
+    // fonctionnalité expérimentale. @Volatile : écrit depuis le thread principal (collecteur de
+    // réglages, initializeTracking(), close() sur toggle-off/onCleared()) mais lu depuis le thread
+    // de callback MediaPipe (handleTrackingResult -> sampleMouthTongueEmbedding) -- même situation
+    // que latestArCoreHeadRotationMatrix ci-dessous, même traitement.
+    @Volatile private var tongueEmbeddingHelper: TongueEmbeddingHelper? = null
     // Mémorisé lors d'initializeTracking() -- nécessaire pour construire tongueEmbeddingHelper à
     // la demande si le toggle est activé après le lancement (tierConfig lui-même n'est qu'une
     // variable locale d'initializeTracking(), jamais stocké ailleurs jusqu'ici).
     private var currentTierConfig: TierConfig? = null
     private var currentDebugForceGpuUnavailable: Boolean = false
     // Chargée une fois (paresseusement, au premier besoin) puis gardée en mémoire -- pas relue à
-    // chaque frame, seulement mise à jour après un enregistrement de calibration réussi.
-    private var tongueCalibrationResult: TongueCalibrationResult? = null
+    // chaque frame, seulement mise à jour après un enregistrement de calibration réussi. @Volatile :
+    // écrite sur Dispatchers.IO (chargement initial, sauvegarde de calibration) mais lue depuis le
+    // thread de callback MediaPipe -- même raison que tongueEmbeddingHelper ci-dessus.
+    @Volatile private var tongueCalibrationResult: TongueCalibrationResult? = null
     private var tongueCalibrationRecordingState = TongueCalibrationRecordingState()
     private var tongueCalibrationLastTimestampMs: Long? = null
     // Lissage d'affichage LOCAL uniquement (voir TongueOutDisplaySmoothing.kt) -- ne touche à aucune
@@ -538,6 +544,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     tongueEmbeddingHelper?.close()
                     tongueEmbeddingHelper = null
+                    // Une calibration en cours perd son helper d'embedding juste au-dessus --
+                    // annule proprement plutôt que de laisser la machine à état tourner à vide
+                    // (embedding toujours null jusqu'à DONE, résultat jeté silencieusement sans
+                    // retour utilisateur). Trouvé en revue de code le 11 août 2026.
+                    cancelTongueCalibration()
                 }
             }
         }
@@ -1057,6 +1068,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     corrected.imageWidthPx,
                     corrected.imageHeightPx,
                 )
+                // Diagnostic seul (loggé plus bas, "etage2=") -- ne gate rien. Le seuil fixe
+                // (DEFAULT_COLOR_RATIO_THRESHOLD, MouthColorAnalysis.kt) qu'il utilise s'est montré
+                // pas assez stable d'une session à l'autre pour porter une vraie décision (revue
+                // technique, point 15bis) ; seul adaptiveFired ci-dessous, sur la référence
+                // adaptative, déclenche réellement l'étage 3. Gardé pour comparer les deux signaux
+                // dans les logs tant que l'étage 2 est encore sous investigation.
                 val colorFired = ratio != null && colorGateOpen(ratio)
                 // Comparaison avec la référence adaptative (TongueColorBaseline.kt, point 15) --
                 // comparée AVANT mise à jour (sinon le ratio courant s'auto-compare à une référence
@@ -1171,7 +1188,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Calcule l'embedding du recadrage buccal courant pour l'étage 3 (point 15) -- réutilise le
-     * même accès bitmap synchrone que [sampleMouthTonguePixelRatio]/[saveTongueDebugCrop]. `null`
+     * même accès bitmap synchrone que [sampleMouthTonguePixelRatio]. `null`
      * si le recadrage est impossible, si aucun bitmap n'est disponible, ou si
      * [tongueEmbeddingHelper] n'est pas prêt (toggle expérimental éteint, ou pas encore de frame
      * traitée depuis son activation).

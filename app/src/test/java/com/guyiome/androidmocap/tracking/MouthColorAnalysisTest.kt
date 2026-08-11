@@ -123,21 +123,4 @@ class MouthColorAnalysisTest {
     fun `colorGateOpen ouvert au-dessus du seuil`() {
         assertTrue(colorGateOpen(0.5f, threshold = 0.12f))
     }
-
-    @Test
-    fun `averageHsv renvoie 0,0,0 sur un tableau vide`() {
-        val hsv = averageHsv(IntArray(0))
-        assertEquals(0f, hsv[0], delta)
-        assertEquals(0f, hsv[1], delta)
-        assertEquals(0f, hsv[2], delta)
-    }
-
-    @Test
-    fun `averageHsv moyenne correctement deux pixels connus`() {
-        // rouge pur (H=0,S=1,V=1) + noir pur (H=0,S=0,V=0) -> moyenne (0, 0.5, 0.5)
-        val hsv = averageHsv(intArrayOf(argb(255, 0, 0), argb(0, 0, 0)))
-        assertEquals(0f, hsv[0], delta)
-        assertEquals(0.5f, hsv[1], delta)
-        assertEquals(0.5f, hsv[2], delta)
-    }
 }

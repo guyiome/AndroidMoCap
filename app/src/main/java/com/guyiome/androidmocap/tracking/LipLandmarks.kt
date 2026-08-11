@@ -1,6 +1,7 @@
 package com.guyiome.androidmocap.tracking
 
 import kotlin.math.abs
+import kotlin.math.sqrt
 
 /**
  * Indices dans le mesh 478 points de MediaPipe Face Landmarker. **Coins de bouche et lèvre
@@ -9,10 +10,15 @@ import kotlin.math.abs
  * produisait un rectangle de 2x3px constant, révélant que 61/291 sont en réalité quasi superposés
  * en X (Δx≈0,001, Δy≈0,046 -- une paire VERTICALE, pas des coins) alors que 0/17 partagent
  * exactement le même Y (Δx≈0,052, Δy≈0,000 -- une paire HORIZONTALE, les vrais coins). Indices
- * corrigés en conséquence ci-dessous. **13/14 restent une hypothèse non confirmée** : les
- * coordonnées observées les montrent eux aussi plutôt horizontaux (Δx≈0,029, Δy≈0,002), pas la
- * paire verticale "lèvre interne" attendue -- à revérifier avant de faire confiance à
- * [mouthOpennessRatio] pour autre chose qu'un diagnostic relatif.
+ * corrigés en conséquence ci-dessous. **13/14 restent une hypothèse non confirmée par inspection
+ * visuelle directe** : les coordonnées observées les montrent eux aussi plutôt horizontaux
+ * (Δx≈0,029, Δy≈0,002), pas la paire verticale "lèvre interne" attendue. Malgré ça,
+ * [mouthOpennessRatio] (qui en dépend) est devenu un gate dur de l'étage 1 le 11 août 2026
+ * (`TongueOutGate.mouthGeometricGateOpen`, revue technique point 15quinquies) : quels que soient
+ * les indices 13/14 réels, le ratio qu'ils produisent sépare nettement et de façon reproductible
+ * bouche pressée (~0,001-0,12) de bouche réellement ouverte (~0,44+) sur plusieurs sessions device
+ * indépendantes -- validation comportementale, pas une confirmation des indices eux-mêmes. Si ce
+ * gate se montre un jour peu fiable, revérifier 13/14 en premier.
  */
 internal object LipLandmarkIndices {
     const val MOUTH_CORNER_LEFT = 0
@@ -49,15 +55,17 @@ internal data class MouthCropRegion(val x: Int, val y: Int, val width: Int, val 
  * faux positif sans le résoudre (faux `TONGUE_OUT` encore fréquents à 15-17px). Remonté à 25px sur
  * la base d'un seul relevé non contrôlé (`logcat -d` sur 6s mélangeant plusieurs gestes, pas un test
  * isolé propre) -- surcorrection confirmée par l'utilisateur : plus aucune détection possible même
- * langue réellement tirée. Redescendu à 15px, dernier état confirmé fonctionnel (pas parfait, mais
- * la langue tirée redevient détectable). **La largeur de recadrage en pixels absolus n'est
- * probablement pas le bon signal** -- elle dépend de la distance/position par rapport à la caméra,
- * pas juste du geste. `mouthOpennessRatio` (déjà calculé, normalisé par la largeur de bouche, donc
- * indépendant de la distance caméra) semble mieux séparer les deux cas dans les données collectées
- * ce jour (bouche pressée/mordue : ~0,003-0,12 ; bouche réellement ouverte, avec ou sans langue :
- * ~0,44+) -- piste à explorer en remplacement de ce garde-fou plutôt que de continuer à ajuster une
- * valeur en pixels, voir backlog privé. Même leçon que le seuil couleur de l'étage 2 (revue
- * technique, point 15bis) : ne pas re-deviner un scalaire sans un test contrôlé propre à l'appui.
+ * langue réellement tirée. Redescendu à 15px, dernier état confirmé fonctionnel. **La largeur de
+ * recadrage en pixels absolus n'était pas le bon signal principal** -- elle dépend de la
+ * distance/position par rapport à la caméra, pas juste du geste. Le vrai correctif retenu est
+ * `TongueOutGate.mouthGeometricGateOpen()` (gate dur sur `mouthOpennessRatio`, normalisé donc
+ * indépendant de la distance caméra, voir revue technique point 15quinquies) -- ce garde-fou en
+ * pixels **reste en place** comme filet de sécurité complémentaire (pas redondant : les deux
+ * signaux ne mesurent pas la même chose, et ce garde-fou reste la seule protection pendant la
+ * calibration elle-même, dont l'accès bitmap n'est volontairement pas gaté par
+ * `mouthGeometricGateOpen` -- voir kdoc de `MainViewModel.sampleMouthTongueEmbedding`). Même leçon
+ * que le seuil couleur de l'étage 2 (revue technique, point 15bis) : ne pas re-deviner un scalaire
+ * sans un test contrôlé propre à l'appui.
  */
 internal const val MIN_CROP_DIMENSION_PX = 15
 
@@ -129,5 +137,5 @@ internal fun mouthCropRegion(
 private fun distance(a: Pair<Float, Float>, b: Pair<Float, Float>): Float {
     val dx = a.first - b.first
     val dy = a.second - b.second
-    return kotlin.math.sqrt(dx * dx + dy * dy)
+    return sqrt(dx * dx + dy * dy)
 }

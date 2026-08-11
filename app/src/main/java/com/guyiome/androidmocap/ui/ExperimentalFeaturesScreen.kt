@@ -28,11 +28,11 @@ import androidx.compose.ui.unit.dp
 import com.guyiome.androidmocap.R
 
 /**
- * Catégorie dédiée aux fonctionnalités expérimentales -- une des quatre catégories de
- * [SettingsScreen] (voir rapport technique, point 21), créée par anticipation des points 15
+ * Catégorie dédiée aux fonctionnalités expérimentales -- une des cinq catégories de
+ * [SettingsScreen] (voir revue technique, point 21), créée par anticipation des points 15
  * (détection de la langue tirée) et 16 (détection des joues gonflées). Point 16 reste un
- * placeholder pur ; point 15 a désormais un vrai réglage (phase 1 de la cascade, purement
- * diagnostique -- voir `AppSettingsStore.tongueOutDetectionEnabled`).
+ * placeholder pur ; point 15 a désormais un vrai réglage (cascade à 3 étages, affichage local
+ * uniquement -- voir `AppSettingsStore.tongueOutDetectionEnabled`).
  */
 @Composable
 fun ExperimentalFeaturesScreen(

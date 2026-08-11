@@ -14,7 +14,8 @@ package com.guyiome.androidmocap.tracking
  * Seuils calés une première fois sur device le 11 août 2026 (voir `TONGUE_DIAGNOSTIC_LOGGING`,
  * `MainViewModel`) -- un seul essai, une seule condition d'éclairage, à revalider plus tard.
  * `TONGUE_MIN_SATURATION` en particulier a dû être fortement assoupli (0,35 -> 0,15) : la
- * saturation moyenne réelle du recadrage buccal (~0,22, mesurée via [averageHsv]) était sous
+ * saturation moyenne réelle du recadrage buccal (~0,22, mesurée via une fonction de diagnostic
+ * jetable depuis retirée, `averageHsv` -- même sort que `saveTongueDebugCrop`) était sous
  * l'ancien seuil, qui excluait alors 100% des pixels quel que soit l'état de la langue -- voir
  * `DEFAULT_COLOR_RATIO_THRESHOLD` pour ce que ce réglage plus permissif implique pour le mécanisme
  * de discrimination réel.
@@ -68,31 +69,6 @@ internal fun tonguePixelRatio(pixelsArgb: IntArray): Float {
     if (pixelsArgb.isEmpty()) return 0f
     val matching = pixelsArgb.count { isTongueColoredPixel(it) }
     return matching.toFloat() / pixelsArgb.size
-}
-
-/**
- * Teinte/saturation/valeur moyennes du recadrage -- `[0,0,0]` si le tableau est vide. Diagnostic
- * ajouté le 11 août 2026 pour distinguer "recadrage mal placé" de "seuils couleur mal calés" quand
- * `tonguePixelRatio` restait obstinément à 0.0 sur device malgré un étage 1 sain. A confirmé un
- * recadrage correct (visuellement validé par l'utilisateur) mais une saturation moyenne (~0,22)
- * sous l'ancien seuil (0,35) -- d'où l'assouplissement de `TONGUE_MIN_SATURATION` ci-dessous.
- */
-internal fun averageHsv(pixelsArgb: IntArray): FloatArray {
-    if (pixelsArgb.isEmpty()) return floatArrayOf(0f, 0f, 0f)
-    var hueSum = 0f
-    var saturationSum = 0f
-    var valueSum = 0f
-    for (argb in pixelsArgb) {
-        val r = (argb shr 16) and 0xFF
-        val g = (argb shr 8) and 0xFF
-        val b = argb and 0xFF
-        val hsv = rgbToHsv(r, g, b)
-        hueSum += hsv[0]
-        saturationSum += hsv[1]
-        valueSum += hsv[2]
-    }
-    val n = pixelsArgb.size
-    return floatArrayOf(hueSum / n, saturationSum / n, valueSum / n)
 }
 
 /**

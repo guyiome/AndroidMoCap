@@ -1065,6 +1065,51 @@ l'utilisateur, "j'ai toujours du blink") soit désormais correctement traité pa
 la source du bruit supprimée. À vérifier dans une session ultérieure plutôt que de conclure sans
 données fraîches.
 
+### 15sexies. Revue de code + documentation de toute la feature (11 août 2026, demande explicite de l'utilisateur)
+
+Passe complète (agent de revue dédié sur tous les fichiers du point 15, plus une revue manuelle de
+la documentation transverse) une fois le fil du faux positif "bouche pressée" clos. Corrigé :
+
+- **Code mort retiré** : `averageHsv()` (`MouthColorAnalysis.kt`), diagnostic ponctuel du 11 août
+  utilisé une seule fois via `saveTongueDebugCrop()` (déjà retiré) -- plus aucun appelant en
+  production, seulement ses propres tests. Même sort que `saveTongueDebugCrop()`, 2 tests retirés
+  avec.
+- **Sécurité multi-thread renforcée** : `tongueEmbeddingHelper`/`tongueCalibrationResult`
+  (`MainViewModel.kt`) écrits depuis le thread principal mais lus depuis le thread de callback
+  MediaPipe -- passés `@Volatile`, même traitement que `latestArCoreHeadRotationMatrix`/
+  `savedVtsAuthToken` déjà dans la classe.
+- **Calibration orpheline évitée** : désactiver le toggle expérimental en pleine calibration fermait
+  le helper d'embedding sans annuler la machine à état, qui continuait à tourner à vide jusqu'à
+  `DONE` puis jetait silencieusement un résultat vide sans retour utilisateur -- `cancelTongueCalibration()`
+  appelé explicitement dans ce cas maintenant.
+- **Une demi-douzaine de commentaires/kdoc obsolètes corrigés** : référence pendante à
+  `saveTongueDebugCrop()` (retiré) dans le kdoc de `sampleMouthTongueEmbedding` ; kdoc de
+  `MIN_CROP_DIMENSION_PX` qui présentait `mouthGeometricGateOpen()` comme "piste à explorer" alors
+  qu'elle est implémentée ; commentaire de `TONGUE_DIAGNOSTIC_LOGGING` qui se disait "désactivé"
+  alors que la constante vaut `true` ; kdoc de `MainUiState.tongueOutDetectionEnabled` et
+  `AppSettingsStore.tongueOutDetectionEnabled` qui parlaient encore de "phase 1 purement
+  diagnostique" alors que l'étage 3 existe et que la valeur est affichée localement ; contradiction
+  entre le kdoc de `LipLandmarkIndices` (13/14 "hypothèse non confirmée, à ne pas utiliser au-delà
+  d'un diagnostic relatif") et `mouthGeometricGateOpen()` qui en dépend pourtant comme gate dur
+  depuis le 15quinquies -- reformulé pour assumer la validation comportementale sans prétendre que
+  les indices eux-mêmes sont confirmés visuellement. Une chaîne utilisateur FR/EN obsolète
+  (`experimental_tongue_detection_description`, encore "Phase 1 only... toujours à 0") corrigée
+  aussi -- c'était visible dans l'app, pas juste un commentaire de code.
+- **Doc transverse synchronisée** : `spec_fonctionnelle.md`/`spec_technique.md`/tableau d'index de
+  `revue_technique.md` étaient en retard sur le code (point 15 encore listé "non implémenté" en
+  §4 de la spec fonctionnelle, menu réglages décrit à 4 catégories au lieu de 5) -- corrigés,
+  commit séparé de celui-ci.
+
+**Laissé tel quel, signalé mais pas corrigé** (nits, ou changements de comportement jugés trop
+risqués en fin de session après plusieurs corrections déjà appliquées le même jour) : deux
+`_trackingFrame.update{}` par frame au lieu d'un seul (micro-optimisation, pas un bug) ;
+`TongueCalibrationScreen`'s branches `DONE` inatteignables (la machine collapse `DONE`→`IDLE` dans
+la même frame côté `MainViewModel`, sans conséquence visible) ; `colorFired` reste purement
+diagnostique (jamais gatant, comportement inchangé, juste mieux commenté) ; incohérence de
+nommage mineure entre `mouthGeometric`/`mouthGeometricRatio`/`mouthOpennessRatio` pour la même
+grandeur ; `TongueCalibrationStore.clear()` sans appelant en production (pas d'affordance "réinitialiser
+la calibration" dans l'UI à ce jour).
+
 ### 16. Détection expérimentale de `cheekPuff` (joues gonflées) -- même famille que le point 15, cascade allégée
 
 Même statut que `tongueOut` chez MediaPipe (signal peu fiable, cf. issue GitHub #4436 et le mapping

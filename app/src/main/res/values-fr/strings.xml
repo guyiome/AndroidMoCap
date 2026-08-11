@@ -138,7 +138,7 @@
     <string name="experimental_features_title">Fonctionnalités expérimentales</string>
     <string name="experimental_features_placeholder">La détection des joues gonflées n\'est pas encore implémentée (voir la revue technique).</string>
     <string name="experimental_tongue_detection_title">Détection langue tirée (diagnostic)</string>
-    <string name="experimental_tongue_detection_description">Désactivé par défaut. Phase 1 uniquement : logue si les heuristiques d\'ouverture de bouche et de couleur se déclenchent, sans changer la valeur tongueOut réellement envoyée (toujours à 0). Aucun effet sur la donnée réseau pour l\'instant.</string>
+    <string name="experimental_tongue_detection_description">Désactivé par défaut. Fait tourner une cascade à 3 étages (porte d\'ouverture de bouche, heuristique couleur, embedding calibré personnellement) et affiche le résultat en direct dans le panneau de blendshapes si tongueOut est coché. Fiabilité encore en cours de validation -- n\'affecte jamais ce qui est réellement envoyé au réseau.</string>
     <string name="experimental_tongue_calibration_button">Calibrer la détection…</string>
 
     <!-- Écran de calibration langue tirée -->

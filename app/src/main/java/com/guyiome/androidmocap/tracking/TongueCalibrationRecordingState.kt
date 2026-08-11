@@ -1,5 +1,9 @@
 package com.guyiome.androidmocap.tracking
 
+/** Publique (pas `internal`) : exposée dans `MainUiState`, elle-même publique -- même précédent que
+ *  `TrackingTier`. */
+enum class TongueCalibrationPhase { IDLE, RECORDING_TONGUE_OUT, PREPARE_TONGUE_IN, RECORDING_TONGUE_IN, DONE }
+
 /**
  * Machine à état pure pilotant l'enregistrement d'une calibration de l'étage 3 (revue technique,
  * point 15) : "langue dehors" puis "langue rentrée", quelques secondes chacune -- même famille que
@@ -7,17 +11,14 @@ package com.guyiome.androidmocap.tracking
  * (temps écoulé + embedding optionnel de la frame) depuis `MainViewModel` plutôt que d'implémenter
  * cette logique de comptage directement dans le ViewModel.
  *
- * Une pause [PREPARE_TONGUE_IN] sépare les deux enregistrements (ajoutée le 11 août 2026, retour
- * utilisateur après un premier essai de calibration faible) : sans elle, la transition entre les
- * deux phases est instantanée dès que la durée de la première est atteinte, risquant de capturer
- * des frames de transition (langue en train de rentrer, pas encore stabilisée) dans l'accumulateur
- * "langue rentrée" -- et inversement, une préparation insuffisante avant "langue dehors" pouvait
- * déjà expliquer une référence peu discriminante. Aucune accumulation pendant cette pause.
+ * Une pause [TongueCalibrationPhase.PREPARE_TONGUE_IN] sépare les deux enregistrements (ajoutée le
+ * 11 août 2026, retour utilisateur après un premier essai de calibration faible) : sans elle, la
+ * transition entre les deux phases est instantanée dès que la durée de la première est atteinte,
+ * risquant de capturer des frames de transition (langue en train de rentrer, pas encore stabilisée)
+ * dans l'accumulateur "langue rentrée" -- et inversement, une préparation insuffisante avant "langue
+ * dehors" pouvait déjà expliquer une référence peu discriminante. Aucune accumulation pendant cette
+ * pause.
  */
-/** Publique (pas `internal`) : exposée dans `MainUiState`, elle-même publique -- même précédent que
- *  `TrackingTier`. */
-enum class TongueCalibrationPhase { IDLE, RECORDING_TONGUE_OUT, PREPARE_TONGUE_IN, RECORDING_TONGUE_IN, DONE }
-
 internal data class TongueCalibrationRecordingState(
     val phase: TongueCalibrationPhase = TongueCalibrationPhase.IDLE,
     val tongueOutAccumulator: EmbeddingAccumulator = EmbeddingAccumulator(),
