@@ -53,6 +53,7 @@ import com.guyiome.androidmocap.tracking.isRunningHigh
 import com.guyiome.androidmocap.tracking.isElevated
 import com.guyiome.androidmocap.tracking.classifyTongueState
 import com.guyiome.androidmocap.tracking.cosineSimilarity
+import com.guyiome.androidmocap.tracking.DEFAULT_CALIBRATION_PREPARE_DURATION_MS
 import com.guyiome.androidmocap.tracking.DEFAULT_CALIBRATION_RECORDING_DURATION_MS
 import com.guyiome.androidmocap.tracking.DEFAULT_CLASSIFICATION_MARGIN
 import com.guyiome.androidmocap.tracking.TongueEmbeddingClassification
@@ -231,6 +232,9 @@ data class MainUiState(
     // (IDLE hors calibration), poussée dans _uiState seulement aux transitions (pas à chaque
     // frame, même discipline que calibrationAnomalyFlagged) -- voir handleTrackingResult().
     val tongueCalibrationPhase: TongueCalibrationPhase = TongueCalibrationPhase.IDLE,
+    // Compte à rebours affiché pendant une phase de calibration (enregistrement ou pause de
+    // préparation), null hors calibration -- voir handleTrackingResult().
+    val tongueCalibrationSecondsRemaining: Int? = null,
     // Miroir UI-only (voir AppSettingsStore.tongueReferencesCalibrated) -- source de vérité réelle :
     // tongueCalibrationResult (privé, chargé depuis TongueCalibrationStore).
     val tongueReferencesCalibrated: Boolean = false,
@@ -976,25 +980,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 corrected.imageHeightPx,
             )
             val previousPhase = tongueCalibrationRecordingState.phase
+            val recordingDurationMs = _uiState.value.tongueCalibrationRecordingDurationMs
             tongueCalibrationRecordingState = tongueCalibrationRecordingState.tick(
                 calibrationElapsedMs,
                 embedding,
-                _uiState.value.tongueCalibrationRecordingDurationMs,
+                recordingDurationMs,
             )
-            if (tongueCalibrationRecordingState.phase != previousPhase) {
-                if (tongueCalibrationRecordingState.phase == TongueCalibrationPhase.DONE) {
-                    val result = tongueCalibrationRecordingState.result()
-                    if (result != null) {
-                        tongueCalibrationResult = result
-                        tongueCalibrationStore.save(result)
-                        viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setTongueReferencesCalibrated(true) }
-                    }
-                    // Repart directement à IDLE -- une nouvelle calibration remplace entièrement
-                    // l'ancienne (même principe que performCalibration(), pas de fusion partielle).
-                    tongueCalibrationRecordingState = TongueCalibrationRecordingState()
-                    tongueCalibrationLastTimestampMs = null
+            if (tongueCalibrationRecordingState.phase == TongueCalibrationPhase.DONE) {
+                val result = tongueCalibrationRecordingState.result()
+                if (result != null) {
+                    tongueCalibrationResult = result
+                    tongueCalibrationStore.save(result)
+                    viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setTongueReferencesCalibrated(true) }
                 }
-                _uiState.update { it.copy(tongueCalibrationPhase = tongueCalibrationRecordingState.phase) }
+                // Repart directement à IDLE -- une nouvelle calibration remplace entièrement
+                // l'ancienne (même principe que performCalibration(), pas de fusion partielle).
+                tongueCalibrationRecordingState = TongueCalibrationRecordingState()
+                tongueCalibrationLastTimestampMs = null
+                _uiState.update {
+                    it.copy(tongueCalibrationPhase = TongueCalibrationPhase.IDLE, tongueCalibrationSecondsRemaining = null)
+                }
+            } else {
+                // Compte à rebours dérivé du même état réel qui pilote l'accumulation (pas un
+                // minuteur indépendant, voir kdoc de TongueCalibrationScreen) -- durée de la phase
+                // courante selon qu'on est en enregistrement (réglable, panneau debug) ou en pause
+                // de préparation (constante, pas encore réglable). Poussé à _uiState seulement au
+                // changement de seconde affichée ou de phase, pas à chaque frame (même discipline
+                // que calibrationAnomalyFlagged) : ceil() pour un décompte 3,2,1 naturel plutôt que
+                // de sauter directement à 2 dès la première frame.
+                val phaseDurationMs = if (tongueCalibrationRecordingState.phase == TongueCalibrationPhase.PREPARE_TONGUE_IN) {
+                    DEFAULT_CALIBRATION_PREPARE_DURATION_MS
+                } else {
+                    recordingDurationMs
+                }
+                val secondsRemaining = kotlin.math.ceil(
+                    (phaseDurationMs - tongueCalibrationRecordingState.elapsedMsInPhase) / 1000f
+                ).toInt().coerceAtLeast(0)
+                if (tongueCalibrationRecordingState.phase != previousPhase ||
+                    secondsRemaining != _uiState.value.tongueCalibrationSecondsRemaining
+                ) {
+                    _uiState.update {
+                        it.copy(
+                            tongueCalibrationPhase = tongueCalibrationRecordingState.phase,
+                            tongueCalibrationSecondsRemaining = secondsRemaining,
+                        )
+                    }
+                }
             }
         }
 
@@ -1383,14 +1414,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun startTongueCalibration() {
         tongueCalibrationRecordingState = newTongueCalibrationRecording()
         tongueCalibrationLastTimestampMs = null
-        _uiState.update { it.copy(tongueCalibrationPhase = tongueCalibrationRecordingState.phase) }
+        val initialSecondsRemaining = kotlin.math.ceil(_uiState.value.tongueCalibrationRecordingDurationMs / 1000f).toInt()
+        _uiState.update {
+            it.copy(
+                tongueCalibrationPhase = tongueCalibrationRecordingState.phase,
+                tongueCalibrationSecondsRemaining = initialSecondsRemaining,
+            )
+        }
     }
 
     /** Annule une calibration en cours -- remet la machine à IDLE, ne touche pas à une calibration déjà sauvegardée. */
     fun cancelTongueCalibration() {
         tongueCalibrationRecordingState = TongueCalibrationRecordingState()
         tongueCalibrationLastTimestampMs = null
-        _uiState.update { it.copy(tongueCalibrationPhase = TongueCalibrationPhase.IDLE) }
+        _uiState.update { it.copy(tongueCalibrationPhase = TongueCalibrationPhase.IDLE, tongueCalibrationSecondsRemaining = null) }
     }
 
     /** Réglages debug (durée d'enregistrement / marge de classification), voir `AppSettingsStore`. */

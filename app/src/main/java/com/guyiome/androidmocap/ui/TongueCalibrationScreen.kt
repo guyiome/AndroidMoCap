@@ -46,6 +46,7 @@ import com.guyiome.androidmocap.tracking.TongueCalibrationPhase
 @Composable
 fun TongueCalibrationScreen(
     phase: TongueCalibrationPhase,
+    secondsRemaining: Int?,
     isCalibrated: Boolean,
     recordingDurationMs: Long,
     classificationMargin: Float,
@@ -100,10 +101,23 @@ fun TongueCalibrationScreen(
                         stringResource(R.string.tongue_calibration_status_never)
                     }
                 TongueCalibrationPhase.RECORDING_TONGUE_OUT -> stringResource(R.string.tongue_calibration_status_recording_out)
+                TongueCalibrationPhase.PREPARE_TONGUE_IN -> stringResource(R.string.tongue_calibration_status_prepare_in)
                 TongueCalibrationPhase.RECORDING_TONGUE_IN -> stringResource(R.string.tongue_calibration_status_recording_in)
                 TongueCalibrationPhase.DONE -> stringResource(R.string.tongue_calibration_status_calibrated)
             }
             Text(statusText, color = Color.White, style = MaterialTheme.typography.titleMedium)
+
+            // Compte à rebours numérique, dérivé du même état réel qui pilote l'accumulation
+            // d'embeddings (pas un minuteur indépendant qui pourrait dériver) -- demande explicite
+            // de l'utilisateur (11 août 2026) pour un meilleur retour pendant la calibration.
+            if (secondsRemaining != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "${secondsRemaining}s",
+                    color = Color.White.copy(alpha = 0.8f),
+                    style = MaterialTheme.typography.displaySmall,
+                )
+            }
 
             Spacer(Modifier.height(24.dp))
             when (phase) {
@@ -118,7 +132,7 @@ fun TongueCalibrationScreen(
                         )
                     }
                 }
-                TongueCalibrationPhase.RECORDING_TONGUE_OUT, TongueCalibrationPhase.RECORDING_TONGUE_IN -> {
+                TongueCalibrationPhase.RECORDING_TONGUE_OUT, TongueCalibrationPhase.PREPARE_TONGUE_IN, TongueCalibrationPhase.RECORDING_TONGUE_IN -> {
                     OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.tongue_calibration_button_cancel))
                     }

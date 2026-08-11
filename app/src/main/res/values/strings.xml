@@ -149,6 +149,7 @@
     <string name="tongue_calibration_status_never">Never calibrated yet.</string>
     <string name="tongue_calibration_status_calibrated">Calibrated ✓</string>
     <string name="tongue_calibration_status_recording_out">Stick your tongue out and hold…</string>
+    <string name="tongue_calibration_status_prepare_in">Get ready to relax your tongue back in…</string>
     <string name="tongue_calibration_status_recording_in">Tongue in, mouth relaxed…</string>
     <string name="tongue_calibration_button_start">Start calibration</string>
     <string name="tongue_calibration_button_recalibrate">Recalibrate</string>

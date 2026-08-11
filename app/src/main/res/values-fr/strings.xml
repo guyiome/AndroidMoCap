@@ -147,6 +147,7 @@
     <string name="tongue_calibration_status_never">Jamais calibré pour l\'instant.</string>
     <string name="tongue_calibration_status_calibrated">Calibré ✓</string>
     <string name="tongue_calibration_status_recording_out">Tire la langue et tiens la pose…</string>
+    <string name="tongue_calibration_status_prepare_in">Prépare-toi à rentrer la langue…</string>
     <string name="tongue_calibration_status_recording_in">Langue rentrée, bouche détendue…</string>
     <string name="tongue_calibration_button_start">Démarrer la calibration</string>
     <string name="tongue_calibration_button_recalibrate">Recalibrer</string>

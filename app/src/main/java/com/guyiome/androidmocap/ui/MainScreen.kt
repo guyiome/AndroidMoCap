@@ -343,6 +343,7 @@ fun MainScreen(
             if (showTongueCalibration) {
                 TongueCalibrationScreen(
                     phase = uiState.tongueCalibrationPhase,
+                    secondsRemaining = uiState.tongueCalibrationSecondsRemaining,
                     isCalibrated = uiState.tongueReferencesCalibrated,
                     recordingDurationMs = uiState.tongueCalibrationRecordingDurationMs,
                     classificationMargin = uiState.tongueClassificationMargin,
