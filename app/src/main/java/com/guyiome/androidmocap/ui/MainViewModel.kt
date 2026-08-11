@@ -4,6 +4,9 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.opengl.GLSurfaceView
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.camera.view.PreviewView
@@ -985,8 +988,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         try {
             val cropped = Bitmap.createBitmap(bitmap, region.x, region.y, region.width, region.height)
-            val file = File(getApplication<Application>().filesDir, "tongue_debug_crop.png")
-            FileOutputStream(file).use { out -> cropped.compress(Bitmap.CompressFormat.PNG, 100, out) }
+            val cropFile = File(getApplication<Application>().filesDir, "tongue_debug_crop.png")
+            FileOutputStream(cropFile).use { out -> cropped.compress(Bitmap.CompressFormat.PNG, 100, out) }
+
+            // Image complète + rectangle rouge autour de la zone recadrée (demande explicite de
+            // l'utilisateur, 11 août 2026, pour situer précisément le recadrage par rapport au
+            // visage entier -- le petit recadrage seul, 25x61px, est trop imprécis pour juger à l'œil).
+            val fullCopy = bitmap.copy(Bitmap.Config.ARGB_8888, true)
+            val canvas = Canvas(fullCopy)
+            val paint = Paint().apply {
+                style = Paint.Style.STROKE
+                color = Color.RED
+                strokeWidth = 3f
+            }
+            canvas.drawRect(
+                region.x.toFloat(),
+                region.y.toFloat(),
+                (region.x + region.width).toFloat(),
+                (region.y + region.height).toFloat(),
+                paint,
+            )
+            val fullFile = File(getApplication<Application>().filesDir, "tongue_debug_full.png")
+            FileOutputStream(fullFile).use { out -> fullCopy.compress(Bitmap.CompressFormat.PNG, 100, out) }
         } catch (e: Exception) {
             AppLog.w(TONGUE_DIAG_TAG, "Échec sauvegarde recadrage debug langue", e)
         }
