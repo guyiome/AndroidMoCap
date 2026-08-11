@@ -240,8 +240,10 @@ structurelle : `tongueOut` n'est jamais restitué de façon fiable (la langue n'
 topologie du mesh de landmarks, qui ne modélise que la surface visible du visage) ; `cheekPuff` est
 également peu fiable en pratique mais pour une raison différente (déformation de surface bien
 présente dans le mesh, vraisemblablement un manque de couverture du modèle officiel plutôt qu'une
-impossibilité structurelle) -- distinction qui conditionne les pistes de correction envisagées
-(revue technique points 15/16).
+impossibilité structurelle) -- distinction qui a conditionné les pistes de correction retenues
+(revue technique points 15/16). `tongueOut` a une mitigation applicative construite en dehors du
+mesh (cascade porte géométrique → couleur → embedding, point 15), fiabilité toujours en cours de
+validation à ce jour ; `cheekPuff` (point 16) n'a pas encore de mitigation implémentée.
 
 **ARCore** -- utilisé uniquement pour Augmented Faces au palier `OPTIMAL` (voir §4), pas pour un
 usage de réalité augmentée classique.

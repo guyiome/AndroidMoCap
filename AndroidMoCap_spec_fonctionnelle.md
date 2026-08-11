@@ -47,8 +47,15 @@ l'avatar affiché côté PC qui sert de retour visuel.
   fonctionnel sur device (point 13 de la revue technique).
 - Calcul de 52 blendshapes au format ARKit à partir de la caméra frontale (MediaPipe Face
   Landmarker). Deux blendshapes (`tongueOut`, `cheekPuff`) ne sont pas restitués de façon fiable
-  par ce modèle -- limitation du modèle lui-même, documentée, pas un bug de l'app (voir §4 pour les
-  pistes de correction envisagées).
+  par ce modèle -- limitation du modèle lui-même, documentée, pas un bug de l'app. `tongueOut`
+  bénéficie d'une détection expérimentale alternative (voir ci-dessous) ; `cheekPuff` reste sans
+  mitigation pour l'instant (voir §4, point 16).
+- **Détection expérimentale de la langue tirée** (`tongueOut`) -- cascade dédiée (porte géométrique
+  bouche ouverte → recadrage/couleur → comparaison à une calibration personnelle par embedding),
+  activable dans "Fonctionnalités expérimentales" (§3.4). Fiabilité en cours de validation, pas
+  encore confirmée (voir revue technique, point 15) -- la valeur reste affichée localement
+  uniquement (panneau de sélection des blendshapes, si `tongueOut` est coché) et n'est **jamais**
+  envoyée aux protocoles réseau (§3.3) tant que la fiabilité n'est pas confirmée.
 - Estimation de la direction du regard (par œil, pitch/yaw) reconstruite à partir des blendshapes
   directionnels (`eyeLookUp/Down/In/OutLeft/Right`), MediaPipe ne fournissant pas cette donnée
   nativement.
@@ -100,13 +107,15 @@ Le téléphone et le PC receveur doivent être sur le même réseau Wi-Fi local 
   détection du visage, bouton connexion/déconnexion, bouton de calibrage (avec anneau de compte à
   rebours), accès aux réglages. Chaque icône pivote sur elle-même pour rester lisible quel que soit
   l'angle auquel le téléphone est tenu ou posé.
-- **Écran de réglages**, réorganisé en menu à 4 catégories (chacune son propre écran, retour vers
+- **Écran de réglages**, réorganisé en menu à 5 catégories (chacune son propre écran, retour vers
   le menu par flèche standard ou bouton/geste retour système) : Diagnostics (lecture seule -- palier
   actif, délégué GPU/CPU, visage détecté, latence d'inférence, état de calibration), Connexion
   (type + cible réseau, seul le sous-bloc du type choisi affiché), Affichage & confort (accès à
   l'écran de sélection des blendshapes affichés + sa persistance, overlay du mesh de tracking, mode
-  économie d'énergie, seuil d'alerte batterie), Fonctionnalités expérimentales (catégorie réservée,
-  vide pour l'instant -- voir §4).
+  économie d'énergie, seuil d'alerte batterie), Fonctionnalités expérimentales (interrupteur de
+  détection de la langue tirée + accès à son écran de calibration dédié, voir ci-dessus ; réservée
+  pour la détection des joues gonflées, pas encore implémentée -- voir §4), Journalisation (niveau
+  de log, partage du fichier de logs).
 - **Écran de sélection des blendshapes affichés** : catalogue complet des 52 blendshapes ARKit,
   groupés par catégorie (sourcils, yeux, joues, nez, mâchoire, bouche, langue), avec recherche.
   Affiche la valeur en direct de chaque blendshape coché sur l'écran principal. Icône d'avertissement
@@ -114,7 +123,7 @@ Le téléphone et le PC receveur doivent être sur le même réseau Wi-Fi local 
   `jawLeft`, `jawRight`, `mouthDimpleLeft/Right`, `cheekPuff`, `tongueOut`) -- informatif, n'empêche
   pas la sélection. Non conservée d'une session à l'autre par défaut, mais persistance activable
   dans les réglages (Affichage & confort).
-- **Navigation** : chaque écran superposé (réglages et ses 4 catégories, sélection des blendshapes)
+- **Navigation** : chaque écran superposé (réglages et ses 5 catégories, sélection des blendshapes)
   se ferme via une flèche retour standard, le bouton retour matériel, ou le geste de balayage
   système (predictive back, Android 13+) -- les trois déclenchent la même action.
 - **Langue** : interface disponible en français (défaut) et anglais. Deux façons de la choisir,
@@ -152,13 +161,10 @@ Fonctionnalités actées en conception dans `AndroidMoCap_revue_technique.md` ma
 ce jour. Un résumé d'une ligne ici, le détail complet (raisonnement, architecture envisagée, points
 d'attention) reste dans la revue technique :
 
-- **Détection expérimentale de la langue tirée** (`tongueOut`) -- cascade porte géométrique →
-  couleur → comparaison à une calibration personnelle. Point 15.
-- **Détection expérimentale des joues gonflées** (`cheekPuff`) -- cascade géométrique allégée.
-  Point 16.
-- Les deux ci-dessus seraient rangées derrière un interrupteur dédié dans la catégorie
-  "Fonctionnalités expérimentales" des réglages (déjà créée, vide pour l'instant), avec
-  avertissement si l'appareil throttle.
+- **Détection expérimentale des joues gonflées** (`cheekPuff`) -- cascade géométrique allégée,
+  même famille que la détection de langue tirée déjà implémentée (§3.1, point 15). Point 16.
+  Rangée derrière le même interrupteur "Fonctionnalités expérimentales" une fois codée, avec
+  avertissement si l'appareil throttle (même mécanisme déjà en place pour la langue tirée).
 - **Affichage de la valeur brute à côté de la valeur ajustée** dans l'écran de sélection des
   blendshapes, si une pondération par blendshape est un jour ajoutée -- n'a de sens que ce jour-là.
   La persistance optionnelle de la sélection, elle, est déjà implémentée (voir §3.4).
