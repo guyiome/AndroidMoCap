@@ -2,6 +2,7 @@ package com.guyiome.androidmocap.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -19,7 +21,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,11 +47,18 @@ import com.guyiome.androidmocap.tracking.TongueCalibrationPhase
 fun TongueCalibrationScreen(
     phase: TongueCalibrationPhase,
     isCalibrated: Boolean,
+    recordingDurationMs: Long,
+    classificationMargin: Float,
     onStartCalibration: () -> Unit,
     onCancel: () -> Unit,
+    onSetRecordingDurationMs: (Long) -> Unit,
+    onSetClassificationMargin: (Float) -> Unit,
     onClose: () -> Unit,
 ) {
     BackHandler(onBack = onClose)
+    // État local, volontairement non hoisté/persisté -- même patron que DiagnosticsScreen (voir
+    // DebugPanelUnlock.kt) : le geste (7 taps sur le titre) ne coûte que quelques secondes à refaire.
+    var debugUnlock by remember { mutableStateOf(DebugPanelUnlockState()) }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -56,7 +70,9 @@ fun TongueCalibrationScreen(
                     stringResource(R.string.tongue_calibration_title),
                     color = Color.White,
                     style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { debugUnlock = debugUnlock.registerTap(System.currentTimeMillis()) },
                 )
                 IconButton(onClick = onClose) {
                     Icon(
@@ -107,6 +123,59 @@ fun TongueCalibrationScreen(
                         Text(stringResource(R.string.tongue_calibration_button_cancel))
                     }
                 }
+            }
+
+            if (debugUnlock.unlocked) {
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    stringResource(R.string.tongue_calibration_debug_section_title),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+
+                // Durée d'enregistrement par phase -- pas de rebuild pour retenter un autre réglage,
+                // vu le nombre de sessions de réglage qu'ont demandé les étages 1/2.
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        stringResource(R.string.tongue_calibration_debug_duration, recordingDurationMs / 1000f),
+                        color = Color.White.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = { onSetRecordingDurationMs((recordingDurationMs - 500L).coerceAtLeast(500L)) }) {
+                        Text("-0.5s")
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    TextButton(onClick = { onSetRecordingDurationMs(recordingDurationMs + 500L) }) {
+                        Text("+0.5s")
+                    }
+                }
+
+                // Marge de classification (voir TongueEmbeddingClassifier.classifyTongueState).
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        stringResource(R.string.tongue_calibration_debug_margin, classificationMargin),
+                        color = Color.White.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = { onSetClassificationMargin((classificationMargin - 0.01f).coerceAtLeast(0f)) }) {
+                        Text("-0.01")
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    TextButton(onClick = { onSetClassificationMargin(classificationMargin + 0.01f) }) {
+                        Text("+0.01")
+                    }
+                }
+
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    stringResource(R.string.tongue_calibration_debug_hint),
+                    color = Color.White.copy(alpha = 0.5f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
     }

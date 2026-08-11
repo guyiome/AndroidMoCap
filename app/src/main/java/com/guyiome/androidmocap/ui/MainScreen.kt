@@ -344,8 +344,12 @@ fun MainScreen(
                 TongueCalibrationScreen(
                     phase = uiState.tongueCalibrationPhase,
                     isCalibrated = uiState.tongueReferencesCalibrated,
+                    recordingDurationMs = uiState.tongueCalibrationRecordingDurationMs,
+                    classificationMargin = uiState.tongueClassificationMargin,
                     onStartCalibration = { viewModel.startTongueCalibration() },
                     onCancel = { viewModel.cancelTongueCalibration() },
+                    onSetRecordingDurationMs = { durationMs -> viewModel.setTongueCalibrationRecordingDurationMs(durationMs) },
+                    onSetClassificationMargin = { margin -> viewModel.setTongueClassificationMargin(margin) },
                     onClose = { showTongueCalibration = false },
                 )
             }

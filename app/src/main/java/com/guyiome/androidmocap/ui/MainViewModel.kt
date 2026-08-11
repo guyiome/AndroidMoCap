@@ -51,8 +51,11 @@ import com.guyiome.androidmocap.tracking.correctEyeBlinkScores
 import com.guyiome.androidmocap.tracking.InferenceLoadState
 import com.guyiome.androidmocap.tracking.isRunningHigh
 import com.guyiome.androidmocap.tracking.isElevated
+import com.guyiome.androidmocap.tracking.classifyTongueState
+import com.guyiome.androidmocap.tracking.cosineSimilarity
 import com.guyiome.androidmocap.tracking.DEFAULT_CALIBRATION_RECORDING_DURATION_MS
 import com.guyiome.androidmocap.tracking.DEFAULT_CLASSIFICATION_MARGIN
+import com.guyiome.androidmocap.tracking.TongueEmbeddingClassification
 import com.guyiome.androidmocap.tracking.jawOpenGateOpen
 import com.guyiome.androidmocap.tracking.LipLandmarkIndices
 import com.guyiome.androidmocap.tracking.averageHsv
@@ -1013,11 +1016,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (ratio != null) {
                     tongueColorBaselineState = tongueColorBaselineState.next(ratio)
                 }
+
+                // Étage 3 (embedding + calibration personnelle, revue technique point 15) -- ne se
+                // déclenche que si l'étage 2 a lui-même donné un indice positif (adaptiveFired,
+                // retenu comme le moins mauvais des deux signaux étage 2 -- colorFired seul jugé
+                // trop instable sur device) ET qu'une calibration existe. Toute la cascade garde le
+                // même principe : chaque étage ne se déclenche que si le précédent a déjà donné un
+                // indice positif. Purement diagnostique -- aucune injection dans "final"/
+                // corrected.blendshapes tant qu'un test device n'a pas confirmé l'étage 3 lui-même.
+                var embeddingClassification: TongueEmbeddingClassification? = null
+                var simOut: Float? = null
+                var simIn: Float? = null
+                val calibrationResult = tongueCalibrationResult
+                if (adaptiveFired && calibrationResult != null) {
+                    val embedding = sampleMouthTongueEmbedding(
+                        corrected.timestampMs,
+                        corrected.faceLandmarks,
+                        corrected.imageWidthPx,
+                        corrected.imageHeightPx,
+                    )
+                    if (embedding != null) {
+                        simOut = cosineSimilarity(embedding, calibrationResult.tongueOutReference)
+                        simIn = cosineSimilarity(embedding, calibrationResult.tongueInReference)
+                        embeddingClassification = classifyTongueState(
+                            embedding,
+                            calibrationResult.tongueOutReference,
+                            calibrationResult.tongueInReference,
+                            margin = _uiState.value.tongueClassificationMargin,
+                        )
+                    }
+                }
+
                 if (TONGUE_DIAGNOSTIC_LOGGING) {
                     AppLog.d(
                         TONGUE_DIAG_TAG,
-                        "jawOpen=%.3f mouthGeo=%.3f etage1=OK ratio=%s etage2=%s etage2Adaptatif=%s baseline=%.4f".format(
+                        "jawOpen=%.3f mouthGeo=%.3f etage1=OK ratio=%s etage2=%s etage2Adaptatif=%s baseline=%.4f etage3=%s simOut=%s simIn=%s".format(
                             jawOpen, mouthGeometric, ratio, colorFired, adaptiveFired, tongueColorBaselineState.value,
+                            embeddingClassification, simOut, simIn,
                         ),
                     )
                     // Diagnostic ponctuel (11 août 2026) : ratio restait à 0.0 sur device malgré un

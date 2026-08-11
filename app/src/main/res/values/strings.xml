@@ -153,6 +153,10 @@
     <string name="tongue_calibration_button_start">Start calibration</string>
     <string name="tongue_calibration_button_recalibrate">Recalibrate</string>
     <string name="tongue_calibration_button_cancel">Cancel</string>
+    <string name="tongue_calibration_debug_section_title">Debug (7-tap unlock)</string>
+    <string name="tongue_calibration_debug_duration">Recording duration per phase: %.1fs</string>
+    <string name="tongue_calibration_debug_margin">Classification margin: %.2f</string>
+    <string name="tongue_calibration_debug_hint">Applies immediately, no rebuild needed. Tap the title 7 times again to hide this section.</string>
 
     <!-- Logging settings screen -->
     <string name="logging_settings_title">Logging</string>
