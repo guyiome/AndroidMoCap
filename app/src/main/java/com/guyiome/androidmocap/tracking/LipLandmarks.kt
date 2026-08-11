@@ -43,14 +43,23 @@ internal data class MouthCropRegion(val x: Int, val y: Int, val width: Int, val 
  * entre les lèvres pressées, pas l'intérieur de la bouche), contre 27-63px pour une bouche
  * réellement ouverte sur les mêmes sessions -- lu comme "100% couleur langue" à tort par l'étage 2
  * ET l'étage 3, alors que jawOpen (blendshape ML) restait élevé malgré une bouche géométriquement
- * fermée (mouthOpennessRatio proche de 0). Un premier seuil à 15px a réduit le problème sans le
- * résoudre -- 67% des faux `TONGUE_OUT` restants tombaient à 15-17px, juste au-dessus de ce seuil
- * trop juste -- remonté à 25px, nettement au-dessus de ce groupe résiduel. Valeur provisoire, pas
- * finement calée -- à réviser si de futures données montrent un chevauchement (même esprit que
- * InferenceLoadMonitor.marginRatio, "garde-fou conservateur non validé" documenté comme tel plutôt
- * que présenté comme définitif).
+ * fermée (mouthOpennessRatio proche de 0).
+ *
+ * **Historique de calage, pour ne pas répéter l'erreur** : un premier seuil à 15px réduisait le
+ * faux positif sans le résoudre (faux `TONGUE_OUT` encore fréquents à 15-17px). Remonté à 25px sur
+ * la base d'un seul relevé non contrôlé (`logcat -d` sur 6s mélangeant plusieurs gestes, pas un test
+ * isolé propre) -- surcorrection confirmée par l'utilisateur : plus aucune détection possible même
+ * langue réellement tirée. Redescendu à 15px, dernier état confirmé fonctionnel (pas parfait, mais
+ * la langue tirée redevient détectable). **La largeur de recadrage en pixels absolus n'est
+ * probablement pas le bon signal** -- elle dépend de la distance/position par rapport à la caméra,
+ * pas juste du geste. `mouthOpennessRatio` (déjà calculé, normalisé par la largeur de bouche, donc
+ * indépendant de la distance caméra) semble mieux séparer les deux cas dans les données collectées
+ * ce jour (bouche pressée/mordue : ~0,003-0,12 ; bouche réellement ouverte, avec ou sans langue :
+ * ~0,44+) -- piste à explorer en remplacement de ce garde-fou plutôt que de continuer à ajuster une
+ * valeur en pixels, voir backlog privé. Même leçon que le seuil couleur de l'étage 2 (revue
+ * technique, point 15bis) : ne pas re-deviner un scalaire sans un test contrôlé propre à l'appui.
  */
-internal const val MIN_CROP_DIMENSION_PX = 25
+internal const val MIN_CROP_DIMENSION_PX = 15
 
 /**
  * Ratio d'ouverture de bouche dérivé des landmarks (distance lèvre sup./inf. internes, normalisée
