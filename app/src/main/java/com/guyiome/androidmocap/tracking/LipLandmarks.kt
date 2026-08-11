@@ -37,6 +37,20 @@ internal object LipLandmarkIndices {
 internal data class MouthCropRegion(val x: Int, val y: Int, val width: Int, val height: Int)
 
 /**
+ * Taille minimale (largeur ET hauteur, px) sous laquelle un recadrage est considéré dégénéré plutôt
+ * que fiable -- trouvé sur device le 11 août 2026 (revue technique, point 15quater) : bouche fermée
+ * + lèvre inférieure mordue/rentrée produit un recadrage de 7-14px de large (la ligne de contact
+ * entre les lèvres pressées, pas l'intérieur de la bouche), contre 17-63px pour une bouche
+ * réellement ouverte sur les mêmes sessions -- lu comme "100% couleur langue" à tort par l'étage 2
+ * ET l'étage 3, alors que jawOpen (blendshape ML) restait élevé malgré une bouche géométriquement
+ * fermée (mouthOpennessRatio proche de 0). Valeur provisoire, pas finement calée -- choisie pour
+ * séparer nettement les deux groupes observés, à réviser si de futures données montrent un
+ * chevauchement (même esprit que InferenceLoadMonitor.marginRatio, "garde-fou conservateur non
+ * validé" documenté comme tel plutôt que présenté comme définitif).
+ */
+internal const val MIN_CROP_DIMENSION_PX = 15
+
+/**
  * Ratio d'ouverture de bouche dérivé des landmarks (distance lèvre sup./inf. internes, normalisée
  * par la largeur de bouche) -- diagnostic croisé avec le score `jawOpen` brut de MediaPipe, même
  * esprit que la comparaison EAR géométrique/blendshape déjà en place pour les yeux. 0f si les
@@ -60,7 +74,9 @@ internal fun mouthOpennessRatio(landmarks: List<Pair<Float, Float>>): Float {
  * largeur de bouche (une langue tirée dépasse la ligne des lèvres, voir revue technique point 15).
  * Pure -- ne touche à aucun `Bitmap`, se contente de calculer des coordonnées, clampées aux bornes
  * de l'image. `null` si les landmarks sont absents/trop courts, si les dimensions image sont
- * inconnues, ou si la bouche est dégénérée (coins confondus) plutôt qu'un rectangle de taille 0.
+ * inconnues, si la bouche est dégénérée (coins confondus) plutôt qu'un rectangle de taille 0, ou si
+ * le rectangle résultant est plus petit que [MIN_CROP_DIMENSION_PX] dans une dimension ou l'autre
+ * (bouche pressée/lèvre mordue -- voir son kdoc).
  */
 internal fun mouthCropRegion(
     landmarks: List<Pair<Float, Float>>,
@@ -94,7 +110,7 @@ internal fun mouthCropRegion(
     val y = (topNorm * imageHeightPx).toInt()
     val width = ((rightNorm - leftNorm) * imageWidthPx).toInt()
     val height = ((bottomNorm - topNorm) * imageHeightPx).toInt()
-    if (width <= 0 || height <= 0) return null
+    if (width < MIN_CROP_DIMENSION_PX || height < MIN_CROP_DIMENSION_PX) return null
 
     return MouthCropRegion(x, y, width, height)
 }

@@ -97,6 +97,21 @@ class LipLandmarksTest {
     }
 
     @Test
+    fun `mouthCropRegion renvoie null si le rectangle est plus petit que MIN_CROP_DIMENSION_PX -- bouche pressee-mordue`() {
+        // Reproduit la géométrie mesurée sur device le 11 août 2026 (revue technique, point
+        // 15quater) : bouche fermée, coins de bouche très proches horizontalement (lèvre pressée/
+        // mordue), qui donnait un recadrage de 7-14px de large avant ce garde-fou.
+        val landmarks = landmarksWith(
+            LipLandmarkIndices.MOUTH_CORNER_LEFT to (0.478f to 0.5f),
+            LipLandmarkIndices.MOUTH_CORNER_RIGHT to (0.488f to 0.5f),
+            LipLandmarkIndices.UPPER_LIP_OUTER to (0.483f to 0.498f),
+            LipLandmarkIndices.LOWER_LIP_OUTER to (0.483f to 0.502f),
+        )
+        // mouthWidthNorm = 0.01 -> largeur brute avant marge = 0.01*1.25*1000 = 12.5px < 15px
+        assertNull(mouthCropRegion(landmarks, imageWidthPx = 1000, imageHeightPx = 1000))
+    }
+
+    @Test
     fun `mouthCropRegion renvoie null si les coins de bouche sont confondus`() {
         val landmarks = landmarksWith(
             LipLandmarkIndices.MOUTH_CORNER_LEFT to (0.5f to 0.5f),
