@@ -984,12 +984,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // Cascade de détection de la langue tirée, phase 1 (revue technique, point 15) -- étages 1
-        // (porte jawOpen) + 2 (ratio couleur du recadrage buccal), gatée par le réglage
-        // expérimental. Purement diagnostique pour l'instant : aucune injection dans
-        // "final"/corrected.blendshapes, tongueOut reste absent (donc à 0 côté BlendshapeCatalog)
-        // tant que l'étage 3 (classification, phase 2) n'existe pas -- injecter une valeur non
-        // fiable serait pire que l'honnêteté actuelle du signal à 0.
+        // Cascade de détection de la langue tirée, phase 1+3 (revue technique, point 15) -- gatée
+        // par le réglage expérimental. Aucune injection dans "final"/corrected.blendshapes (ce qui
+        // part sur le réseau) tant qu'un test device n'a pas confirmé l'étage 3 -- injecter une
+        // valeur non fiable serait pire que l'honnêteté actuelle du signal à 0. En revanche,
+        // valorisée dans le panneau LOCAL de l'app (tongueOutClassification ci-dessous, ajouté à
+        // TrackingFrame.allBlendshapes en fin de bloc, jamais à "final") -- demande explicite de
+        // l'utilisateur pour avoir un retour direct pendant les phases de test, sans risquer
+        // d'envoyer un signal pas encore validé à un récepteur connecté (VBridger/VMC/VTube Studio).
         if (_uiState.value.tongueOutDetectionEnabled) {
             val jawOpen = corrected.blendshapes.firstOrNull { it.name == "jawOpen" }?.score ?: 0f
             // Diagnostic croisé (voir kdoc de mouthOpennessRatio, LipLandmarks.kt) : mesure
@@ -998,6 +1000,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // vraie langue tirée, pour vérifier si c'est un artefact du blendshape ML (la langue
             // perturbe le suivi des landmarks mâchoire) ou un vrai relâchement de la bouche.
             val mouthGeometric = mouthOpennessRatio(corrected.faceLandmarks)
+            var tongueOutClassification: TongueEmbeddingClassification? = null
             if (jawOpenGateOpen(jawOpen)) {
                 val ratio = sampleMouthTonguePixelRatio(
                     corrected.timestampMs,
@@ -1024,7 +1027,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // même principe : chaque étage ne se déclenche que si le précédent a déjà donné un
                 // indice positif. Purement diagnostique -- aucune injection dans "final"/
                 // corrected.blendshapes tant qu'un test device n'a pas confirmé l'étage 3 lui-même.
-                var embeddingClassification: TongueEmbeddingClassification? = null
                 var simOut: Float? = null
                 var simIn: Float? = null
                 val calibrationResult = tongueCalibrationResult
@@ -1038,7 +1040,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (embedding != null) {
                         simOut = cosineSimilarity(embedding, calibrationResult.tongueOutReference)
                         simIn = cosineSimilarity(embedding, calibrationResult.tongueInReference)
-                        embeddingClassification = classifyTongueState(
+                        tongueOutClassification = classifyTongueState(
                             embedding,
                             calibrationResult.tongueOutReference,
                             calibrationResult.tongueInReference,
@@ -1052,7 +1054,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         TONGUE_DIAG_TAG,
                         "jawOpen=%.3f mouthGeo=%.3f etage1=OK ratio=%s etage2=%s etage2Adaptatif=%s baseline=%.4f etage3=%s simOut=%s simIn=%s".format(
                             jawOpen, mouthGeometric, ratio, colorFired, adaptiveFired, tongueColorBaselineState.value,
-                            embeddingClassification, simOut, simIn,
+                            tongueOutClassification, simOut, simIn,
                         ),
                     )
                     // Diagnostic ponctuel (11 août 2026) : ratio restait à 0.0 sur device malgré un
@@ -1064,6 +1066,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } else if (TONGUE_DIAGNOSTIC_LOGGING) {
                 AppLog.d(TONGUE_DIAG_TAG, "jawOpen=%.3f mouthGeo=%.3f etage1=NON".format(jawOpen, mouthGeometric))
             }
+
+            // Valorisation LOCALE uniquement (panneau de blendshapes de l'app) -- demande explicite
+            // de l'utilisateur (11 août 2026) pour un retour direct pendant les phases de test, sans
+            // envoyer un signal pas encore validé à un récepteur connecté. N'écrit jamais dans
+            // "final"/corrected -- "final" reste ce qui part vers vmcSender/iFacialMocapSender/
+            // vtubeStudioSender, inchangé. 1f seulement si l'étage 3 a explicitement tranché pour
+            // TONGUE_OUT -- TONGUE_IN, UNDECIDED et "étage 3 jamais atteint ce tour-ci" affichent
+            // tous 0f, pas de distinction visuelle entre ces cas pour l'instant.
+            val tongueOutDisplayValue = if (tongueOutClassification == TongueEmbeddingClassification.TONGUE_OUT) 1f else 0f
+            _trackingFrame.update { it.copy(allBlendshapes = it.allBlendshapes + BlendshapeScore("tongueOut", tongueOutDisplayValue)) }
         }
     }
 
