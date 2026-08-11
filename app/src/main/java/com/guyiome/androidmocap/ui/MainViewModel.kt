@@ -49,12 +49,14 @@ import com.guyiome.androidmocap.tracking.colorGateOpen
 import com.guyiome.androidmocap.tracking.correctEyeBlinkScores
 import com.guyiome.androidmocap.tracking.InferenceLoadState
 import com.guyiome.androidmocap.tracking.isRunningHigh
+import com.guyiome.androidmocap.tracking.isElevated
 import com.guyiome.androidmocap.tracking.jawOpenGateOpen
 import com.guyiome.androidmocap.tracking.LipLandmarkIndices
 import com.guyiome.androidmocap.tracking.averageHsv
 import com.guyiome.androidmocap.tracking.mirrorFaceTrackingResult
 import com.guyiome.androidmocap.tracking.mouthCropRegion
 import com.guyiome.androidmocap.tracking.mouthOpennessRatio
+import com.guyiome.androidmocap.tracking.TongueColorBaseline
 import com.guyiome.androidmocap.tracking.tonguePixelRatio
 import com.guyiome.androidmocap.tracking.FaceTrackingResult
 import com.guyiome.androidmocap.tracking.REST_VARIANCE_THRESHOLD
@@ -361,6 +363,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Moyenne mobile de inferenceTimeMs (voir InferenceLoadMonitor.kt, point 15) -- alimente
     // MainUiState.inferenceRunningHigh, mise à jour à chaque frame dans handleTrackingResult().
     private var inferenceLoadState = InferenceLoadState()
+    // Référence "sans langue" du ratio couleur, suivie dynamiquement (voir TongueColorBaseline.kt,
+    // point 15) -- remplace un seuil absolu fixe qui s'est révélé instable d'une session à l'autre
+    // sur device (11 août 2026).
+    private var tongueColorBaselineState = TongueColorBaseline()
     // Garde contre un double appel à initializeTracking() (ex. permission caméra révoquée puis
     // ré-accordée sans destruction de l'Activity) -- sans cette garde, un second appel recréait un
     // FaceLandmarkerHelper et un CameraController complets par-dessus les précédents, sans jamais
@@ -890,11 +896,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     corrected.imageHeightPx,
                 )
                 val colorFired = ratio != null && colorGateOpen(ratio)
+                // Comparaison avec la référence adaptative (TongueColorBaseline.kt, point 15) --
+                // comparée AVANT mise à jour (sinon le ratio courant s'auto-compare à une référence
+                // qui vient de l'intégrer). Mise à jour juste après, avec ce même ratio, pour la
+                // frame suivante -- uniquement quand la bouche est déjà assez ouverte (ce bloc),
+                // jawOpen sous le seuil ne calcule pas de ratio (voir étage 1) donc ne participe pas
+                // à la référence.
+                val adaptiveFired = ratio != null && tongueColorBaselineState.isElevated(ratio)
+                if (ratio != null) {
+                    tongueColorBaselineState = tongueColorBaselineState.next(ratio)
+                }
                 if (TONGUE_DIAGNOSTIC_LOGGING) {
                     AppLog.d(
                         TONGUE_DIAG_TAG,
-                        "jawOpen=%.3f mouthGeo=%.3f etage1=OK ratio=%s etage2=%s".format(
-                            jawOpen, mouthGeometric, ratio, colorFired,
+                        "jawOpen=%.3f mouthGeo=%.3f etage1=OK ratio=%s etage2=%s etage2Adaptatif=%s baseline=%.4f".format(
+                            jawOpen, mouthGeometric, ratio, colorFired, adaptiveFired, tongueColorBaselineState.value,
                         ),
                     )
                     // Diagnostic ponctuel (11 août 2026) : ratio restait à 0.0 sur device malgré un

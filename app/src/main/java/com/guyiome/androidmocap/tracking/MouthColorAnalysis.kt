@@ -11,10 +11,15 @@ package com.guyiome.androidmocap.tracking
  * Android indisponible en test JVM pur (`testDebugUnitTest` ne configure pas Robolectric), donc la
  * conversion HSV est réécrite à la main ici, même discipline d'extraction que `RotationMath`.
  *
- * Seuils provisoires ci-dessous, à affiner sur device via `TONGUE_DIAGNOSTIC_LOGGING`
- * (`MainViewModel`) une fois de vraies images de recadrage buccal disponibles.
+ * Seuils calés une première fois sur device le 11 août 2026 (voir `TONGUE_DIAGNOSTIC_LOGGING`,
+ * `MainViewModel`) -- un seul essai, une seule condition d'éclairage, à revalider plus tard.
+ * `TONGUE_MIN_SATURATION` en particulier a dû être fortement assoupli (0,35 -> 0,15) : la
+ * saturation moyenne réelle du recadrage buccal (~0,22, mesurée via [averageHsv]) était sous
+ * l'ancien seuil, qui excluait alors 100% des pixels quel que soit l'état de la langue -- voir
+ * `DEFAULT_COLOR_RATIO_THRESHOLD` pour ce que ce réglage plus permissif implique pour le mécanisme
+ * de discrimination réel.
  */
-internal const val TONGUE_MIN_SATURATION = 0.35f
+internal const val TONGUE_MIN_SATURATION = 0.15f
 internal const val TONGUE_MIN_VALUE = 0.25f
 internal const val TONGUE_MAX_HUE_RED = 25f
 internal const val TONGUE_MIN_HUE_PINK = 335f
@@ -67,10 +72,10 @@ internal fun tonguePixelRatio(pixelsArgb: IntArray): Float {
 
 /**
  * Teinte/saturation/valeur moyennes du recadrage -- `[0,0,0]` si le tableau est vide. Diagnostic
- * ajouté le 11 août 2026 : `tonguePixelRatio` restait à 0.0 sur device malgré un étage 1 sain
- * (mouth ouverte confirmée par ailleurs), sans indiquer si c'est le recadrage qui ne tombe pas sur
- * la bouche ou les seuils couleur qui sont mal calés -- ces moyennes permettent de faire la
- * différence (ex. valeur très basse = zone sombre, probablement hors visage).
+ * ajouté le 11 août 2026 pour distinguer "recadrage mal placé" de "seuils couleur mal calés" quand
+ * `tonguePixelRatio` restait obstinément à 0.0 sur device malgré un étage 1 sain. A confirmé un
+ * recadrage correct (visuellement validé par l'utilisateur) mais une saturation moyenne (~0,22)
+ * sous l'ancien seuil (0,35) -- d'où l'assouplissement de `TONGUE_MIN_SATURATION` ci-dessous.
  */
 internal fun averageHsv(pixelsArgb: IntArray): FloatArray {
     if (pixelsArgb.isEmpty()) return floatArrayOf(0f, 0f, 0f)
@@ -90,8 +95,17 @@ internal fun averageHsv(pixelsArgb: IntArray): FloatArray {
     return floatArrayOf(hueSum / n, saturationSum / n, valueSum / n)
 }
 
-/** Seuil provisoire, à affiner sur device. */
-internal const val DEFAULT_COLOR_RATIO_THRESHOLD = 0.12f
+/**
+ * Calé sur une vraie mesure device (11 août 2026, palier ARCore, un seul éclairage/utilisateur --
+ * à revalider dans d'autres conditions) : bouche ouverte sans langue -> ratio 0,81-0,93 (n=64) ;
+ * langue tirée -> ratio 0,95-0,99 (n=39), **aucun chevauchement** sur cet essai. 0,93 se place dans
+ * l'écart avec une marge des deux côtés. Le mécanisme réel n'est pas "détecter le rose de la langue
+ * spécifiquement" (la saturation minimale a dû être assouplie à 0,15, cf. TONGUE_MIN_SATURATION --
+ * lèvres/dents/gencives passent aussi ce seuil) mais "la zone qui déborde sous la lèvre inférieure
+ * (extraDownwardRatio, LipLandmarks.kt) est-elle remplie de chair ou vide/dans l'ombre" -- plus
+ * robuste qu'une détection de teinte fine, mais encore un seul point de données.
+ */
+internal const val DEFAULT_COLOR_RATIO_THRESHOLD = 0.93f
 
 /** `true` si [ratio] dépasse le seuil minimal de pixels "couleur langue" dans le recadrage. */
 internal fun colorGateOpen(ratio: Float, threshold: Float = DEFAULT_COLOR_RATIO_THRESHOLD): Boolean =
