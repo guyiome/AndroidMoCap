@@ -983,6 +983,46 @@ Tests : `TongueEmbeddingClassifierTest.kt`, `TongueCalibrationAveragingTest.kt`,
 purs/JVM, `TongueEmbeddingHelper.kt`/`TongueCalibrationStore.kt` non testés (glue device/IO, même
 principe que `FaceLandmarkerHelper`/`AppLog`).
 
+### 15quater. Deux bugs réels trouvés et corrigés, un faux positif reproductible identifié (11 août 2026, même journée)
+
+Retour utilisateur après le 15ter ("je ne vois jamais tongueOut passer à 1") a mené à deux
+corrections concrètes, sans lien avec la fiabilité du classifieur lui-même :
+
+- **Calibration corrompue par la locale de l'appareil (corrigé, confirmé)** :
+  `TongueCalibrationStore.save()` formatait les floats avec `"%.8f".format(it)` sans locale
+  explicite -- en français ça écrit une virgule décimale (`-0,00334370`), qui collisionne avec le
+  séparateur CSV et coupe chaque nombre en deux à la relecture (un vecteur de ~1024 valeurs se
+  relisait à 2048). `cosineSimilarity()` traite ça comme une incompatibilité de taille et renvoie
+  0.0 en permanence -- `UNDECIDED` systématique, sans exception ni log d'erreur. N'affectait pas les
+  tests du 15ter (référence encore correcte en mémoire depuis la calibration, jamais rechargée du
+  disque) -- n'apparaît qu'après un redémarrage de l'app. Corrigé (`Locale.ROOT` explicite, même
+  précédent que `LogFormatting.kt`), avec un test de non-régression sous `Locale.FRANCE`
+  (`TongueCalibrationStoreTest.kt`, 5 tests -- cette classe s'avère testable en JVM pur malgré son
+  package `settings/`, ne dépendant que de `java.io.File`, contrairement à `AppSettingsStore`).
+  Confirmé sur device : fichier relu à 1024 valeurs après recalibration, séparateur correct.
+
+- **Latence du mesh à l'ouverture de bouche (corrigé, confirmé)** : `saveTongueDebugCrop()`, marqué
+  "jetable, à retirer une fois la cause confirmée" depuis la phase 1 (débogage du mapping
+  `LipLandmarkIndices`, déjà résolu) mais jamais retiré, restait actif à chaque frame où l'étage 1
+  (jawOpen) est ouvert tant que `TONGUE_DIAGNOSTIC_LOGGING` est actif : copie bitmap plein cadre +
+  dessin d'un rectangle + double encodage/écriture PNG sur disque, plusieurs fois par seconde en
+  continu tant que la bouche reste ouverte. Retiré entièrement (les lignes de log légères restent).
+  Confirmé par l'utilisateur : "Plus de latence. Ce point est bon."
+
+**Fiabilité du classifieur, après ces deux corrections** : deux tests contrôlés (langue tirée tenue,
+51 frames : 76% `TONGUE_OUT` correct, 24% `UNDECIDED`, 0% faux négatif ; langue rentrée tenue, 58
+frames : 10% `TONGUE_IN` correct, 90% `UNDECIDED`, 0% faux positif) montrent qu'il ne s'est jamais
+trompé de sens, seulement indécis -- meilleur que redouté. Mais l'utilisateur a ensuite démontré un
+**faux positif reproductible et net** : bouche entièrement fermée, lèvre inférieure "mangée"/rentrée
+avec les dents (recule légèrement la mâchoire) -- 100% des frames sur 12s classées `TONGUE_OUT` à
+tort, avec `mouthGeo` proche de zéro (bouche géométriquement fermée) mais `ratio` couleur pégé à 1.0.
+Hypothèse de l'utilisateur, plausible mais **pas encore confirmée par les données de recadrage** :
+mordre/rentrer la lèvre inférieure expose sa face interne humide, colorimétriquement proche d'une
+langue -- pas forcément un bug de calcul mais une vraie ambiguïté du signal sur ce geste précis. Une
+ligne de log légère (coordonnées du recadrage seules, pas de bitmap) a été ajoutée pour vérifier,
+mais le test a été interrompu par une batterie faible côté téléphone -- **à reprendre**, voir backlog
+privé.
+
 ### 16. Détection expérimentale de `cheekPuff` (joues gonflées) -- même famille que le point 15, cascade allégée
 
 Même statut que `tongueOut` chez MediaPipe (signal peu fiable, cf. issue GitHub #4436 et le mapping

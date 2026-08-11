@@ -1089,11 +1089,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 if (TONGUE_DIAGNOSTIC_LOGGING) {
+                    // Région de recadrage : coordonnées seules (pas de lecture/écriture de bitmap,
+                    // contrairement à l'ancien saveTongueDebugCrop() retiré pour la perf) -- ajouté
+                    // le 11 août 2026 pour diagnostiquer un faux positif reproductible où mouthGeo
+                    // reste proche de zéro (bouche quasi fermée) alors que ratio reste pégé à 1.0,
+                    // signe possible d'un recadrage qui tombe sur la peau des lèvres plutôt que
+                    // l'intérieur de la bouche quand celle-ci est peu ouverte.
+                    val region = mouthCropRegion(corrected.faceLandmarks, corrected.imageWidthPx, corrected.imageHeightPx)
                     AppLog.d(
                         TONGUE_DIAG_TAG,
-                        "jawOpen=%.3f mouthGeo=%.3f etage1=OK ratio=%s etage2=%s etage2Adaptatif=%s baseline=%.4f etage3=%s simOut=%s simIn=%s".format(
+                        "jawOpen=%.3f mouthGeo=%.3f etage1=OK ratio=%s etage2=%s etage2Adaptatif=%s baseline=%.4f etage3=%s simOut=%s simIn=%s recadrage=%s".format(
                             jawOpen, mouthGeometric, ratio, colorFired, adaptiveFired, tongueColorBaselineState.value,
                             tongueOutClassification, simOut, simIn,
+                            region?.let { "x=${it.x} y=${it.y} w=${it.width} h=${it.height}" } ?: "null",
                         ),
                     )
                 }
