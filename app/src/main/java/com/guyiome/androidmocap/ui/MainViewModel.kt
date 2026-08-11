@@ -48,6 +48,7 @@ import com.guyiome.androidmocap.tracking.isRunningHigh
 import com.guyiome.androidmocap.tracking.jawOpenGateOpen
 import com.guyiome.androidmocap.tracking.mirrorFaceTrackingResult
 import com.guyiome.androidmocap.tracking.mouthCropRegion
+import com.guyiome.androidmocap.tracking.mouthOpennessRatio
 import com.guyiome.androidmocap.tracking.tonguePixelRatio
 import com.guyiome.androidmocap.tracking.FaceTrackingResult
 import com.guyiome.androidmocap.tracking.REST_VARIANCE_THRESHOLD
@@ -272,7 +273,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // DEFAULT_COLOR_RATIO_THRESHOLD et l'hypothèse LipLandmarkIndices sur device avant
         // d'envisager l'étage 3 (classification, phase 2) -- aucune injection de tongueOut tant que
         // ce diagnostic n'a pas confirmé les deux premiers étages.
-        private const val TONGUE_DIAGNOSTIC_LOGGING = false
+        private const val TONGUE_DIAGNOSTIC_LOGGING = true
         private const val TONGUE_DIAG_TAG = "TongueDiag"
 
         // Cadence du sondage de throttling thermique (voir startThermalPolling) -- doit rester
@@ -868,6 +869,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // fiable serait pire que l'honnêteté actuelle du signal à 0.
         if (_uiState.value.tongueOutDetectionEnabled) {
             val jawOpen = corrected.blendshapes.firstOrNull { it.name == "jawOpen" }?.score ?: 0f
+            // Diagnostic croisé (voir kdoc de mouthOpennessRatio, LipLandmarks.kt) : mesure
+            // géométrique indépendante du classifieur ML de jawOpen -- ajouté le 11 août 2026 après
+            // avoir constaté sur device que jawOpen s'effondrait de façon inattendue pendant une
+            // vraie langue tirée, pour vérifier si c'est un artefact du blendshape ML (la langue
+            // perturbe le suivi des landmarks mâchoire) ou un vrai relâchement de la bouche.
+            val mouthGeometric = mouthOpennessRatio(corrected.faceLandmarks)
             if (jawOpenGateOpen(jawOpen)) {
                 val ratio = sampleMouthTonguePixelRatio(
                     corrected.timestampMs,
@@ -879,11 +886,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (TONGUE_DIAGNOSTIC_LOGGING) {
                     AppLog.d(
                         TONGUE_DIAG_TAG,
-                        "jawOpen=%.3f etage1=OK ratio=%s etage2=%s".format(jawOpen, ratio, colorFired),
+                        "jawOpen=%.3f mouthGeo=%.3f etage1=OK ratio=%s etage2=%s".format(
+                            jawOpen, mouthGeometric, ratio, colorFired,
+                        ),
                     )
                 }
             } else if (TONGUE_DIAGNOSTIC_LOGGING) {
-                AppLog.d(TONGUE_DIAG_TAG, "jawOpen=%.3f etage1=NON".format(jawOpen))
+                AppLog.d(TONGUE_DIAG_TAG, "jawOpen=%.3f mouthGeo=%.3f etage1=NON".format(jawOpen, mouthGeometric))
             }
         }
     }
@@ -892,9 +901,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Étage 2 de la cascade langue tirée (point 15) : recadre la région buccale à partir des
      * landmarks puis calcule la fraction de pixels "couleur langue" ([tonguePixelRatio]). `null` si
      * le recadrage est impossible (landmarks insuffisants) ou si le bitmap du frame correspondant
-     * n'est plus disponible dans le pool (ex. palier OPTIMAL/ARCore, qui n'a pas de pool de bitmap
-     * -- voir [CameraController.peekPooledBitmap]). Glue Android non testée (accès direct à un
-     * `Bitmap`), même catégorie que le reste de `CameraController` touchant `Bitmap`/`Canvas`.
+     * n'est plus disponible. Essaie `cameraController` (palier CameraX) puis `arCoreHeadPoseTracker`
+     * (palier OPTIMAL) -- mutuellement exclusifs (voir leur déclaration), au plus un des deux
+     * renvoie un bitmap. `ArCoreHeadPoseTracker.peekLastBitmap` ajouté le 11 août 2026 pour lever la
+     * limite initiale de la phase 1 ("pas de pool de bitmap côté ARCore") -- voir son kdoc pour le
+     * détail (pas un vrai pool, juste le dernier bitmap converti retenu un instant de plus). Glue
+     * Android non testée (accès direct à un `Bitmap`), même catégorie que le reste de
+     * `CameraController`/`ArCoreHeadPoseTracker` touchant `Bitmap`/`Canvas`.
      */
     private fun sampleMouthTonguePixelRatio(
         frameTimeMs: Long,
@@ -903,7 +916,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         imageHeightPx: Int,
     ): Float? {
         val region = mouthCropRegion(landmarks, imageWidthPx, imageHeightPx) ?: return null
-        val bitmap = cameraController?.peekPooledBitmap(frameTimeMs) ?: return null
+        val bitmap = cameraController?.peekPooledBitmap(frameTimeMs)
+            ?: arCoreHeadPoseTracker?.peekLastBitmap(frameTimeMs)
+            ?: return null
         val pixels = IntArray(region.width * region.height)
         bitmap.getPixels(pixels, 0, region.width, region.x, region.y, region.width, region.height)
         return tonguePixelRatio(pixels)

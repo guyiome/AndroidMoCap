@@ -165,6 +165,12 @@ class ArCoreHeadPoseTracker(
         // traiter coûte que coûte chaque frame caméra -- un retard qui s'accumule sur un thread
         // dédié est pire pour la latence perçue qu'une frame simplement sautée.
         private const val MAX_PENDING_CONVERSIONS = 1
+
+        // Nombre de bitmaps convertis conservés en mémoire (voir lastBitmaps ci-dessous, point 15)
+        // avant de purger le plus ancien jamais réclamé -- même valeur et même garde-fou que
+        // CameraController.MAX_TRACKED_BITMAPS, pour la même raison : éviter une fuite si un frame
+        // n'obtient jamais de résultat MediaPipe (releaseFrame() jamais appelé pour lui).
+        private const val MAX_TRACKED_BITMAPS = 3
     }
 
     // Conversion YUV->RGB + rotation déplacées hors du thread GL (onDrawFrame) : faites pixel par
@@ -175,6 +181,16 @@ class ArCoreHeadPoseTracker(
     // seule caméra) plutôt qu'un pool.
     private val imageProcessingExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val pendingConversions = AtomicInteger(0)
+
+    // Cache du dernier bitmap converti par frame (point 15, cascade de détection de la langue
+    // tirée, étage 2) -- PAS un pool comme CameraController.inFlightBitmaps : ARCore alloue déjà un
+    // Bitmap neuf à chaque frame sans réutilisation (voir emitCameraImage/yuv420ToBitmap), donc rien
+    // à recycler ici, juste à conserver un instant de plus au lieu de le laisser sortir de portée
+    // dès emitCameraImage() terminé. Écrit depuis imageProcessingExecutor, lu depuis le thread de
+    // callback MediaPipe (MainViewModel.handleTrackingResult(), via peekLastBitmap) -- verrou
+    // dédié, même précaution que CameraController.poolLock.
+    private val bitmapCacheLock = Any()
+    private val lastBitmaps = HashMap<Long, Bitmap>()
 
     @Volatile private var session: Session? = null
     // Mémorisé (pas seulement reçu en paramètre transitoire de attachTo()) pour pouvoir piloter
@@ -283,18 +299,31 @@ class ArCoreHeadPoseTracker(
         imageProcessingExecutor.shutdown()
         session?.close()
         session = null
+        synchronized(bitmapCacheLock) { lastBitmaps.clear() }
     }
 
     /**
-     * Ne fait plus rien -- gardée pour la compatibilité de signature avec l'appel sûr (`?.`) déjà
-     * fait dans `MainViewModel.onFrameProcessed` (mutuellement exclusif avec
-     * `CameraController.releaseFrame`, voir ce callback). L'`Image` ARCore source est désormais
-     * fermée de façon synchrone dans [emitCameraImage] juste après la conversion en `Bitmap`, plus
-     * besoin de la garder ouverte jusqu'à ce que MediaPipe ait fini de traiter le frame.
+     * L'`Image` ARCore source elle-même est fermée de façon synchrone dans [emitCameraImage] juste
+     * après la conversion en `Bitmap`, plus besoin de la garder ouverte jusqu'à ce que MediaPipe ait
+     * fini de traiter le frame -- mais depuis le point 15 (cascade langue tirée, étage 2), le
+     * `Bitmap` converti, lui, est retenu dans [lastBitmaps] pour permettre [peekLastBitmap] ; cet
+     * appel (routé depuis `MainViewModel.onFrameProcessed`, mutuellement exclusif avec
+     * `CameraController.releaseFrame`) le retire de la table une fois que MediaPipe a fini avec ce
+     * frame précis.
      */
     fun releaseFrame(frameTimeMs: Long) {
-        // No-op, voir doc ci-dessus.
+        synchronized(bitmapCacheLock) { lastBitmaps.remove(frameTimeMs) }
     }
+
+    /**
+     * Lecture seule d'un bitmap converti encore retenu, SANS le retirer (contrairement à
+     * [releaseFrame]) -- même contrat que `CameraController.peekPooledBitmap` : destiné à un accès
+     * pixel synchrone et bref depuis `MainViewModel.handleTrackingResult()` (= `onResult`, appelé
+     * avant `onFrameProcessed`/`releaseFrame` dans `FaceLandmarkerHelper.onLiveStreamResult()`, de
+     * façon synchrone sur le même thread). Ne jamais conserver la référence retournée au-delà de cet
+     * appel synchrone.
+     */
+    fun peekLastBitmap(frameTimeMs: Long): Bitmap? = synchronized(bitmapCacheLock) { lastBitmaps[frameTimeMs] }
 
     private fun tryCreateSession(): Session? {
         // Hissé hors du try (au lieu d'un val local) pour pouvoir le fermer depuis le catch
@@ -488,6 +517,15 @@ class ArCoreHeadPoseTracker(
 
                 val mpImage = BitmapImageBuilder(bitmap).build()
                 val frameTimeMs = SystemClock.uptimeMillis()
+                // Conservé pour peekLastBitmap() (étage 2, point 15) -- AVANT onFrame() pour que le
+                // bitmap soit déjà disponible si MediaPipe répond très vite (peu probable vu le
+                // callback asynchrone, mais pas d'hypothèse d'ordonnancement à faire ici).
+                synchronized(bitmapCacheLock) {
+                    if (lastBitmaps.size >= MAX_TRACKED_BITMAPS) {
+                        lastBitmaps.keys.minOrNull()?.let { lastBitmaps.remove(it) }
+                    }
+                    lastBitmaps[frameTimeMs] = bitmap
+                }
                 onFrame(mpImage, frameTimeMs)
             } catch (e: Exception) {
                 AppLog.e(TAG, "Échec de conversion YUV -> Bitmap de l'image caméra ARCore", e)
