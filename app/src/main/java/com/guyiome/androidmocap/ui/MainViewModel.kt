@@ -54,6 +54,7 @@ import com.guyiome.androidmocap.tracking.DEFAULT_CALIBRATION_PREPARE_DURATION_MS
 import com.guyiome.androidmocap.tracking.DEFAULT_CALIBRATION_RECORDING_DURATION_MS
 import com.guyiome.androidmocap.tracking.DEFAULT_CLASSIFICATION_MARGIN
 import com.guyiome.androidmocap.tracking.TongueEmbeddingClassification
+import com.guyiome.androidmocap.tracking.TongueOutDisplayState
 import com.guyiome.androidmocap.tracking.jawOpenGateOpen
 import com.guyiome.androidmocap.tracking.mirrorFaceTrackingResult
 import com.guyiome.androidmocap.tracking.mouthCropRegion
@@ -358,6 +359,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var tongueCalibrationResult: TongueCalibrationResult? = null
     private var tongueCalibrationRecordingState = TongueCalibrationRecordingState()
     private var tongueCalibrationLastTimestampMs: Long? = null
+    // Lissage d'affichage LOCAL uniquement (voir TongueOutDisplaySmoothing.kt) -- ne touche à aucune
+    // décision de la cascade, juste à la valeur "tongueOut" poussée au panneau de test.
+    private var tongueOutDisplayState = TongueOutDisplayState()
+    private var tongueOutDisplayLastTimestampMs: Long? = null
 
     // Calibration de la pose de tête neutre. Tout se compose en espace matriciel (voir
     // RotationMath) plutôt qu'en soustrayant des angles d'Euler déjà décomposés -- une simple
@@ -1113,10 +1118,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // de l'utilisateur (11 août 2026) pour un retour direct pendant les phases de test, sans
             // envoyer un signal pas encore validé à un récepteur connecté. N'écrit jamais dans
             // "final"/corrected -- "final" reste ce qui part vers vmcSender/iFacialMocapSender/
-            // vtubeStudioSender, inchangé. 1f seulement si l'étage 3 a explicitement tranché pour
-            // TONGUE_OUT -- TONGUE_IN, UNDECIDED et "étage 3 jamais atteint ce tour-ci" affichent
-            // tous 0f, pas de distinction visuelle entre ces cas pour l'instant.
-            val tongueOutDisplayValue = if (tongueOutClassification == TongueEmbeddingClassification.TONGUE_OUT) 1f else 0f
+            // vtubeStudioSender, inchangé.
+            // Lissé (TongueOutDisplaySmoothing.kt) plutôt qu'un booléen brut par frame -- retour
+            // utilisateur (11 août 2026) : pendant une tenue réelle, l'étage 3 alterne souvent
+            // TONGUE_OUT/UNDECIDED d'une frame à l'autre, ce qui clignotait 1/0 à l'écran. Le
+            // lissage ne change aucune décision de la cascade elle-même (etage3/simOut/simIn dans
+            // les logs restent bruts, non lissés).
+            val displayElapsedMs = tongueOutDisplayLastTimestampMs?.let { corrected.timestampMs - it } ?: 0L
+            tongueOutDisplayLastTimestampMs = corrected.timestampMs
+            tongueOutDisplayState = tongueOutDisplayState.next(tongueOutClassification, displayElapsedMs)
+            val tongueOutDisplayValue = if (tongueOutDisplayState.displayedAsOut) 1f else 0f
             _trackingFrame.update { it.copy(allBlendshapes = it.allBlendshapes + BlendshapeScore("tongueOut", tongueOutDisplayValue)) }
         }
     }
