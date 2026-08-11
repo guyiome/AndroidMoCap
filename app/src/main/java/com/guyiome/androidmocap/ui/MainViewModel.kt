@@ -47,6 +47,7 @@ import com.guyiome.androidmocap.tracking.correctEyeBlinkScores
 import com.guyiome.androidmocap.tracking.InferenceLoadState
 import com.guyiome.androidmocap.tracking.isRunningHigh
 import com.guyiome.androidmocap.tracking.jawOpenGateOpen
+import com.guyiome.androidmocap.tracking.LipLandmarkIndices
 import com.guyiome.androidmocap.tracking.averageHsv
 import com.guyiome.androidmocap.tracking.mirrorFaceTrackingResult
 import com.guyiome.androidmocap.tracking.mouthCropRegion
@@ -948,6 +949,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         imageWidthPx: Int,
         imageHeightPx: Int,
     ) {
+        // Coordonnées brutes des 6 indices utilisés (11 août 2026) : le recadrage tombait à 2x3px
+        // constant frame après frame, signe que les coins de bouche supposés (61/291) sont quasi
+        // superposés en X dans les données réelles -- avant de conclure, on regarde où ils tombent
+        // vraiment plutôt que de deviner un nouveau jeu d'indices.
+        if (landmarks.size > LipLandmarkIndices.maxIndex) {
+            val cl = landmarks[LipLandmarkIndices.MOUTH_CORNER_LEFT]
+            val cr = landmarks[LipLandmarkIndices.MOUTH_CORNER_RIGHT]
+            val uo = landmarks[LipLandmarkIndices.UPPER_LIP_OUTER]
+            val lo = landmarks[LipLandmarkIndices.LOWER_LIP_OUTER]
+            val ui = landmarks[LipLandmarkIndices.UPPER_LIP_INNER]
+            val li = landmarks[LipLandmarkIndices.LOWER_LIP_INNER]
+            AppLog.d(
+                TONGUE_DIAG_TAG,
+                "landmarks 61=(%.3f,%.3f) 291=(%.3f,%.3f) 0=(%.3f,%.3f) 17=(%.3f,%.3f) 13=(%.3f,%.3f) 14=(%.3f,%.3f)".format(
+                    cl.first, cl.second, cr.first, cr.second, uo.first, uo.second,
+                    lo.first, lo.second, ui.first, ui.second, li.first, li.second,
+                ),
+            )
+        }
+
         val region = mouthCropRegion(landmarks, imageWidthPx, imageHeightPx) ?: return
         val bitmap = cameraController?.peekPooledBitmap(frameTimeMs)
             ?: arCoreHeadPoseTracker?.peekLastBitmap(frameTimeMs)

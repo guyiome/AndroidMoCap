@@ -3,23 +3,22 @@ package com.guyiome.androidmocap.tracking
 import kotlin.math.abs
 
 /**
- * Indices dans le mesh 478 points de MediaPipe Face Landmarker -- **hypothèse, PAS encore
- * confirmée sur device** (même traitement que [BrowLandmarkIndices], revue technique point 15).
- * Contrairement aux yeux/sourcils, pas de risque d'inversion gauche/droite ici : la région buccale
- * est symétrique et unique, un seul recadrage centré sur la bouche, pas deux moitiés mirrorées à
- * distinguer. Le seul risque est qu'un indice ne pointe pas exactement où on le pense -- valeurs
- * reprises de la convention la plus largement citée pour les lèvres dans les implémentations
- * MediaPipe Face Mesh (coins de bouche 61/291, lèvre supérieure/inférieure externe 0/17, lèvre
- * supérieure/inférieure interne 13/14). À confirmer via `TONGUE_DIAGNOSTIC_LOGGING`
- * (`MainViewModel`) avant de faire confiance au recadrage pour une vraie classification -- un
- * recadrage mal centré donnerait un `tonguePixelRatio` plat/bruité indépendamment de l'état de la
- * langue, signal négatif utile en soi pour repérer le problème.
+ * Indices dans le mesh 478 points de MediaPipe Face Landmarker. **Coins de bouche et lèvre
+ * externe confirmés sur device le 11 août 2026** (première hypothèse -- 61/291 comme coins,
+ * 0/17 comme lèvre sup./inf. externe -- infirmée par les coordonnées réelles : `mouthCropRegion`
+ * produisait un rectangle de 2x3px constant, révélant que 61/291 sont en réalité quasi superposés
+ * en X (Δx≈0,001, Δy≈0,046 -- une paire VERTICALE, pas des coins) alors que 0/17 partagent
+ * exactement le même Y (Δx≈0,052, Δy≈0,000 -- une paire HORIZONTALE, les vrais coins). Indices
+ * corrigés en conséquence ci-dessous. **13/14 restent une hypothèse non confirmée** : les
+ * coordonnées observées les montrent eux aussi plutôt horizontaux (Δx≈0,029, Δy≈0,002), pas la
+ * paire verticale "lèvre interne" attendue -- à revérifier avant de faire confiance à
+ * [mouthOpennessRatio] pour autre chose qu'un diagnostic relatif.
  */
 internal object LipLandmarkIndices {
-    const val MOUTH_CORNER_LEFT = 61
-    const val MOUTH_CORNER_RIGHT = 291
-    const val UPPER_LIP_OUTER = 0
-    const val LOWER_LIP_OUTER = 17
+    const val MOUTH_CORNER_LEFT = 0
+    const val MOUTH_CORNER_RIGHT = 17
+    const val UPPER_LIP_OUTER = 61
+    const val LOWER_LIP_OUTER = 291
     const val UPPER_LIP_INNER = 13
     const val LOWER_LIP_INNER = 14
 
