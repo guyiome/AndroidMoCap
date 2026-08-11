@@ -918,6 +918,71 @@ Prochaine étape : étage 3 (nouvelle dépendance `ImageEmbedder`, déjà prése
 sans coût de dépendance additionnel -- voir plan détaillé au moment de l'implémentation ; flux de
 calibration personnelle à concevoir).
 
+### 15ter. Étage 3 de la cascade langue tirée (embedding + calibration personnelle) -- mécaniquement fonctionnel, fiabilité partielle confirmée sur device le 11 août 2026
+
+**Implémentation** : `tracking/TongueEmbeddingClassifier.kt` (classification pure par similarité
+cosinus, `UNDECIDED` si écart sous la marge ou référence absente), `tracking/TongueEmbeddingHelper.kt`
+(wrapper `ImageEmbedder`, GPU→CPU comme `FaceLandmarkerHelper`, `RunningMode.IMAGE` synchrone),
+`tracking/TongueCalibrationAveraging.kt` + `tracking/TongueCalibrationRecordingState.kt` (machine à
+état pure pilotant l'enregistrement des deux références), `settings/TongueCalibrationStore.kt`
+(persistance CSV dans `filesDir`, même patron qu'`AppLog`). Modèle `image_embedder.tflite`
+(`mobilenet_v3_small`, 224x224, optionnel -- l'app tourne sans si l'étage 3 n'est jamais activé).
+`ui/TongueCalibrationScreen.kt` nouvel écran de calibration, accessible depuis "Fonctionnalités
+expérimentales" une fois le toggle activé. **Aucune injection réseau** : `tongueOut` est affiché
+localement (panneau de test, `allBlendshapes`) mais jamais ajouté à `corrected.blendshapes` -- choix
+explicite de l'utilisateur pour avoir un retour direct en test sans risquer d'envoyer un signal non
+fiable à VBridger/VMC/VTube Studio.
+
+**Bug trouvé et corrigé** : une course d'initialisation faisait que `TongueEmbeddingHelper` n'était
+jamais construit si le toggle expérimental était déjà activé au démarrage (cas normal après une
+première session) -- le collecteur réactif de `MainViewModel.init{}` tentait de le construire avant
+que `currentTierConfig` soit renseigné par `initializeTracking()`, et comme un `Flow` ne réémet que
+sur un changement de valeur (pas périodiquement), la tentative ratée n'était jamais retentée. Symptôme
+observé : la calibration semblait se dérouler normalement (deux phases, `DONE` atteint) mais aucun
+fichier `tongue_calibration.csv` n'était créé, et l'app affichait "jamais calibré" en boucle. Corrigé
+en ajoutant un second appel à `ensureTongueEmbeddingHelper()` à la fin de `initializeTracking()`,
+après que `currentTierConfig` soit posé. Confirmé sur device (log de confirmation toujours actif,
+`"TongueEmbeddingHelper initialisé"`, apparaissant bien après la sélection du palier).
+
+**Première calibration, mécaniquement réussie mais peu discriminante** : une fois le bug ci-dessus
+corrigé, le fichier de calibration se créait correctement, mais un test de tenue de pose (langue
+rentrée / langue tirée) montrait le classifieur bloqué sur `TONGUE_IN` presque tout le temps, y
+compris pendant une vraie tenue "langue tirée" -- hypothèse (pas certitude) : la transition
+instantanée entre les deux phases d'enregistrement capturait des frames de transition côté "langue
+dehors", diluant la référence. Corrigé en ajoutant une pause de préparation (`PREPARE_TONGUE_IN`,
+2s par défaut, n'accumule jamais) entre les deux phases, plus un compte à rebours numérique affiché
+à l'utilisateur (`TongueCalibrationRecordingState.kt` + `TongueCalibrationScreen.kt`) -- demande
+explicite de l'utilisateur pour un meilleur retour pendant la calibration.
+
+**Test de validation après recalibration (11 août 2026, palier OPTIMAL/ARCore)** :
+- **Langue tirée tenue** : net progrès -- après ~1s de transition, le classifieur reste stable sur
+  `TONGUE_OUT` tout le reste du segment (`simOut` ~0,84-0,92 contre `simIn` ~0,74-0,83). Avant la
+  pause de calibration, ce cas basculait presque toujours à tort sur `TONGUE_IN`.
+- **Langue rentrée tenue** : correcte au début (`TONGUE_IN`, `simIn` 0,91-0,93), mais bascule à tort
+  sur `TONGUE_OUT` en fin de tenue (`simOut` 0,78-0,86 contre `simIn` 0,72-0,79), au moment précis
+  d'un pic de `jawOpen` (0,37→0,55) et de `ratio` (0,88→0,95) -- confirmé par l'utilisateur : variation
+  involontaire d'ouverture de mâchoire pendant la tenue, pas un vrai changement de langue.
+- **Test ciblé "mâchoire grande ouverte, langue rentrée"** (pour vérifier si l'étage 3 confond
+  bouche ouverte et langue tirée) : inconclusif -- l'étage 2 a filtré la quasi-totalité du segment
+  avant même d'atteindre l'étage 3 (`ratio` 0,58-0,65, sous la référence adaptative ~0,61-0,62). La
+  seule frame ayant atteint l'étage 3 retombe sur `UNDECIDED` (`simOut=0,592` vs `simIn=0,558`), pas
+  de faux positif. Le `ratio` de ce test délibéré (0,58-0,65) est nettement plus bas que celui du
+  faux positif observé pendant la tenue "langue rentrée" (0,88-0,95) -- donc ce n'était probablement
+  pas un simple bâillement qui causait ce faux positif, cause exacte non identifiée.
+
+**Conclusion honnête, pas forcée** : progrès réel et mesuré par rapport à la première calibration,
+mais la barre de fiabilité fixée par le plan ("aucun chevauchement `simOut`/`simIn` sur au moins 2
+sessions indépendantes") n'est pas encore atteinte -- un chevauchement a été observé dans cette même
+session (fin de tenue "langue rentrée"). `tongueOutInjectionConfirmed` reste `false`, aucune
+injection dans `corrected.blendshapes`/les émetteurs réseau. Piste ouverte pour une session
+ultérieure : refaire le test "langue rentrée" avec une mâchoire délibérément stable, pour isoler si
+la confusion est purement due au mouvement ou une vraie limite du classifieur.
+
+Tests : `TongueEmbeddingClassifierTest.kt`, `TongueCalibrationAveragingTest.kt`,
+`TongueCalibrationRecordingStateTest.kt` (12, réécrits pour la phase `PREPARE_TONGUE_IN`) -- tous
+purs/JVM, `TongueEmbeddingHelper.kt`/`TongueCalibrationStore.kt` non testés (glue device/IO, même
+principe que `FaceLandmarkerHelper`/`AppLog`).
+
 ### 16. Détection expérimentale de `cheekPuff` (joues gonflées) -- même famille que le point 15, cascade allégée
 
 Même statut que `tongueOut` chez MediaPipe (signal peu fiable, cf. issue GitHub #4436 et le mapping

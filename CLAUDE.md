@@ -260,6 +260,24 @@ user looking at the image, not just inferred — a pre-existing bug in
 verified"), independent of point 15 and potentially affecting OPTIMAL-tier tracking accuracy more
 broadly. Not yet fixed — noted in the private backlog.
 
+Stage 3 (`tracking/TongueEmbeddingClassifier.kt` cosine-similarity classification,
+`tracking/TongueEmbeddingHelper.kt` wrapping MediaPipe `ImageEmbedder`, personal calibration via
+`ui/TongueCalibrationScreen.kt` + `tracking/TongueCalibrationRecordingState.kt` +
+`settings/TongueCalibrationStore.kt`) is implemented and mechanically confirmed on device (11 Aug
+2026, see revue technique point 15ter) — including a genuine init-race-condition bug that silently
+broke calibration (`TongueEmbeddingHelper` never constructed if the experimental toggle was already
+on at startup) and a calibration UX fix (a `PREPARE_TONGUE_IN` pause + countdown between the two
+recording phases, to stop the "tongue out" reference from absorbing transition frames). Reliability
+is real but **not yet proven**: a held tongue-out gesture now classifies correctly and stays stable,
+but a held tongue-in gesture drifted to a false `TONGUE_OUT` near the end of one test session,
+correlated with (user-confirmed) unintentional jaw movement during the hold — a targeted follow-up
+test ("jaw wide open, tongue in") was largely inconclusive since stage 2 filtered it out before
+reaching stage 3. The plan's bar for flipping `tongueOutInjectionConfirmed` (zero `simOut`/`simIn`
+overlap across ≥2 independent sessions) is not met yet — don't flip it or wire real injection without
+re-reading point 15ter first. `tongueOut` is displayed locally only (`TrackingFrame.allBlendshapes`,
+by explicit user choice for direct test feedback) and is never present in `corrected.blendshapes` or
+sent to any network sender.
+
 **Settings persistence.** `settings/AppSettingsStore.kt` and `settings/ConnectionSettingsStore.kt`
 wrap Jetpack DataStore Preferences. Blendshape selection persistence across sessions is opt-in
 (`persistBlendshapeSelectionEnabled`, default off — historic reset-on-launch behavior preserved
