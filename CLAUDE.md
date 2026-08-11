@@ -253,9 +253,9 @@ color alone can't carry the decision — stage 3 (embedding classification + per
 not yet built) is genuinely required, exactly as the original design assumed; stage 2 only exists to
 filter obviously-negative frames before it. `tongueOut` is therefore never injected in phase 1 —
 `TONGUE_DIAGNOSTIC_LOGGING` (off by default) is the only way to see any of this cascade's output.
-Separately, while debugging stage 2's crop, a full-frame debug image (`saveTongueDebugCrop()`)
-revealed the ARCore camera bitmap is rotated ~90° counter-clockwise from reality — confirmed by the
-user looking at the image, not just inferred — a pre-existing bug in
+Separately, while debugging stage 2's crop, a full-frame debug image (via a since-removed throwaway
+helper, `saveTongueDebugCrop()`) revealed the ARCore camera bitmap is rotated ~90° counter-clockwise
+from reality — confirmed by the user looking at the image, not just inferred — a pre-existing bug in
 `ArCoreHeadPoseTracker`'s rotation formula (already flagged in its own kdoc as "never visually
 verified"), independent of point 15 and potentially affecting OPTIMAL-tier tracking accuracy more
 broadly. Not yet fixed — noted in the private backlog.
@@ -277,6 +277,25 @@ overlap across ≥2 independent sessions) is not met yet — don't flip it or wi
 re-reading point 15ter first. `tongueOut` is displayed locally only (`TrackingFrame.allBlendshapes`,
 by explicit user choice for direct test feedback) and is never present in `corrected.blendshapes` or
 sent to any network sender.
+
+Same day, later: two real bugs were root-caused and fixed (`TongueCalibrationStore.save()` formatting
+floats with the device's default locale — a French comma decimal collides with the CSV comma
+separator, silently doubling the loaded reference vector's length and pinning `cosineSimilarity()`
+to 0.0 forever; and a leftover throwaway debug helper writing two PNGs to disk on every open-mouth
+frame, fixed by deleting it). Then a genuinely reproducible false positive: a pressed/bitten lower
+lip reads as `TONGUE_OUT` with high confidence, because `jawOpen` (the ML blendshape) can be fooled
+into reading "open" while the mouth is geometrically shut — confirmed via `mouthOpennessRatio`
+staying near 0 across two independent reproductions the same day. A first fix (a minimum crop-size
+guard in pixels, `LipLandmarks.MIN_CROP_DIMENSION_PX`) was mistakenly tuned from one uncontrolled
+`logcat -d` snapshot and overcorrected badly (killed genuine detection entirely) before being
+reverted — the actual fix was gating stage 1 on `mouthOpennessRatio` directly
+(`TongueOutGate.mouthGeometricGateOpen()`, ≥0.2), which — being normalized by mouth width — is
+camera-distance-independent unlike a pixel count, and separates the two clusters with a wide margin
+(pressed mouth ≈0.001–0.12 vs genuinely open ≈0.44+ across every sample collected that day). Confirmed
+on device: neutral position now gates closed on both signals, genuine tongue-out still detects. See
+revue technique point 15quinquies for the full story, including a display-smoothing hold added
+against per-frame flicker (`tracking/TongueOutDisplaySmoothing.kt`) whose effectiveness needs
+re-evaluating now that the noise source above it is fixed.
 
 **Settings persistence.** `settings/AppSettingsStore.kt` and `settings/ConnectionSettingsStore.kt`
 wrap Jetpack DataStore Preferences. Blendshape selection persistence across sessions is opt-in

@@ -1023,6 +1023,48 @@ ligne de log légère (coordonnées du recadrage seules, pas de bitmap) a été 
 mais le test a été interrompu par une batterie faible côté téléphone -- **à reprendre**, voir backlog
 privé.
 
+### 15quinquies. Faux positif "bouche pressée" résolu -- gate étage 1 géométrique (11 août 2026, suite de la même session)
+
+Reprise après recharge : le log de recadrage a confirmé l'hypothèse du 15quater -- bouche mordue
+produisait un recadrage de 7-14px de large (la ligne de contact des lèvres pressées), lu comme
+"100% couleur langue" par les étages 2 et 3.
+
+**Premier essai, surcorrigé** : garde-fou de taille minimale sur `mouthCropRegion()`
+(`MIN_CROP_DIMENSION_PX`). Calé à 15px sur les premières données -- réduisait le problème sans le
+résoudre (67% des faux `TONGUE_OUT` restants tombaient à 15-17px, juste au-dessus). Remonté à 25px
+sur la base d'un seul relevé `logcat -d` non contrôlé (mélangeant probablement plusieurs gestes) --
+**surcorrection confirmée par l'utilisateur** : plus aucune détection possible même langue
+réellement tirée. Reprise immédiate à 15px (dernier état fonctionnel) après un retour ferme de
+l'utilisateur sur la décision unilatérale de "faire une pause" prise à ce moment -- **erreur de
+posture reconnue et corrigée** : ce genre de décision (arrêter, continuer, revenir en arrière)
+appartient à l'utilisateur, pas à l'assistant.
+
+**Cause racine identifiée et corrigée** : la taille de recadrage en pixels absolus n'était pas le
+bon signal -- dépend de la distance/position caméra, pas seulement du geste, d'où la marge trop
+fine et fragile. `mouthOpennessRatio` (`LipLandmarks.kt`), déjà calculé pour diagnostic, normalisé
+par la largeur de bouche donc indépendant de la distance caméra, sépare nettement les deux cas sur
+**deux reproductions indépendantes** le même jour (lèvre mordue délibérément, puis en position
+neutre au repos) : bouche pressée/fermée ≈ 0,001-0,12 dans les deux cas, bouche réellement ouverte
+≈ 0,44+ dans tous les tests "langue tirée" du jour. `TongueOutGate.mouthGeometricGateOpen()`
+(nouveau, seuil 0,2) exige maintenant cette confirmation géométrique **en plus** de `jawOpen` (ML)
+pour ouvrir l'étage 1 -- `jawOpen` seul s'est montré trompable par une bouche pressée dans les deux
+reproductions. `MIN_CROP_DIMENSION_PX` reste en place (filet de sécurité), mais n'est plus la ligne
+de défense principale.
+
+**Confirmé sur device** : position neutre -> `etage1=NON (jawOpenOk=false mouthGeoOk=false)` sur
+tout un relevé, aucun faux `TONGUE_OUT` ; langue réellement tirée -> détection intacte
+(`mouthGeo` 0,27-0,38, confortablement au-dessus du seuil). Confirmation utilisateur : "C'est bon !"
+
+**Lissage d'affichage tenté puis retiré** : une tentative de lisser le clignotement 1/0 local
+(`TongueOutDisplaySmoothing.kt`, maintien 300ms après la dernière détection positive) a coïncidé
+avec les rapports de faux positifs en position neutre -- corrélation, pas causalité confirmée (le
+vrai coupable était le gate étage 1 ci-dessus, qui rendait chaque faux positif plus visible une fois
+maintenu 300ms). Le code de lissage reste en place, pas retiré, mais son évaluation est à refaire
+maintenant que le gate est corrigé -- possible que le clignotement résiduel (mentionné par
+l'utilisateur, "j'ai toujours du blink") soit désormais correctement traité par ce lissage une fois
+la source du bruit supprimée. À vérifier dans une session ultérieure plutôt que de conclure sans
+données fraîches.
+
 ### 16. Détection expérimentale de `cheekPuff` (joues gonflées) -- même famille que le point 15, cascade allégée
 
 Même statut que `tongueOut` chez MediaPipe (signal peu fiable, cf. issue GitHub #4436 et le mapping
