@@ -308,7 +308,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // (embedding + calibration) nécessaire pour une vraie détection, pas juste un réglage de
         // seuil. Désactivé en attendant l'étage 3 -- remettre à `true` si ce diagnostic redevient
         // utile (ex. calibration de l'étage 3 elle-même).
-        private const val TONGUE_DIAGNOSTIC_LOGGING = false
+        private const val TONGUE_DIAGNOSTIC_LOGGING = true
         private const val TONGUE_DIAG_TAG = "TongueDiag"
 
         // Cadence du sondage de throttling thermique (voir startThermalPolling) -- doit rester
@@ -611,6 +611,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         thermalThrottleState = ThermalThrottleState.initial(nominalFps = tierConfig.targetFps)
         currentTierConfig = tierConfig
         currentDebugForceGpuUnavailable = debugForceGpuUnavailable
+        // Course d'initialisation corrigée le 11 août 2026, confirmée sur device : le collecteur
+        // tongueOutDetectionEnabled (init{}) se déclenche dès la création du ViewModel, AVANT que
+        // initializeTracking() (suspend fun, appelée depuis un LaunchedEffect côté UI donc après
+        // init{}) n'ait fixé currentTierConfig -- si le toggle était déjà persisté à true,
+        // ensureTongueEmbeddingHelper() abandonnait silencieusement (currentTierConfig encore null)
+        // et ne réessayait plus jamais (le Flow ne réémet pas tant que la valeur ne change pas).
+        // Symptôme observé : une calibration se termine ses deux phases normalement côté UI, mais
+        // aucun embedding n'a jamais été calculé -- rien n'est sauvegardé, "jamais calibré" persiste.
+        // Ce deuxième appel, maintenant que currentTierConfig est connu, rattrape ce cas -- mais
+        // seulement si le toggle est bien actif (ensureTongueEmbeddingHelper() ne le vérifie pas
+        // elle-même, c'était jusqu'ici la responsabilité de l'appelant, le collecteur).
+        if (_uiState.value.tongueOutDetectionEnabled) {
+            ensureTongueEmbeddingHelper()
+        }
 
         _uiState.update {
             it.copy(
@@ -1354,6 +1368,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             forceGpuUnavailable = currentDebugForceGpuUnavailable,
             onError = { message -> AppLog.w(TAG, "Échec d'initialisation de TongueEmbeddingHelper : $message") },
         ).also { it.setup() }
+        // Log toujours actif (pas gaté par TONGUE_DIAGNOSTIC_LOGGING) : confirmer que le helper
+        // s'est bien construit était justement ce qui manquait pour diagnostiquer la course
+        // d'initialisation corrigée juste au-dessus -- un simple silence ne dit pas "jamais tenté"
+        // de "tenté et réussi".
+        AppLog.i(TAG, "TongueEmbeddingHelper initialisé (délégué GPU=${tongueEmbeddingHelper?.activeDelegateIsGpu})")
     }
 
     /**
