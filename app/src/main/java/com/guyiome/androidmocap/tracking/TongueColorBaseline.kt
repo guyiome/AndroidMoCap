@@ -37,6 +37,13 @@ internal fun TongueColorBaseline.next(ratio: Float, elevatedMargin: Float = 0.02
 /**
  * `true` si [ratio] dépasse la référence courante d'au moins [margin] -- `false` tant qu'aucun
  * échantillon n'a encore été intégré (pas de comparaison possible avant [next]).
+ *
+ * Marge relevée 0,02 -> 0,06 après un premier test device (11 août 2026, palier ARCore) : à 0,02,
+ * de simples pics de bruit frame-à-frame en "langue rentrée" (jusqu'à 0,9489 mesuré, largement
+ * au-dessus de la référence ~0,84-0,85) déclenchaient de faux positifs (32% des frames en phase de
+ * rodage, 8% une fois la référence stabilisée) -- la marge doit couvrir ce bruit sans manquer les
+ * frames "langue tirée" les plus faibles (minimum mesuré 0,8147 sur ce même essai, donc pas de
+ * marge illimitée non plus). Valeur encore provisoire, un seul essai.
  */
-internal fun TongueColorBaseline.isElevated(ratio: Float, margin: Float = 0.02f): Boolean =
+internal fun TongueColorBaseline.isElevated(ratio: Float, margin: Float = 0.06f): Boolean =
     sampleCount > 0 && ratio > value + margin
