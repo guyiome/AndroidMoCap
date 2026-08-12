@@ -270,7 +270,7 @@ fun MainScreen(
                 onCalibrate = { viewModel.startCalibrationCountdown() },
                 onToggleConnection = { viewModel.toggleActiveConnection() },
                 onOpenSettings = { showSettings = true },
-                onOpenTongueSettings = { showExperimentalFeatures = true },
+                onOpenExperimental = { showExperimentalFeatures = true },
             )
 
             if (showSettings) {

@@ -54,7 +54,7 @@ fun MainHud(
     onCalibrate: () -> Unit,
     onToggleConnection: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenTongueSettings: () -> Unit,
+    onOpenExperimental: () -> Unit,
 ) {
     // "En cours" par type (revue technique, point 40) :
     // - VMC : résolution DNS/construction du socket (connectVmcTarget) -- généralement bref, mais
@@ -104,7 +104,7 @@ fun MainHud(
             val tongueStrain = uiState.tongueOutDetectionEnabled && uiState.inferenceRunningHigh
             if (uiState.isThermalThrottling || tongueStrain) {
                 Spacer(Modifier.width(18.dp))
-                IconButton(onClick = onOpenTongueSettings, enabled = tongueStrain, modifier = Modifier.size(28.dp)) {
+                IconButton(onClick = onOpenExperimental, enabled = tongueStrain, modifier = Modifier.size(28.dp)) {
                     Icon(
                         imageVector = Icons.Filled.WarningAmber,
                         contentDescription = if (tongueStrain) {
