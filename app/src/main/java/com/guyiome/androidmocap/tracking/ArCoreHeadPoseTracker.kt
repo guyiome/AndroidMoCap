@@ -32,6 +32,7 @@ import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.MPImage
 import com.guyiome.androidmocap.camera.CameraController
 import com.guyiome.androidmocap.logging.AppLog
+import com.guyiome.androidmocap.sensors.IconOrientationTracker
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -163,21 +164,20 @@ class ArCoreHeadPoseTracker(
     companion object {
         private const val TAG = "ArCoreHeadPoseTracker"
 
-        // Diagnostic ponctuel (12 août 2026) : le fond caméra GL (maybeRotateBackgroundQuad,
-        // hold-independent -- aucune lecture capteur, juste cameraRotationDegrees, une constante de
-        // session) s'est révélé correct en portrait mais faux en paysage, sur le MÊME device et la
-        // MÊME session -- paradoxe logique : un code qui ne lit jamais l'orientation physique ne
-        // peut pas produire un résultat différent entre deux tenues, SAUF si la texture OES
-        // elle-même (écrite par ARCore via setCameraTextureName, jamais par notre propre code) est
-        // déjà pré-tournée en interne par ARCore selon l'orientation physique réelle -- hypothèse à
-        // confirmer avant tout nouveau correctif à l'aveugle (déjà 3 tentatives infructueuses).
-        // Log throttlé (~1/s) : cameraRotationDegrees (doit rester constant), hasDisplayGeometryChanged()
-        // (devrait ne jamais redevenir true après le setup initial si rien ne change côté ARCore),
-        // dimensions de surface connues, et la sortie BRUTE de transformCoordinates2d (recalculée ici
-        // uniquement pour ce log, indépendamment du rendu réel qui ne l'utilise plus) -- si cette
-        // dernière diffère entre une capture en portrait et une capture en paysage sur la même
-        // session, ça confirme l'hypothèse et donne les vrais chiffres pour le correctif suivant.
-        private const val BACKGROUND_ROTATION_DIAGNOSTIC_LOGGING = true
+        // Diagnostic ponctuel (12 août 2026), désormais conclu -- gardé désactivé au cas où un
+        // diagnostic similaire redevienne utile (même discipline que les autres flags de ce type
+        // dans le projet, ex. ROTATION_QUALITY_DIAGNOSTIC_LOGGING). Le fond caméra GL
+        // (maybeRotateBackgroundQuad, alors hold-independent -- aucune lecture capteur, juste
+        // cameraRotationDegrees) s'est révélé correct en portrait mais faux en paysage, sur le MÊME
+        // device et la MÊME session -- paradoxe logique résolu par ce log : cameraRotationDegrees,
+        // hasDisplayGeometryChanged(), les dimensions de surface et la sortie brute de
+        // transformCoordinates2d se sont révélés STRICTEMENT IDENTIQUES entre portrait et paysage
+        // (capture ~2,5 min couvrant les deux tenues) -- ARCore ne compense donc rien en interne,
+        // le rendu était bien hold-independent comme prévu. La vraie explication (voir kdoc de
+        // maybeRotateBackgroundQuad/physicalOrientationTracker) : contrairement au mesh, le fond
+        // montre le monde réel et a besoin d'une compensation dynamique que le mesh n'a jamais eu
+        // besoin d'avoir, pour une raison différente de celle déjà infirmée pour le mesh (point 52).
+        private const val BACKGROUND_ROTATION_DIAGNOSTIC_LOGGING = false
         private const val BACKGROUND_ROTATION_DIAG_TAG = "BackgroundRotationDiag"
 
         // Nombre de conversions YUV->Bitmap tolérées "en vol" (soumises à imageProcessingExecutor,
@@ -226,6 +226,27 @@ class ArCoreHeadPoseTracker(
     // GL, même principe que cameraTextureId/maybeBindCameraTexture() ci-dessous.
     @Volatile private var lastKnownSurfaceWidth: Int = 0
     @Volatile private var lastKnownSurfaceHeight: Int = 0
+
+    // Tenue physique réelle du téléphone (accéléromètre seul, même outil que MainScreen.kt pour la
+    // rotation des icônes du HUD -- instance séparée et dédiée ici, pas de partage entre Compose et
+    // ce tracker, même principe que DeviceOrientationTracker déjà séparé d'IconOrientationTracker
+    // ailleurs dans l'app). Nécessaire UNIQUEMENT pour le fond caméra GL (voir
+    // maybeRotateBackgroundQuad) -- le chemin CPU (cameraRotationDegrees, rotateBitmap) reste fixe,
+    // hold-independent, confirmé correct ainsi dans toutes les tenues testées (revue technique
+    // point 52) : c'est le fond GL spécifiquement qui a besoin de cette compensation dynamique
+    // (raison détaillée dans le diagnostic du 12 août 2026 -- contrairement au mesh, un point-cloud
+    // sans "haut" absolu, le fond montre le monde réel et doit donc suivre visuellement la tenue).
+    private val physicalOrientationTracker = IconOrientationTracker(context) { rawDegrees ->
+        val bucket = snapToRotationBucket(rawDegrees)
+        if (bucket != physicalHoldDegrees) {
+            physicalHoldDegrees = bucket
+            backgroundQuadRotated = false // force un recalcul au prochain onDrawFrame
+        }
+    }
+
+    // Palier {0,90,180,270} le plus proche de la tenue physique réelle, horaire (même convention
+    // que cameraRotationDegrees) -- voir physicalOrientationTracker ci-dessus.
+    @Volatile private var physicalHoldDegrees: Int = 0
 
     @Volatile private var targetFps: Int = initialTargetFps.coerceAtLeast(1)
     @Volatile private var minFrameIntervalMs: Long = 1000L / targetFps
@@ -392,6 +413,7 @@ class ArCoreHeadPoseTracker(
         // posé -- voir attachTo()). Peut être no-op si la surface n'existe pas encore, rattrapé
         // alors par attachTo() lui-même.
         glSurfaceView?.onResume()
+        physicalOrientationTracker.enable()
     }
 
     /**
@@ -406,6 +428,7 @@ class ArCoreHeadPoseTracker(
      * garanti sur le thread de rendu, purement synchrone).
      */
     fun stop() {
+        physicalOrientationTracker.disable()
         glSurfaceView?.onPause()
         session?.pause()
     }
@@ -591,32 +614,50 @@ class ArCoreHeadPoseTracker(
     }
 
     /**
-     * Tourne [backgroundQuadCoords] une fois [cameraRotationDegrees] connu (une seule fois --
-     * cette valeur ne change jamais après la création de la session, voir [readCameraSensorOrientation]),
-     * plutôt que de dépendre de `Frame#transformCoordinates2d`/`Session#setDisplayGeometry` --
-     * abandonné après deux tentatives infructueuses sur device pour cette caméra frontale, voir le
-     * kdoc du bloc de champs ci-dessus. [cameraRotationDegrees] est en revanche déjà prouvé correct
-     * dans toutes les tenues testées (portrait ET paysage) pour le chemin CPU ([rotateBitmap]),
-     * revue technique point 52 -- réutilisé ici tel quel.
+     * Tourne [backgroundQuadCoords] -- appelé à chaque [onDrawFrame] mais ressort immédiatement si
+     * [backgroundQuadRotated] est déjà à jour (coût réel : un `Boolean` lu, recalcul uniquement au
+     * premier appel ou quand [physicalOrientationTracker] signale un changement de palier).
+     *
+     * **Historique (12 août 2026)** : deux tentatives basées sur
+     * `Frame#transformCoordinates2d`/`Session#setDisplayGeometry` ont échoué sur device (fond tourné
+     * à 180°). Remplacées par [cameraRotationDegrees] seul (constante de session, déjà prouvée
+     * correcte pour le chemin CPU dans toutes les tenues, revue technique point 52) -- correct en
+     * portrait, mais TOUJOURS faux en paysage. Diagnostic ponctuel (log throttlé de
+     * `transformCoordinates2d`/`hasDisplayGeometryChanged`/dimensions de surface pendant un
+     * changement réel de tenue, sur la même session) : **aucune valeur ARCore ne bouge entre
+     * portrait et paysage** -- le rendu est donc bien hold-independent comme prévu, ce n'était pas
+     * un bug de code. La vraie explication : contrairement au mesh (nuage de points sans "haut"
+     * absolu, jamais gêné par une rotation non compensée), le fond montre le monde réel -- une
+     * rotation non compensée de la prise de vue, combinée à l'écran lui-même physiquement penché
+     * dans la main du spectateur (qui ne penche pas la tête pour suivre), se cumule visuellement
+     * plutôt que de s'annuler. D'où [physicalOrientationTracker] : lit la tenue physique réelle
+     * (palier {0,90,180,270}, [physicalHoldDegrees]) et l'ajoute à [cameraRotationDegrees] pour
+     * compenser dynamiquement -- **uniquement pour ce fond GL**, le chemin CPU
+     * ([rotateBitmap]/mesh) reste inchangé, hold-independent, toujours correct pour sa propre
+     * raison (voir kdoc de [physicalOrientationTracker]).
      *
      * Tourner les POSITIONS du quad (texture échantillonnée avec un UV fixe, [backgroundTexCoords])
-     * plutôt que l'image produit le même résultat visuel qu'une rotation directe de l'image :
-     * pour un sommet à la position d'origine Q et un mapping UV(Q) fixe, si le sommet est déplacé en
+     * plutôt que l'image produit le même résultat visuel qu'une rotation directe de l'image : pour
+     * un sommet à la position d'origine Q et un mapping UV(Q) fixe, si le sommet est déplacé en
      * position R(θ)·Q (rotation horaire d'angle θ) tout en gardant UV(Q) (pas UV(R(θ)·Q)), alors pour
-     * tout point écran S = R(θ)·Q on affiche texture(UV(R(θ)⁻¹·S)) = texture(UV(R(-θ)·S)) -- exactement
-     * ce qu'on obtiendrait en tournant l'image elle-même de θ (horaire) et en l'affichant dans un quad
-     * fixe. Formule de rotation horaire en repère Y vers le haut (NDC), dérivée à la main --
-     * *différente* de son équivalent Y vers le bas (image/bitmap, `Matrix.postRotate`) à cause de cet
-     * axe inversé (même piège CW/CCW que celui déjà rencontré et documenté revue technique point 52) :
-     * (x,y) -> (x·cosθ + y·sinθ, -x·sinθ + y·cosθ). Miroir horizontal appliqué en dernier sur le
-     * résultat (négation du X final) -- même convention que
+     * tout point écran S = R(θ)·Q on affiche texture(UV(R(θ)⁻¹·S)) = texture(UV(R(-θ)·S)) --
+     * exactement ce qu'on obtiendrait en tournant l'image elle-même de θ (horaire) et en l'affichant
+     * dans un quad fixe. Formule de rotation horaire en repère Y vers le haut (NDC), dérivée à la
+     * main -- *différente* de son équivalent Y vers le bas (image/bitmap, `Matrix.postRotate`) à
+     * cause de cet axe inversé (même piège CW/CCW que celui déjà rencontré et documenté revue
+     * technique point 52) : (x,y) -> (x·cosθ + y·sinθ, -x·sinθ + y·cosθ). Miroir horizontal appliqué
+     * en dernier sur le résultat (négation du X final) -- même convention que
      * `LandmarkProjection.toScreenPoint(mirror=true)`, utilisé par `FaceMeshOverlay` pour rester
-     * cohérent avec `PreviewView`, qui mirrore automatiquement la caméra frontale.
+     * cohérent avec `PreviewView`, qui mirrore automatiquement la caméra frontale. **Signe de
+     * `physicalHoldDegrees` non vérifié sur device** (hypothèse : s'additionne à
+     * `cameraRotationDegrees`, raisonnement dans le commit -- si le paysage est encore faux après ce
+     * correctif, inverser le signe est le premier réflexe, pas une nouvelle combinaison à deviner).
      */
     private fun maybeRotateBackgroundQuad() {
         if (backgroundQuadRotated) return
         session ?: return // cameraRotationDegrees pas encore lu (voir tryCreateSession) -- réessayer plus tard
-        val radians = Math.toRadians(cameraRotationDegrees.toDouble())
+        val totalDegrees = cameraRotationDegrees + physicalHoldDegrees
+        val radians = Math.toRadians(totalDegrees.toDouble())
         val cos = cos(radians).toFloat()
         val sin = sin(radians).toFloat()
         val identityCorners = floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f)
@@ -745,7 +786,11 @@ class ArCoreHeadPoseTracker(
         // Dessiné à chaque onDrawFrame, pas soumis au throttle targetFps ci-dessous -- la texture
         // OES vient d'être rafraîchie par session.update() ci-dessus, donc toujours à jour ici (le
         // throttle ne gère que le travail EN AVAL, emitCameraImage/emitHeadPose, voir plus haut).
+        // maybeRotateBackgroundQuad() ressort immédiatement si déjà à jour (voir son kdoc) -- coût
+        // négligeable de l'appeler à chaque frame, nécessaire depuis que physicalOrientationTracker
+        // peut signaler un changement de tenue à tout moment pendant une session live.
         if (backgroundRenderingEnabled) {
+            maybeRotateBackgroundQuad()
             drawCameraBackground()
         }
 
