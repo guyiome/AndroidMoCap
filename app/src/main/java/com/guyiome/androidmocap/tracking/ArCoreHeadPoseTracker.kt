@@ -588,18 +588,33 @@ class ArCoreHeadPoseTracker(
             com.google.ar.core.Coordinates2d.TEXTURE_NORMALIZED,
             backgroundRawTexCoords,
         )
-        // Miroir horizontal par permutation des 4 UV déjà correctes (sommets 0<->1, paire du bas ;
-        // 2<->3, paire du haut) -- voir kdoc de backgroundTexCoords pour pourquoi ceci remplace
-        // l'ancienne approche (mirrorer le tableau source passé à transformCoordinates2d).
+        // Miroir horizontal + rotation 180° combinés en une seule permutation des 4 UV déjà
+        // correctes (sommets opposés en diagonale : 0<->3, 1<->2) -- voir kdoc de
+        // backgroundTexCoords pour pourquoi ceci remplace l'ancienne approche (mirrorer le tableau
+        // source passé à transformCoordinates2d). Le second test sur device (12 août 2026) a
+        // confirmé qu'un simple miroir horizontal (0<->1, 2<->3) ne suffisait pas -- le fond restait
+        // tête en bas, ce qu'un miroir seul ne peut pas expliquer (il n'inverse jamais haut/bas) :
+        // la sortie brute de transformCoordinates2d pour cette caméra frontale est donc elle-même
+        // déjà tête en bas, indépendamment de tout miroir. Un miroir horizontal ET une rotation
+        // 180° sont deux symétries diagonales (chacune n'inverse le signe que d'un axe à la fois
+        // sur une base tournée) qui commutent entre elles et se combinent en un simple échange par
+        // paires opposées en diagonale plutôt que par paires adjacentes. Si ça ne suffit toujours
+        // pas au prochain test, ne pas re-deviner un troisième réglage à l'aveugle : le signal
+        // manquant est de savoir si le résultat est alors bien mirroré (main droite à gauche) mais
+        // seulement tourné de 90°/270° plutôt que 180°, ce qui pointerait vers un axe X/Y interverti
+        // plutôt qu'un simple signe -- comparer avec cameraRotationDegrees (lu via
+        // CameraCharacteristics.SENSOR_ORIENTATION, déjà confirmé correct sur device pour le chemin
+        // CPU, voir readCameraSensorOrientation) donnerait alors une vraie valeur de référence
+        // plutôt qu'un nouvel essai-erreur.
         val raw = backgroundRawTexCoords
-        backgroundTexCoords.put(0, raw.get(2))
-        backgroundTexCoords.put(1, raw.get(3))
-        backgroundTexCoords.put(2, raw.get(0))
-        backgroundTexCoords.put(3, raw.get(1))
-        backgroundTexCoords.put(4, raw.get(6))
-        backgroundTexCoords.put(5, raw.get(7))
-        backgroundTexCoords.put(6, raw.get(4))
-        backgroundTexCoords.put(7, raw.get(5))
+        backgroundTexCoords.put(0, raw.get(6))
+        backgroundTexCoords.put(1, raw.get(7))
+        backgroundTexCoords.put(2, raw.get(4))
+        backgroundTexCoords.put(3, raw.get(5))
+        backgroundTexCoords.put(4, raw.get(2))
+        backgroundTexCoords.put(5, raw.get(3))
+        backgroundTexCoords.put(6, raw.get(0))
+        backgroundTexCoords.put(7, raw.get(1))
         backgroundTexCoordsInitialized = true
     }
 
