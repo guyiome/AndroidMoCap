@@ -122,6 +122,17 @@ import javax.microedition.khronos.opengles.GL10
  * sur repli `onUnavailable`, laissant tourner [imageProcessingExecutor] pour rien le reste de la
  * session.
  *
+ * ⚠️ **Rotation, corrigée à nouveau (12 août 2026, revue technique points 1/15/20)** : le correctif
+ * du 6 août ne considérait que [sensorOrientationDegrees] (constante matérielle fixe), en supposant
+ * à tort que l'orientation de la fenêtre (verrouillée portrait) valait orientation *physique* du
+ * téléphone -- confirmé faux sur device via une image de debug plein cadre le 11 août (tenue en
+ * paysage, cas d'usage le plus fréquent de l'utilisateur). [cameraRotationDegrees] est maintenant
+ * recalculé à chaud ([setPhysicalRotationDegrees]) à partir d'une lecture réelle de l'orientation
+ * physique (`sensors/IconOrientationTracker`, poussée depuis `MainViewModel`), combinée à la
+ * constante fixe via `CameraOrientation.frontCameraRotationDegrees` -- généralisation de la formule
+ * déjà en place, pas une nouvelle hypothèse. [maybeSetDisplayGeometry] reste délibérément non
+ * touché (voir sa doc).
+ *
  * Raison d'être : ARCore Augmented Faces gère lui-même la capture caméra frontale en interne (via
  * `Session#setCameraTextureName`, qui nécessite un contexte GL) -- il ne peut donc pas cohabiter
  * avec CameraX sur la même caméra (Camera2 n'autorise qu'un seul client actif). Ce tracker pilote
@@ -208,18 +219,25 @@ class ArCoreHeadPoseTracker(
     @Volatile private var minFrameIntervalMs: Long = 1000L / targetFps
     private var lastAcceptedFrameElapsedMs: Long = 0L
 
-    // Rotation (degrés, horaire) à appliquer à l'image YUV brute pour l'amener à l'orientation
-    // portrait attendue par MediaPipe -- lue une fois la caméra ARCore sélectionnée (voir
-    // tryCreateSession) via Camera2 (CameraCharacteristics.SENSOR_ORIENTATION), l'app étant
-    // verrouillée portrait (device rotation toujours ROTATION_0, voir maybeSetDisplayGeometry).
-    // Même formule que celle utilisée en interne par CameraX pour une caméra frontale à
-    // destination fixe 0° (CameraOrientationUtil.getRelativeImageRotation, isOppositeFacing=true
-    // -> rotation relative = orientation du capteur telle quelle) -- sans miroir : le miroir reste
-    // géré uniquement à l'affichage (voir LandmarkProjection), jamais dans l'image envoyée à
-    // MediaPipe, même convention que CameraController. Confirmé nécessaire sur device (retour
-    // utilisateur 6 août 2026 : rotation visiblement absente avant ce correctif) mais formule non
-    // vérifiée visuellement -- à confirmer au prochain test (le mesh doit apparaître à l'endroit,
-    // tourner la tête doit bouger le mesh dans le sens intuitif).
+    // Constante matérielle fixe (Camera2 CameraCharacteristics.SENSOR_ORIENTATION, lue une fois à
+    // la sélection de la caméra ARCore, voir tryCreateSession) -- l'angle de montage du capteur par
+    // rapport à l'orientation naturelle du téléphone. Ne dépend PAS de la tenue physique de
+    // l'utilisateur, contrairement à ce qu'un ancien commentaire ici laissait penser à tort (voir
+    // cameraRotationDegrees ci-dessous et revue technique, points 1/15/20 : confirmé sur device le
+    // 11 août 2026 que l'image sort tournée ~90° quand le téléphone est tenu en paysage, faute de
+    // combiner cette constante avec l'orientation physique réelle).
+    @Volatile private var sensorOrientationDegrees: Int = 0
+
+    // Rotation (degrés, convention Surface.ROTATION_*) réellement appliquée à l'image YUV brute
+    // pour l'amener à l'orientation attendue par MediaPipe -- dérivée de [sensorOrientationDegrees]
+    // (constante) ET de l'orientation physique courante du téléphone (dynamique, voir
+    // setPhysicalRotationDegrees ci-dessous, poussée depuis MainViewModel). Formule ML-Kit/
+    // CameraOrientationUtil pour caméra frontale (CameraOrientation.frontCameraRotationDegrees) --
+    // sans miroir : le miroir reste géré uniquement à l'affichage (voir LandmarkProjection), jamais
+    // dans l'image envoyée à MediaPipe, même convention que CameraController. Initialisée avec
+    // destination=0 (préserve exactement le comportement d'avant ce correctif tant qu'aucune
+    // lecture capteur d'orientation n'est encore arrivée) -- confirmé nécessaire sur device (retour
+    // utilisateur 6 août 2026 : rotation visiblement absente avant le tout premier correctif).
     @Volatile private var cameraRotationDegrees: Int = 0
 
     // Réutilisé à chaque appel de rotateBitmap() plutôt que de passer `null` à Canvas.drawBitmap
@@ -249,6 +267,21 @@ class ArCoreHeadPoseTracker(
     fun setTargetFps(fps: Int) {
         targetFps = fps.coerceAtLeast(1)
         minFrameIntervalMs = 1000L / targetFps
+    }
+
+    /**
+     * Rotation caméra selon l'orientation physique réelle du téléphone (revue technique, points
+     * 1/15/20) -- ajusté à chaud depuis `MainViewModel`, même patron que [setTargetFps] et
+     * `CameraController.setPhysicalRotationDegrees`. [surfaceRotationEquivalentDegrees] doit déjà
+     * être en convention `Surface.ROTATION_*` (sortie de
+     * `CameraOrientation.surfaceRotationEquivalentDegrees()`, pas un palier brut de
+     * `snapToRotationBucket()`). Ne touche jamais [maybeSetDisplayGeometry]/`Surface.ROTATION_0`
+     * -- deux axes délibérément découplés : la géométrie d'affichage ARCore reflète la rotation de
+     * la *fenêtre* (verrouillée portrait, réellement toujours 0), celle-ci reflète l'orientation
+     * *physique* du téléphone, un axe indépendant.
+     */
+    fun setPhysicalRotationDegrees(surfaceRotationEquivalentDegrees: Int) {
+        cameraRotationDegrees = frontCameraRotationDegrees(sensorOrientationDegrees, surfaceRotationEquivalentDegrees)
     }
 
     /** À appeler sur ON_START (voir `MainViewModel.initializeTracking`). */
@@ -346,7 +379,11 @@ class ArCoreHeadPoseTracker(
                 return null
             }
             newSession.setCameraConfig(frontCameraConfigs[0])
-            cameraRotationDegrees = readCameraSensorOrientation(frontCameraConfigs[0].cameraId)
+            sensorOrientationDegrees = readCameraSensorOrientation(frontCameraConfigs[0].cameraId)
+            // destination=0 : préserve exactement le comportement d'avant ce correctif tant
+            // qu'aucune lecture capteur d'orientation physique n'est encore arrivée (voir
+            // setPhysicalRotationDegrees, qui prendra le relais dès le premier événement).
+            cameraRotationDegrees = frontCameraRotationDegrees(sensorOrientationDegrees, 0)
 
             val config = Config(newSession)
             config.setAugmentedFaceMode(Config.AugmentedFaceMode.MESH3D)
@@ -413,11 +450,14 @@ class ArCoreHeadPoseTracker(
     /**
      * `Session#setDisplayGeometry()` -- jamais appelé avant ce correctif, cause confirmée sur
      * device (logcat utilisateur, 6 août 2026) du warning natif répété en continu "Display
-     * geometry has an invalid width: 0". Rotation fixée à [Surface.ROTATION_0] : l'app est
-     * verrouillée portrait (voir `AndroidManifest.xml`), pas besoin de lire la rotation
-     * d'affichage réelle -- même hypothèse déjà faite ailleurs dans l'app pour la matrice de
-     * rotation caméra de `CameraController` (voir revue technique, point 20, si ce verrouillage
-     * change un jour sur tablette).
+     * geometry has an invalid width: 0". Rotation fixée à [Surface.ROTATION_0] : ceci reflète la
+     * rotation de la *fenêtre* (verrouillage réel via `AndroidManifest.xml`, jamais remis en
+     * cause) -- **délibérément non touché** par le correctif de rotation caméra selon
+     * l'orientation *physique* (revue technique, points 1/15/20, voir [cameraRotationDegrees]/
+     * [setPhysicalRotationDegrees]) : deux axes indépendants, les découpler évite de toucher au
+     * mapping interne GL/texture d'ARCore. Si un aperçu caméra ARCore en direct est un jour
+     * construit (point 13, actuellement reporté), cette géométrie devra elle aussi devenir
+     * dynamique -- pas le cas aujourd'hui, aucun rendu de la texture caméra à l'écran.
      */
     private fun maybeSetDisplayGeometry() {
         val currentSession = session ?: return
