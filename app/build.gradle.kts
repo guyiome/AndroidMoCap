@@ -111,6 +111,10 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    // lifecycle-runtime-compose : uniquement pour androidx.lifecycle.compose.LocalLifecycleOwner
+    // (point 52, revue technique) -- androidx.compose.ui.platform.LocalLifecycleOwner est déprécié
+    // au profit de celui-ci depuis Compose 1.7/lifecycle 2.8.
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
 
