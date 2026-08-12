@@ -18,6 +18,4 @@ internal fun computeMeshOverlayVisible(
     faceMeshOverlayEnabled: Boolean,
     isPowerSaveActive: Boolean,
     keepMeshOverlayInPowerSave: Boolean,
-): Boolean {
-    return if (isPowerSaveActive) faceMeshOverlayEnabled && keepMeshOverlayInPowerSave else faceMeshOverlayEnabled
-}
+): Boolean = faceMeshOverlayEnabled && (!isPowerSaveActive || keepMeshOverlayInPowerSave)
