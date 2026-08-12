@@ -28,7 +28,6 @@ import com.guyiome.androidmocap.network.VTubeStudioSender
 import com.guyiome.androidmocap.network.VmcOscSender
 import com.guyiome.androidmocap.network.getLocalIpAddress
 import com.guyiome.androidmocap.sensors.DeviceOrientationTracker
-import com.guyiome.androidmocap.sensors.IconOrientationTracker
 import com.guyiome.androidmocap.settings.AppLanguage
 import com.guyiome.androidmocap.settings.AppSettingsStore
 import com.guyiome.androidmocap.settings.ConnectionSettingsStore
@@ -58,8 +57,6 @@ import com.guyiome.androidmocap.tracking.TongueEmbeddingClassification
 import com.guyiome.androidmocap.tracking.TongueOutDisplayState
 import com.guyiome.androidmocap.tracking.jawOpenGateOpen
 import com.guyiome.androidmocap.tracking.mouthGeometricGateOpen
-import com.guyiome.androidmocap.tracking.snapToRotationBucket
-import com.guyiome.androidmocap.tracking.surfaceRotationEquivalentDegrees
 import com.guyiome.androidmocap.tracking.mirrorFaceTrackingResult
 import com.guyiome.androidmocap.tracking.mouthCropRegion
 import com.guyiome.androidmocap.tracking.mouthOpennessRatio
@@ -345,15 +342,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // transmis au prochain VTubeStudioSender construit sans redemander le popup d'autorisation.
     @Volatile private var savedVtsAuthToken: String? = null
     private var deviceOrientationTracker: DeviceOrientationTracker? = null
-    // Rotation caméra selon l'orientation physique réelle du téléphone (revue technique, points
-    // 1/15/20) -- instance DÉDIÉE, séparée de celle de MainScreen (icônes du HUD) : ne pas partager
-    // pour ne pas inverser le sens de dépendance établi (l'UI lit MainUiState, elle n'alimente pas
-    // le ViewModel via un canal ad hoc). Léger coût accepté : deux écouteurs accéléromètre légers
-    // plutôt qu'un seul. Cycle de vie identique à deviceOrientationTracker (voir initializeTracking).
-    private var physicalOrientationTracker: IconOrientationTracker? = null
-    // Dédoublonnage -- évite de repousser inutilement la rotation aux deux contrôleurs caméra sur
-    // du simple bruit capteur (voir le callback dans initializeTracking()).
-    private var lastPushedRotationBucket: Int? = null
     private val connectionSettingsStore = ConnectionSettingsStore(application)
     private val appSettingsStore = AppSettingsStore(application)
     private val tongueCalibrationStore = TongueCalibrationStore(application.filesDir)
@@ -740,34 +728,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // à CameraController, dont le cycle de vie est déjà géré par CameraX via bindToLifecycle).
         val tracker = DeviceOrientationTracker(context)
         deviceOrientationTracker = tracker
-
-        // Rotation caméra selon l'orientation physique réelle (revue technique, points 1/15/20) --
-        // instance dédiée d'IconOrientationTracker (voir kdoc du champ), même cycle de vie que le
-        // tracker gyroscope ci-dessus. La conversion horaire (OrientationEventListener) -> anti-
-        // horaire (Surface.ROTATION_*) se fait une seule fois ici, jamais indépendamment dans
-        // chaque contrôleur caméra -- évite que l'un des deux se trompe de sens sans l'autre.
-        val orientationTracker = IconOrientationTracker(context) { raw ->
-            val bucket = snapToRotationBucket(raw)
-            if (bucket != lastPushedRotationBucket) {
-                lastPushedRotationBucket = bucket
-                val surfaceRotation = surfaceRotationEquivalentDegrees(bucket)
-                cameraController?.setPhysicalRotationDegrees(surfaceRotation)
-                arCoreHeadPoseTracker?.setPhysicalRotationDegrees(surfaceRotation)
-            }
-        }
-        physicalOrientationTracker = orientationTracker
-
         lifecycleOwner.lifecycle.addObserver(LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_START -> {
                     tracker.start()
-                    orientationTracker.enable()
                     arCoreHeadPoseTracker?.start()
                     startThermalPolling(context)
                 }
                 Lifecycle.Event.ON_STOP -> {
                     tracker.stop()
-                    orientationTracker.disable()
                     arCoreHeadPoseTracker?.stop()
                     thermalPollingJob?.cancel()
                 }
