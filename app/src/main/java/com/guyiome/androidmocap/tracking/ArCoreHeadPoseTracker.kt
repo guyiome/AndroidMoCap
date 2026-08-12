@@ -164,20 +164,15 @@ class ArCoreHeadPoseTracker(
     companion object {
         private const val TAG = "ArCoreHeadPoseTracker"
 
-        // Diagnostic ponctuel (12 août 2026), désormais conclu -- gardé désactivé au cas où un
-        // diagnostic similaire redevienne utile (même discipline que les autres flags de ce type
-        // dans le projet, ex. ROTATION_QUALITY_DIAGNOSTIC_LOGGING). Le fond caméra GL
-        // (maybeRotateBackgroundQuad, alors hold-independent -- aucune lecture capteur, juste
-        // cameraRotationDegrees) s'est révélé correct en portrait mais faux en paysage, sur le MÊME
-        // device et la MÊME session -- paradoxe logique résolu par ce log : cameraRotationDegrees,
-        // hasDisplayGeometryChanged(), les dimensions de surface et la sortie brute de
-        // transformCoordinates2d se sont révélés STRICTEMENT IDENTIQUES entre portrait et paysage
-        // (capture ~2,5 min couvrant les deux tenues) -- ARCore ne compense donc rien en interne,
-        // le rendu était bien hold-independent comme prévu. La vraie explication (voir kdoc de
-        // maybeRotateBackgroundQuad/physicalOrientationTracker) : contrairement au mesh, le fond
-        // montre le monde réel et a besoin d'une compensation dynamique que le mesh n'a jamais eu
-        // besoin d'avoir, pour une raison différente de celle déjà infirmée pour le mesh (point 52).
-        private const val BACKGROUND_ROTATION_DIAGNOSTIC_LOGGING = false
+        // Diagnostic ponctuel (12 août 2026) -- round 2. Round 1 (voir historique git) a confirmé
+        // qu'ARCore ne compense rien en interne (rendu hold-independent comme prévu) et a mené à
+        // l'ajout de physicalOrientationTracker/physicalHoldDegrees pour compenser dynamiquement
+        // (maybeRotateBackgroundQuad). Résultat sur device : PIRE qu'avant (paysage), miroir
+        // toujours invisible, rendu "bloqué en portrait", image déformée -- avant de deviner un 6e
+        // réglage à l'aveugle, ce round logue directement cameraRotationDegrees/physicalHoldDegrees/
+        // le backgroundQuadCoords final, pour vérifier concrètement si physicalOrientationTracker
+        // détecte bien un changement de palier en paysage et ce que le calcul en tire.
+        private const val BACKGROUND_ROTATION_DIAGNOSTIC_LOGGING = true
         private const val BACKGROUND_ROTATION_DIAG_TAG = "BackgroundRotationDiag"
 
         // Nombre de conversions YUV->Bitmap tolérées "en vol" (soumises à imageProcessingExecutor,
@@ -673,42 +668,25 @@ class ArCoreHeadPoseTracker(
     }
 
     /**
-     * Voir [BACKGROUND_ROTATION_DIAGNOSTIC_LOGGING] pour le contexte complet -- log throttlé
-     * (~1/s) de tout ce qui pourrait expliquer un résultat différent entre deux tenues physiques du
-     * téléphone sur la même session : [cameraRotationDegrees] (doit rester constant),
-     * `hasDisplayGeometryChanged()`, les dimensions de surface connues, et la sortie BRUTE de
-     * `transformCoordinates2d` -- recalculée ici uniquement pour ce log (buffer local, jamais
-     * réutilisé par [drawCameraBackground], qui n'appelle plus cette API depuis le commit
-     * précédent).
+     * Voir [BACKGROUND_ROTATION_DIAGNOSTIC_LOGGING] -- 2e round (12 août 2026, compensation
+     * dynamique de la tenue) : log throttlé (~1/s) de [cameraRotationDegrees], [physicalHoldDegrees]
+     * (palier détecté par [physicalOrientationTracker]) et le [backgroundQuadCoords] final
+     * (4 sommets) réellement utilisé pour le dessin -- pour vérifier concrètement si le capteur
+     * signale bien un changement de palier en paysage, et ce que le calcul en tire.
      */
-    private fun logBackgroundRotationDiagnosticIfDue(frame: com.google.ar.core.Frame) {
+    private fun logBackgroundRotationDiagnosticIfDue() {
         val nowElapsed = SystemClock.elapsedRealtime()
         if (nowElapsed - lastBackgroundDiagLogElapsedMs < 1000L) return
         lastBackgroundDiagLogElapsedMs = nowElapsed
 
-        val identityCorners = directFloatBuffer(floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f))
-        val rawUv = directFloatBuffer(FloatArray(8))
-        val transformOk = try {
-            frame.transformCoordinates2d(
-                com.google.ar.core.Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
-                identityCorners,
-                com.google.ar.core.Coordinates2d.TEXTURE_NORMALIZED,
-                rawUv,
-            )
-            true
-        } catch (e: Exception) {
-            AppLog.w(BACKGROUND_ROTATION_DIAG_TAG, "transformCoordinates2d a échoué", e)
-            false
-        }
-        val uvString = if (transformOk) {
-            (0 until 4).joinToString(" ") { i -> "(%.2f,%.2f)".format(rawUv.get(i * 2), rawUv.get(i * 2 + 1)) }
-        } else {
-            "N/A"
+        val quadString = (0 until 4).joinToString(" ") { i ->
+            "(%.2f,%.2f)".format(backgroundQuadCoords.get(i * 2), backgroundQuadCoords.get(i * 2 + 1))
         }
         AppLog.d(
             BACKGROUND_ROTATION_DIAG_TAG,
-            "cameraRotationDegrees=$cameraRotationDegrees hasDisplayGeometryChanged=${frame.hasDisplayGeometryChanged()} " +
-                "surface=${lastKnownSurfaceWidth}x$lastKnownSurfaceHeight rawTransformUv[v0,v1,v2,v3]=$uvString",
+            "cameraRotationDegrees=$cameraRotationDegrees physicalHoldDegrees=$physicalHoldDegrees " +
+                "totalDegrees=${cameraRotationDegrees + physicalHoldDegrees} " +
+                "surface=${lastKnownSurfaceWidth}x$lastKnownSurfaceHeight backgroundQuadCoords[v0,v1,v2,v3]=$quadString",
         )
     }
 
@@ -780,7 +758,7 @@ class ArCoreHeadPoseTracker(
         }
 
         if (BACKGROUND_ROTATION_DIAGNOSTIC_LOGGING) {
-            logBackgroundRotationDiagnosticIfDue(frame)
+            logBackgroundRotationDiagnosticIfDue()
         }
 
         // Dessiné à chaque onDrawFrame, pas soumis au throttle targetFps ci-dessous -- la texture
