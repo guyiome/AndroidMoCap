@@ -45,6 +45,7 @@ import com.guyiome.androidmocap.sensors.BatteryMonitor
 import com.guyiome.androidmocap.sensors.IconOrientationTracker
 import com.guyiome.androidmocap.tracking.EyeLandmarkIndices
 import com.guyiome.androidmocap.tracking.eyeAspectRatioFromLandmarks
+import com.guyiome.androidmocap.tracking.snapToRotationBucket
 
 /**
  * Écran unique de l'app : preview caméra pleine page + bandeau d'icônes minimal ([MainHud]) +
@@ -89,10 +90,16 @@ fun MainScreen(
     var isCharging by remember { mutableStateOf(true) }
 
     // Panneau blendshapes : pas de rotation continue (illisible pendant la transition), juste un
-    // pas de 90° selon que le téléphone est tenu à la verticale ou à l'horizontale.
-    val panelRotationDegrees = when {
-        iconRotationDegrees in 45f..135f -> -90f
-        iconRotationDegrees in 225f..315f -> 90f
+    // pas de 90° selon que le téléphone est tenu à la verticale ou à l'horizontale. Délègue à
+    // snapToRotationBucket() (tracking/CameraOrientation.kt) plutôt qu'à une logique ad hoc locale --
+    // l'ancienne version avait un trou (135°-225°, tête en bas, tombait à tort sur 0f au lieu de
+    // 180f), corrigé en même temps que le correctif de rotation caméra (revue technique, points
+    // 1/15/20). Reste en convention brute OrientationEventListener (horaire) -- rotation cosmétique
+    // Compose, sans rapport avec la convention Surface.ROTATION_* utilisée côté caméra.
+    val panelRotationDegrees = when (snapToRotationBucket(iconRotationDegrees.toInt())) {
+        90 -> -90f
+        270 -> 90f
+        180 -> 180f
         else -> 0f
     }
 
