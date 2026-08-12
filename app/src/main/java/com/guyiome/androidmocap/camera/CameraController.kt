@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.os.SystemClock
 import android.util.Size
+import android.view.Surface
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -145,6 +146,28 @@ class CameraController(
     }
 
     /**
+     * Rotation caméra selon l'orientation physique réelle du téléphone (revue technique, points
+     * 1/15/20) -- ajusté à chaud depuis `MainViewModel` (même patron que [setTargetFps], poussé
+     * depuis un `IconOrientationTracker` dédié) au lieu d'être figé au bind initial. [rotation] doit
+     * déjà être en convention `Surface.ROTATION_*` (sortie de
+     * `CameraOrientation.surfaceRotationEquivalentDegrees()`, pas un palier brut de
+     * `snapToRotationBucket()`) -- lookup nommé plutôt qu'arithmétique, `Surface.ROTATION_0/90/180/270`
+     * sont des index 0-3, pas des valeurs en degrés. CameraX recalcule `imageInfo.rotationDegrees`
+     * de lui-même dès que `targetRotation` change (prochaine frame, aucun rebind requis) -- aucun
+     * autre changement nécessaire côté [processFrame]/[rotatedDimensions], qui consomment déjà
+     * correctement la valeur mise à jour.
+     */
+    fun setPhysicalRotationDegrees(surfaceRotationEquivalentDegrees: Int) {
+        val rotation = when (surfaceRotationEquivalentDegrees) {
+            90 -> Surface.ROTATION_90
+            180 -> Surface.ROTATION_180
+            270 -> Surface.ROTATION_270
+            else -> Surface.ROTATION_0
+        }
+        imageAnalysis?.targetRotation = rotation
+    }
+
+    /**
      * Active/désactive l'usage caméra "Preview" à chaud, sans jamais toucher à "ImageAnalysis"
      * (voir commentaire sur les champs ci-dessus) -- le tracking ne connaît donc aucune coupure
      * ni gel pendant la transition.
@@ -171,6 +194,10 @@ class CameraController(
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .setResolutionSelector(resolutionSelector)
+            // Valeur explicite plutôt qu'implicite -- corrigée dès qu'une vraie lecture capteur
+            // arrive via setPhysicalRotationDegrees() (voir sa doc). Transitoire portrait acceptée
+            // le temps que le premier événement d'orientation arrive après le démarrage.
+            .setTargetRotation(Surface.ROTATION_0)
             .build()
             .also { it.setAnalyzer(cameraExecutor) { imageProxy -> processFrame(imageProxy) } }
 
