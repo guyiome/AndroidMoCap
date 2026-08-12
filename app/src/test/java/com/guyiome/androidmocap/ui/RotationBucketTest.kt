@@ -1,10 +1,10 @@
-package com.guyiome.androidmocap.tracking
+package com.guyiome.androidmocap.ui
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /** Couvre [snapToRotationBucket] -- pur, testable en JVM. */
-class CameraOrientationTest {
+class RotationBucketTest {
 
     @Test
     fun `snapToRotationBucket -- palier 0, bornes basses`() {
