@@ -33,6 +33,8 @@ import com.google.mediapipe.framework.image.MPImage
 import com.guyiome.androidmocap.camera.CameraController
 import com.guyiome.androidmocap.logging.AppLog
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.FloatBuffer
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
@@ -130,9 +132,11 @@ import javax.microedition.khronos.opengles.GL10
  * place de `FaceLandmarkerResult#facialTransformationMatrixes()`).
  *
  * Nécessite un contexte GL pour exister (contrainte ARCore, pas un choix) : piloté par un
- * [GLSurfaceView] hébergé côté Compose via [attachTo] -- rien n'y est dessiné visuellement pour
- * l'instant (l'aperçu de ce palier est l'overlay du mesh de tracking existant, voir
- * `AndroidMoCap_revue_technique.md` point 13 pour la discussion sur l'aperçu caméra live, reportée).
+ * [GLSurfaceView] hébergé côté Compose via [attachTo]. Ce contexte GL sert aussi à afficher un fond
+ * caméra live (quad plein écran texturé, [drawCameraBackground]) -- réutilise directement la
+ * texture OES qu'ARCore alimente déjà via `Session#setCameraTextureName` pour piloter le tracking,
+ * jamais échantillonnée par notre propre code avant ce correctif (voir
+ * `AndroidMoCap_revue_technique.md` point 13, discussion sur l'aperçu caméra live de ce palier).
  */
 class ArCoreHeadPoseTracker(
     private val context: Context,
@@ -227,6 +231,84 @@ class ArCoreHeadPoseTracker(
     // par multiples de 90°, aucun intérêt à lisser).
     private val rotationPaint = Paint().apply { isFilterBitmap = false }
 
+    // --- Fond caméra live : quad plein écran texturé avec la texture OES qu'ARCore alimente déjà
+    // via setCameraTextureName (voir cameraTextureId/maybeBindCameraTexture ci-dessus) -- jusqu'ici
+    // jamais échantillonnée par notre propre code. Aucun pattern GL existant ailleurs dans ce repo
+    // (ni shader, ni VBO) : implémentation reprise du pattern de référence Google
+    // (`BackgroundRenderer.java`, sample ARCore), adaptée au style de ce fichier. Voir revue
+    // technique, point 13 (discussion initiale sur l'aperçu caméra live de ce palier, reportée) et
+    // point 52 (rotation caméra fixe confirmée correcte dans toutes les orientations testées --
+    // rien ici ne dépend d'une rotation dynamique, même hypothèse que maybeSetDisplayGeometry). ---
+
+    private var backgroundProgram: Int = 0
+    private var backgroundPositionAttrib: Int = 0
+    private var backgroundTexCoordAttrib: Int = 0
+    private var backgroundTextureUniform: Int = 0
+
+    // Quad plein écran en NDC (-1..1), dessiné en GL_TRIANGLE_STRIP (ordre : bas-gauche, bas-droite,
+    // haut-gauche, haut-droite) -- jamais modifié après création, sert de a_Position.
+    private val backgroundQuadCoords = directFloatBuffer(
+        floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f),
+    )
+
+    // Même quad mais X négé -- sert UNIQUEMENT de tableau source à transformCoordinates2d
+    // (updateBackgroundTexCoordsIfNeeded) pour obtenir un fond mirroré. Miroir appliqué côté écran
+    // (même principe que LandmarkProjection.toScreenPoint(mirror=true), utilisé par
+    // FaceMeshOverlay pour rester cohérent avec PreviewView qui mirrore automatiquement la caméra
+    // frontale), pas côté texture : transformCoordinates2d gère en interne la rotation
+    // caméra->écran (posée via setDisplayGeometry) -- mirrorer l'UV en sortie serait faux si cette
+    // rotation inclut un échange d'axes (90°/270°), même piège que les rotations/miroirs déjà
+    // rencontrés dans ce projet (revue technique points 27/51/52). À vérifier sur device (pas
+    // supposé correct du premier coup) : si le fond apparaît mirroré à l'envers par rapport au
+    // mesh, échanger lequel des deux tableaux (celui-ci vs backgroundQuadCoords) porte le X négé --
+    // pas revenir à un flip de l'UV en sortie.
+    private val backgroundQuadCoordsForUvLookup = directFloatBuffer(
+        floatArrayOf(1f, -1f, -1f, -1f, 1f, 1f, -1f, 1f),
+    )
+
+    // Recalculées uniquement quand la géométrie d'affichage change (Frame.hasDisplayGeometryChanged(),
+    // présent depuis longtemps dans le SDK ARCore -- confirmé disponible en 1.54.0, version utilisée
+    // ici) -- évite de refaire ce calcul à chaque frame alors qu'onDrawFrame tourne en continu
+    // (RENDERMODE_CONTINUOUSLY) pour un résultat qui ne change qu'au premier appel ou en cas de
+    // rotation d'écran (setDisplayGeometry vient d'être reposé, voir maybeSetDisplayGeometry).
+    private var backgroundTexCoords: FloatBuffer = directFloatBuffer(FloatArray(8))
+    private var backgroundTexCoordsInitialized = false
+
+    // Coupe le dessin du fond sans toucher au reste du pipeline ARCore (session.update(), pose,
+    // blendshapes continuent de tourner) -- utilisé en mode éco, même principe que
+    // CameraController.previewEnabled/setPreviewEnabled. Actif par défaut, même défaut que
+    // previewEnabled.
+    @Volatile private var backgroundRenderingEnabled: Boolean = true
+
+    private val backgroundVertexShader = """
+        attribute vec4 a_Position;
+        attribute vec2 a_TexCoord;
+        varying vec2 v_TexCoord;
+        void main() {
+            gl_Position = a_Position;
+            v_TexCoord = a_TexCoord;
+        }
+    """.trimIndent()
+
+    // samplerExternalOES : seul type d'échantillonneur valide pour une texture OES (celle qu'ARCore
+    // alimente via setCameraTextureName) -- nécessite l'extension GL_OES_EGL_image_external, sans
+    // quoi le shader échoue à la compilation sur la plupart des GPU Android.
+    private val backgroundFragmentShader = """
+        #extension GL_OES_EGL_image_external : require
+        precision mediump float;
+        varying vec2 v_TexCoord;
+        uniform samplerExternalOES sTexture;
+        void main() {
+            gl_FragColor = texture2D(sTexture, v_TexCoord);
+        }
+    """.trimIndent()
+
+    private fun directFloatBuffer(values: FloatArray): FloatBuffer =
+        ByteBuffer.allocateDirect(values.size * 4)
+            .order(ByteOrder.nativeOrder())
+            .asFloatBuffer()
+            .apply { put(values); position(0) }
+
     /**
      * À appeler avec le [GLSurfaceView] hébergé côté Compose (voir `MainScreen`). Requis par ARCore
      * (la caméra ne peut être pilotée que via une texture GL, voir `Session#setCameraTextureName`),
@@ -249,6 +331,16 @@ class ArCoreHeadPoseTracker(
     fun setTargetFps(fps: Int) {
         targetFps = fps.coerceAtLeast(1)
         minFrameIntervalMs = 1000L / targetFps
+    }
+
+    /**
+     * Active/désactive le dessin du fond caméra à chaud -- pendant du mode éco, même principe que
+     * `CameraController.setPreviewEnabled`. `session.update()` et le reste du pipeline (pose,
+     * blendshapes) continuent de tourner : seul le draw call du quad ([drawCameraBackground]) est
+     * sauté.
+     */
+    fun setBackgroundRenderingEnabled(enabled: Boolean) {
+        backgroundRenderingEnabled = enabled
     }
 
     /** À appeler sur ON_START (voir `MainViewModel.initializeTracking`). */
@@ -425,6 +517,89 @@ class ArCoreHeadPoseTracker(
         currentSession.setDisplayGeometry(Surface.ROTATION_0, lastKnownSurfaceWidth, lastKnownSurfaceHeight)
     }
 
+    /**
+     * Compile et lie le programme GL du fond caméra ([backgroundVertexShader]/
+     * [backgroundFragmentShader]) -- une seule fois par surface GL créée ([onSurfaceCreated]),
+     * jamais recompilé ensuite. Échec de compilation/liaison journalisé puis le fond reste
+     * simplement non dessiné ([backgroundProgram] reste à 0, voir [drawCameraBackground]) plutôt
+     * que de planter tout le renderer -- même philosophie de repli silencieux que
+     * [maybeBindCameraTexture].
+     */
+    private fun setupBackgroundProgram() {
+        val vertexShader = compileShader(GLES20.GL_VERTEX_SHADER, backgroundVertexShader)
+        val fragmentShader = compileShader(GLES20.GL_FRAGMENT_SHADER, backgroundFragmentShader)
+        if (vertexShader == 0 || fragmentShader == 0) return
+
+        val program = GLES20.glCreateProgram()
+        GLES20.glAttachShader(program, vertexShader)
+        GLES20.glAttachShader(program, fragmentShader)
+        GLES20.glLinkProgram(program)
+
+        val linkStatus = IntArray(1)
+        GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linkStatus, 0)
+        if (linkStatus[0] != GLES20.GL_TRUE) {
+            AppLog.e(TAG, "Échec de liaison du programme GL du fond caméra : ${GLES20.glGetProgramInfoLog(program)}")
+            GLES20.glDeleteProgram(program)
+            return
+        }
+
+        backgroundProgram = program
+        backgroundPositionAttrib = GLES20.glGetAttribLocation(program, "a_Position")
+        backgroundTexCoordAttrib = GLES20.glGetAttribLocation(program, "a_TexCoord")
+        backgroundTextureUniform = GLES20.glGetUniformLocation(program, "sTexture")
+    }
+
+    private fun compileShader(type: Int, source: String): Int {
+        val shader = GLES20.glCreateShader(type)
+        GLES20.glShaderSource(shader, source)
+        GLES20.glCompileShader(shader)
+        val compileStatus = IntArray(1)
+        GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
+        if (compileStatus[0] != GLES20.GL_TRUE) {
+            AppLog.e(TAG, "Échec de compilation du shader fond caméra (type=$type) : ${GLES20.glGetShaderInfoLog(shader)}")
+            GLES20.glDeleteShader(shader)
+            return 0
+        }
+        return shader
+    }
+
+    /**
+     * Recalcule [backgroundTexCoords] uniquement quand la géométrie d'affichage a changé
+     * (`Frame#hasDisplayGeometryChanged()`) -- évite de refaire ce calcul à chaque frame alors
+     * qu'[onDrawFrame] tourne en continu (RENDERMODE_CONTINUOUSLY) pour un résultat qui ne change
+     * qu'au premier appel ou en cas de rotation d'écran (setDisplayGeometry vient d'être reposé,
+     * voir [maybeSetDisplayGeometry]).
+     */
+    private fun updateBackgroundTexCoordsIfNeeded(frame: com.google.ar.core.Frame) {
+        if (backgroundTexCoordsInitialized && !frame.hasDisplayGeometryChanged()) return
+        frame.transformCoordinates2d(
+            com.google.ar.core.Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
+            backgroundQuadCoordsForUvLookup,
+            com.google.ar.core.Coordinates2d.TEXTURE_NORMALIZED,
+            backgroundTexCoords,
+        )
+        backgroundTexCoordsInitialized = true
+    }
+
+    private fun drawCameraBackground() {
+        if (backgroundProgram == 0) return // compilation/liaison a échoué, voir setupBackgroundProgram
+        GLES20.glUseProgram(backgroundProgram)
+
+        GLES20.glVertexAttribPointer(backgroundPositionAttrib, 2, GLES20.GL_FLOAT, false, 0, backgroundQuadCoords)
+        GLES20.glEnableVertexAttribArray(backgroundPositionAttrib)
+        GLES20.glVertexAttribPointer(backgroundTexCoordAttrib, 2, GLES20.GL_FLOAT, false, 0, backgroundTexCoords)
+        GLES20.glEnableVertexAttribArray(backgroundTexCoordAttrib)
+
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, cameraTextureId)
+        GLES20.glUniform1i(backgroundTextureUniform, 0)
+
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+
+        GLES20.glDisableVertexAttribArray(backgroundPositionAttrib)
+        GLES20.glDisableVertexAttribArray(backgroundTexCoordAttrib)
+    }
+
     // --- GLSurfaceView.Renderer : appelé depuis le thread GL dédié créé par GLSurfaceView, donc
     // TOUJOURS différent du thread principal -- même situation déjà gérée ailleurs dans l'app
     // (FaceLandmarkerHelper.onLiveStreamResult tourne aussi sur son propre thread de callback),
@@ -440,6 +615,7 @@ class ArCoreHeadPoseTracker(
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
         maybeBindCameraTexture()
+        setupBackgroundProgram()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -469,6 +645,14 @@ class ArCoreHeadPoseTracker(
             // GLSurfaceView.onPause() avant session.pause() dans stop() réduit déjà la fréquence
             // de ce cas, sans l'éliminer totalement (course intrinsèque, pas garantie par l'API).
             return
+        }
+
+        // Dessiné à chaque onDrawFrame, pas soumis au throttle targetFps ci-dessous -- la texture
+        // OES vient d'être rafraîchie par session.update() ci-dessus, donc toujours à jour ici (le
+        // throttle ne gère que le travail EN AVAL, emitCameraImage/emitHeadPose, voir plus haut).
+        if (backgroundRenderingEnabled) {
+            updateBackgroundTexCoordsIfNeeded(frame)
+            drawCameraBackground()
         }
 
         val nowElapsed = SystemClock.elapsedRealtime()
