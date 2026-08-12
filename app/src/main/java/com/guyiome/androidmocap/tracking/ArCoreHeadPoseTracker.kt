@@ -44,85 +44,24 @@ import javax.microedition.khronos.opengles.GL10
 /**
  * Source caméra + pose de tête alternative pour le palier [TrackingTier.OPTIMAL], basée sur ARCore
  * Augmented Faces plutôt que CameraX -- voir `AndroidMoCap_revue_technique.md` point 13 pour le
- * contexte complet.
+ * contexte complet et l'historique détaillé des correctifs qui ont mené à l'état actuel (format
+ * d'image ARCore/crash `MediaImageBuilder`, déport de la conversion YUV->RGB sur
+ * [imageProcessingExecutor], fuite de ressource dans [tryCreateSession], rotation caméra) --
+ * volontairement pas reproduit ici en détail (revue de code du 12 août 2026 : ce kdoc avait
+ * accumulé un historique d'incidents trop long à parcourir avant d'atteindre le comportement
+ * actuel). L'ordre `onPause()`/`session.pause()` dans [stop] a sa propre justification détaillée
+ * sur place (crash confirmé sur device, voir son kdoc) -- pas dupliqué ici non plus.
  *
- * ⚠️ Écrit sans accès à un appareil/émulateur pour compiler ou exécuter ce fichier (contrainte de
- * cette session) -- voir `AndroidMoCap_tests_unitaires.md` pour la liste précise de ce qui est
- * vérifié (rien, ici, au-delà de la relecture attentive) et des points les plus susceptibles de
- * demander un ajustement au premier build/run réel : le nom exact et la signature de
- * [MediaImageBuilder] (classe MediaPipe supposée exister pour construire un [MPImage] directement
- * depuis un `android.media.Image`, jamais exercée dans ce projet avant ce commit) -- **confirmé
- * identique dans MediaPipe 1.0.0 par décompilation `javap` lors de l'intégration de ce fichier dans
- * `main` (6 août 2026), donc plus un point d'incertitude** --, et l'ordre exact des appels ARCore
- * (sélection de la configuration caméra frontale, liaison de la texture GL, `resume()`) qui suit la
- * séquence documentée dans les échantillons officiels ARCore mais n'a pas été rejouée ici.
- *
- * ⚠️ **Crash confirmé sur device (6 août 2026) et corrigé** : `frame.acquireCameraImage()` renvoie
- * toujours du YUV_420_888 côté ARCore (pas d'option de config, contrairement à CameraX/
- * `ImageAnalysis` qui peut demander du RGBA directement, voir `CameraController`) -- passer ça tel
- * quel à `MediaImageBuilder` faisait planter MediaPipe (`AndroidPacketCreator.createImage` :
- * `UnsupportedOperationException: Android media image must use RGBA_8888 config`) dès la première
- * frame. [emitCameraImage] convertit maintenant manuellement en `Bitmap` ARGB_8888
- * ([yuv420ToBitmap], conversion BT.601 standard) avant de construire le [MPImage] via
- * `BitmapImageBuilder`, même format que celui produit par `CameraController`. Conséquence
- * secondaire : plus besoin de garder l'`Image` ARCore ouverte au-delà de cette conversion
- * synchrone, `releaseFrame()` n'a donc plus rien à fermer (voir sa doc) -- simplification par
- * rapport à la version d'origine, qui suivait les images en vol par timestamp.
- *
- * ⚠️ **Perf, corrigé (6 août 2026)** : la conversion YUV->RGB + rotation ([yuv420ToBitmap],
- * [rotateBitmap]) est déportée sur [imageProcessingExecutor] (thread dédié) plutôt que de tourner
- * en synchrone sur le thread GL ([onDrawFrame]) -- confirmé sur device (retour utilisateur) que ça
- * ralentissait à la fois le rendu et la cadence de `session.update()`. Contre-pression explicite
- * ([pendingConversions]/[MAX_PENDING_CONVERSIONS]) : une frame est abandonnée plutôt que mise en
- * file si le thread dédié a du retard -- priorité explicite de l'utilisateur aux données envoyées
- * au récepteur (fluides, à jour) plutôt qu'au traitement exhaustif de chaque frame caméra.
- * [yuv420ToBitmap] alloue toujours un nouveau `Bitmap` par frame (pas de pool de réutilisation
- * comme `CameraController.acquirePooledBitmap`) -- optimisation restante si nécessaire, non
- * prioritaire vu le gain déjà obtenu par le déport de thread.
- *
- * ⚠️ **Crash confirmé sur device (6 août 2026) et corrigé** : `FATAL EXCEPTION` sur le thread GL,
- * `SessionPausedException` levée par `Session.update()` dans [onDrawFrame]. Cause : le thread de
- * rendu du [GLSurfaceView] n'était jamais mis en pause avec le cycle de vie de l'app -- seule la
- * `Session` ARCore l'était ([stop]) -- donc [onDrawFrame] continuait d'appeler `session.update()`
- * après que la session ait déjà été mise en pause (ex. app passée en arrière-plan). Corrigé :
- * [glSurfaceView] mémorisé (pas seulement reçu en paramètre transitoire de [attachTo]) pour piloter
- * son cycle de vie (`onResume()`/`onPause()`) en même temps que celui de la `Session`, avec un
- * ordre précis dans [stop] (voir sa doc) pour éliminer la course. Filet de sécurité additionnel
- * dans [onDrawFrame] (`catch (SessionPausedException)`) au cas où la course subsisterait malgré
- * tout (pas garantie éliminée à 100%, l'API ne le garantit pas).
- *
- * ⚠️ **Rotation, corrigée (6 août 2026)** : [cameraRotationDegrees] (lu via Camera2
- * `CameraCharacteristics.SENSOR_ORIENTATION`, voir [readCameraSensorOrientation]) est appliqué à
- * l'image avant conversion -- confirmé nécessaire et fonctionnel sur device (retour utilisateur :
- * tracking correctement orienté après ce correctif, latence perçue également améliorée).
- *
- * ⚠️ **Warning natif `aimatter_landmarks_3Dmesh.cc: Not able to find preprocess rotation with
- * expected timestamp`, confirmé spécifique à cette classe (6 août 2026, capture logcat continue
- * couvrant un aller-retour `STANDARD` → `OPTIMAL` sur le même appareil, via le sélecteur de palier
- * de `DiagnosticsScreen`)** : **absent à 100% en `STANDARD`** (CameraX, aucune occurrence sur toute
- * la session), **présent en continu dès la première frame en `OPTIMAL`** -- ce n'est donc ni un
- * comportement préexistant de la lib ni lié à l'absence de rotation (hypothèse initiale, infirmée
- * précédemment) : quelque chose de propre à ce fichier. Tracking reste fonctionnel malgré ce
- * warning, donc vraisemblablement sans impact sur la justesse du résultat, mais pas vérifié plus
- * finement (précision landmark par landmark) que par observation qualitative.
- *
- * Piste la plus probable, non confirmée : [emitCameraImage] génère `frameTimeMs` (`SystemClock.
- * uptimeMillis()`) *après* la conversion asynchrone sur [imageProcessingExecutor], donc décalé par
- * rapport à l'instant réel de capture -- contrairement à `CameraController`, qui appelle
- * `detectAsync` de façon synchrone sur son propre thread caméra dédié, sans ce délai variable.
- * Un mécanisme interne à MediaPipe/aimatter qui s'attend à un timestamp cohérent avec le rythme de
- * capture réel pourrait expliquer un "cache miss" systématique ici. Reste à vérifier avant de
- * corriger : ne pas déplacer la génération du timestamp à l'aveugle sans confirmer cette hypothèse
- * (ex. logger la valeur réelle passée à `detectAsync` et la comparer au timestamp du message natif).
- *
- * ⚠️ **Fuite de ressource, corrigée (7 août 2026, relecture globale post-intégration)** :
- * [tryCreateSession] pouvait laisser fuir la `Session` ARCore native si une étape après
- * `Session(context)` échouait (`getSupportedCameraConfigs`/`setCameraConfig`/`configure()`) --
- * seul le chemin "pas de config caméra frontale" fermait explicitement en cas d'échec. Le `catch`
- * générique ferme désormais `newSession` s'il a été créé. Fuite distincte, également corrigée le
- * même jour côté appelant : `MainViewModel` ne fermait pas cette instance avant de l'abandonner
- * sur repli `onUnavailable`, laissant tourner [imageProcessingExecutor] pour rien le reste de la
- * session.
+ * ⚠️ **Encore ouvert, non résolu** : un warning natif MediaPipe
+ * (`aimatter_landmarks_3Dmesh.cc: Not able to find preprocess rotation with expected timestamp`)
+ * apparaît en continu sur ce palier, absent sur `STANDARD` (CameraX) -- tracking reste fonctionnel
+ * malgré ce warning (pas de dégradation qualitative observée que par examen visuel). Piste la plus
+ * probable, non confirmée : [emitCameraImage] génère `frameTimeMs` après la conversion asynchrone
+ * sur [imageProcessingExecutor], donc décalé par rapport à l'instant réel de capture --
+ * contrairement à `CameraController`, qui appelle `detectAsync` de façon synchrone sur son propre
+ * thread caméra dédié. Ne pas déplacer la génération du timestamp à l'aveugle sans confirmer cette
+ * hypothèse en premier (ex. logger la valeur réelle passée à `detectAsync` et la comparer au
+ * timestamp du message natif).
  *
  * Raison d'être : ARCore Augmented Faces gère lui-même la capture caméra frontale en interne (via
  * `Session#setCameraTextureName`, qui nécessite un contexte GL) -- il ne peut donc pas cohabiter
