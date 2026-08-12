@@ -251,26 +251,35 @@ class ArCoreHeadPoseTracker(
         floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f),
     )
 
-    // Même quad mais X négé -- sert UNIQUEMENT de tableau source à transformCoordinates2d
-    // (updateBackgroundTexCoordsIfNeeded) pour obtenir un fond mirroré. Miroir appliqué côté écran
-    // (même principe que LandmarkProjection.toScreenPoint(mirror=true), utilisé par
-    // FaceMeshOverlay pour rester cohérent avec PreviewView qui mirrore automatiquement la caméra
-    // frontale), pas côté texture : transformCoordinates2d gère en interne la rotation
-    // caméra->écran (posée via setDisplayGeometry) -- mirrorer l'UV en sortie serait faux si cette
-    // rotation inclut un échange d'axes (90°/270°), même piège que les rotations/miroirs déjà
-    // rencontrés dans ce projet (revue technique points 27/51/52). À vérifier sur device (pas
-    // supposé correct du premier coup) : si le fond apparaît mirroré à l'envers par rapport au
-    // mesh, échanger lequel des deux tableaux (celui-ci vs backgroundQuadCoords) porte le X négé --
-    // pas revenir à un flip de l'UV en sortie.
-    private val backgroundQuadCoordsForUvLookup = directFloatBuffer(
-        floatArrayOf(1f, -1f, -1f, -1f, 1f, 1f, -1f, 1f),
-    )
+    // Buffer intermédiaire : reçoit les UV "brutes" telles que calculées par transformCoordinates2d
+    // à partir de backgroundQuadCoords SANS modification -- jamais lu directement pour le dessin
+    // (voir updateBackgroundTexCoordsIfNeeded, qui les recopie permutées dans backgroundTexCoords
+    // ci-dessous).
+    private var backgroundRawTexCoords: FloatBuffer = directFloatBuffer(FloatArray(8))
 
-    // Recalculées uniquement quand la géométrie d'affichage change (Frame.hasDisplayGeometryChanged(),
-    // présent depuis longtemps dans le SDK ARCore -- confirmé disponible en 1.54.0, version utilisée
-    // ici) -- évite de refaire ce calcul à chaque frame alors qu'onDrawFrame tourne en continu
+    // UV effectivement utilisées pour le dessin (glVertexAttribPointer). Recalculées uniquement
+    // quand la géométrie d'affichage change (Frame.hasDisplayGeometryChanged(), présent depuis
+    // longtemps dans le SDK ARCore -- confirmé disponible en 1.54.0, version utilisée ici) -- évite
+    // de refaire ce calcul à chaque frame alors qu'onDrawFrame tourne en continu
     // (RENDERMODE_CONTINUOUSLY) pour un résultat qui ne change qu'au premier appel ou en cas de
     // rotation d'écran (setDisplayGeometry vient d'être reposé, voir maybeSetDisplayGeometry).
+    //
+    // **Miroir horizontal, corrigé sur device (12 août 2026)** : la première version demandait à
+    // transformCoordinates2d d'évaluer directement un quad de sommets à X négé (comme "source"),
+    // en supposant que mirrorer l'entrée suffirait à mirrorer la sortie -- confirmé faux sur device
+    // (fond affiché tourné à 180°, pas simplement mirroré). Cause : la transformation caméra->écran
+    // qu'ARCore calcule en interne (rotation liée à setDisplayGeometry) ne commute pas avec un
+    // miroir quand elle inclut un échange d'axes (90°/270°) -- mirrorer AVANT de faire évaluer la
+    // rotation par l'API donne un résultat différent (ici : décalé de 180° supplémentaires) que
+    // mirorer APRÈS. Corrigé en éliminant cette composition : transformCoordinates2d n'est appelé
+    // qu'avec le quad réel non mirroré ([backgroundQuadCoords], comme le sample officiel Google) --
+    // les 4 UV obtenues sont donc, par construction, correctes et non mirrorées. Le miroir est
+    // ensuite appliqué par une simple permutation des 4 valeurs déjà calculées (sommets 0<->1, la
+    // paire du bas, et 2<->3, la paire du haut -- géométriquement opposés en X dans
+    // backgroundQuadCoords), qui ne redemande jamais rien à l'API : insensible à toute rotation
+    // qu'elle applique en interne. Même principe que LandmarkProjection.toScreenPoint(mirror=true)
+    // (utilisé par FaceMeshOverlay pour rester cohérent avec PreviewView, qui mirrore
+    // automatiquement la caméra frontale) : mirrorer côté écran, pas dans l'image/texture source.
     private var backgroundTexCoords: FloatBuffer = directFloatBuffer(FloatArray(8))
     private var backgroundTexCoordsInitialized = false
 
@@ -568,16 +577,29 @@ class ArCoreHeadPoseTracker(
      * (`Frame#hasDisplayGeometryChanged()`) -- évite de refaire ce calcul à chaque frame alors
      * qu'[onDrawFrame] tourne en continu (RENDERMODE_CONTINUOUSLY) pour un résultat qui ne change
      * qu'au premier appel ou en cas de rotation d'écran (setDisplayGeometry vient d'être reposé,
-     * voir [maybeSetDisplayGeometry]).
+     * voir [maybeSetDisplayGeometry]). Voir le kdoc de [backgroundTexCoords] pour l'historique du
+     * correctif miroir (12 août 2026, fond affiché à 180° avant correction).
      */
     private fun updateBackgroundTexCoordsIfNeeded(frame: com.google.ar.core.Frame) {
         if (backgroundTexCoordsInitialized && !frame.hasDisplayGeometryChanged()) return
         frame.transformCoordinates2d(
             com.google.ar.core.Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
-            backgroundQuadCoordsForUvLookup,
+            backgroundQuadCoords,
             com.google.ar.core.Coordinates2d.TEXTURE_NORMALIZED,
-            backgroundTexCoords,
+            backgroundRawTexCoords,
         )
+        // Miroir horizontal par permutation des 4 UV déjà correctes (sommets 0<->1, paire du bas ;
+        // 2<->3, paire du haut) -- voir kdoc de backgroundTexCoords pour pourquoi ceci remplace
+        // l'ancienne approche (mirrorer le tableau source passé à transformCoordinates2d).
+        val raw = backgroundRawTexCoords
+        backgroundTexCoords.put(0, raw.get(2))
+        backgroundTexCoords.put(1, raw.get(3))
+        backgroundTexCoords.put(2, raw.get(0))
+        backgroundTexCoords.put(3, raw.get(1))
+        backgroundTexCoords.put(4, raw.get(6))
+        backgroundTexCoords.put(5, raw.get(7))
+        backgroundTexCoords.put(6, raw.get(4))
+        backgroundTexCoords.put(7, raw.get(5))
         backgroundTexCoordsInitialized = true
     }
 
