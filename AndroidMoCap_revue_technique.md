@@ -199,7 +199,9 @@ Conception (décisions actées avec l'utilisateur) :
   points) est le seul retour visuel, **forcé visible** quand ARCore est la source caméra active
   (indépendamment du réglage "Overlay du mesh", qui reste un diagnostic optionnel pour les autres
   paliers). Conçu pour ne pas fermer la porte à un futur mode "rendu live" (toggle dédié, avec
-  avertissement utilisateur si coûteux en ressources) -- pas construit maintenant.
+  avertissement utilisateur si coûteux en ressources) -- pas construit maintenant. **✅ Construit et
+  confirmé sur device le 12 août 2026, voir point 53** -- le mesh n'est plus forcé, suit le même
+  réglage que CameraX.
 - Le mode économie d'énergie garde la priorité par défaut (l'overlay, forcé ou non, y disparaît
   comme avant) ; nouveau réglage `keepMeshOverlayInPowerSave` (Affichage & confort, tous paliers
   confondus, défaut désactivé) pour le garder visible même en éco.
@@ -2535,3 +2537,81 @@ système sur tablette) reste ouvert, priorité basse -- voir point 20 ci-dessus 
 
 `AndroidMoCap_spec_technique.md` §2/§7 mis à jour en conséquence (réserve levée sur la rotation
 caméra, cause racine et résolution documentées).
+
+### 53. Fond caméra live sur le palier ARCore -- ✅ implémenté et confirmé sur device le 12 août 2026
+
+Repris directement de la discussion du point 13 ("pas d'aperçu caméra live pour ce palier dans
+cette passe... conçu pour ne pas fermer la porte à un futur mode rendu live") : le palier `OPTIMAL`
+n'affichait jusqu'ici qu'un `GLSurfaceView` vide (le mesh de tracking, forcé visible, était le seul
+retour visuel) -- contrairement aux paliers CameraX, qui montrent un `PreviewView` live. Idée
+proposée par l'utilisateur : réutiliser le flux caméra ARCore (déjà décodé côté CPU pour la cascade
+langue tirée, point 15) pour combler ce manque plutôt que de le laisser vide.
+
+**Décisions de conception validées avant implémentation** :
+- Rendu via la texture GL externe qu'ARCore alimente déjà (`Session#setCameraTextureName`), pas via
+  le pipeline CPU décodé pour le point 15 -- ce dernier est bien plus coûteux (décodage YUV→RGB pixel
+  par pixel à 60 fps) et jamais pensé pour un affichage continu.
+- Pas de réglage utilisateur dédié -- même traitement que l'aperçu CameraX : affiché par défaut,
+  masqué uniquement en mode éco (`ArCoreHeadPoseTracker.setBackgroundRenderingEnabled`, câblé dans
+  `MainViewModel.enterPowerSave()`/`exitPowerSave()` à côté de `CameraController.setPreviewEnabled`
+  existant). Justifié a priori (le `GLSurfaceView` tourne déjà en continu, `RENDERMODE_CONTINUOUSLY`,
+  et `session.update()` capture déjà la frame dans la texture à chaque `onDrawFrame` que quelque
+  chose soit dessiné ou non -- un draw call de quad texturé de plus est marginal) et non contredit
+  par les tests sur device.
+- Mesh non forcé sur ARCore -- il ne l'était que faute d'aperçu live sur ce palier
+  (`ui/MeshOverlayVisibility.kt`, paramètre `usingArCoreCameraSource` retiré ; `MeshOverlayVisibilityTest.kt`
+  réécrit pour les 3 booléens restants) : suit désormais `faceMeshOverlayEnabled`, comme CameraX.
+
+**Implémentation GL** (`ArCoreHeadPoseTracker.kt`) : shader/programme/buffers/quad plein écran
+texturé, écrits depuis zéro (aucun pattern GL préexistant dans le repo -- ni shader, ni VBO --
+repris du pattern de référence Google `BackgroundRenderer.java`, sample ARCore). Dessiné à chaque
+`onDrawFrame`, indépendamment du débit cible du palier (qui ne throttle que le travail en aval,
+`emitCameraImage`/`emitHeadPose`).
+
+**Orientation -- la vraie difficulté de ce point, plusieurs fausses pistes avant la bonne réponse**
+(protocole détaillé dans l'historique git, résumé ici) :
+1. Deux tentatives basées sur `Frame#transformCoordinates2d`/`Session#setDisplayGeometry` (rotation
+   caméra→écran calculée en interne par ARCore) ont échoué sur device -- fond tourné à 180°, avec
+   puis sans tentative de miroir, sans qu'aucune permutation d'UV simple ne corrige le résultat.
+2. Repli sur `cameraRotationDegrees` seul (la constante déjà prouvée correcte côté CPU, point 52) :
+   correct en portrait, mais toujours faux en paysage -- paradoxe apparent, puisque ce code ne lit
+   aucun capteur d'orientation (il ne peut donc, en théorie, pas produire un résultat différent
+   selon la tenue). Diagnostic sur device (log throttlé pendant un changement réel de tenue, même
+   session) : **aucune valeur ARCore ne bouge entre portrait et paysage** -- confirmé hold-independent
+   comme prévu, ce n'était donc pas un bug côté ARCore.
+3. Hypothèse retenue ensuite : contrairement au mesh (nuage de points sans "haut" absolu, jamais
+   gêné par une rotation non compensée), le fond montre le monde réel -- une rotation non compensée,
+   combinée à l'écran lui-même physiquement penché dans la main du spectateur, se cumulerait
+   visuellement. Compensation dynamique ajoutée (`IconOrientationTracker` dédié, palier de tenue
+   physique ajouté à `cameraRotationDegrees`) -- **résultat sur device : pire qu'avant**, miroir
+   absent, rendu "bloqué en portrait", image déformée. La dérivation manuelle de la formule
+   (composition rotation + miroir + tenue) s'est révélée être le vrai point faible, pas la
+   compensation elle-même.
+4. Abandon de toute dérivation manuelle au profit d'un **balayage empirique direct sur device** :
+   les 8 symétries du carré (groupe diédral D4 -- 4 rotations × miroir ou non) testées une à une,
+   pilotées en direct par un `BroadcastReceiver` temporaire (`adb shell am broadcast`, sans
+   reconstruire l'app entre chaque essai, build debug uniquement). Résultat, testé dans les 4 tenues
+   possibles (portrait, paysage dans les deux sens, tête en bas) : **la même transformation (une
+   simple rotation 90°, sans miroir) est correcte dans les 4 cas** -- orientation ET latéralité (main
+   droite affichée à droite, confirmé comportement natif/anatomique voulu, **pas** mirroré comme
+   `FaceMeshOverlay`/`PreviewView` le sont pour CameraX -- ce palier n'a pas de `PreviewView`
+   équivalent à qui rester cohérent). Le fond n'a donc **en fait jamais eu besoin de suivre la tenue
+   physique** -- toute la machinerie dynamique de la piste 3 (capteur dédié, formule composée)
+   répondait à un problème qui n'existait pas, elle-même née d'une première formule fixe simplement
+   fausse (piste 2). Repli final : `backgroundQuadCoords` redevient un simple quad figé (comme avant
+   toute cette investigation), aucun calcul de rotation au runtime, comportement hold-independent par
+   construction -- exactement le même principe que `cameraRotationDegrees` côté CPU (point 52), une
+   fois la bonne valeur trouvée.
+
+**Confirmé sur device le 12 août 2026, protocole complet** : orientation et latéralité correctes
+dans les 4 tenues (portrait, paysage × 2 sens, tête en bas) ; mesh cohérent avec le fond dans toutes
+les tenues testées ; mode éco masque et restaure fond et mesh ensemble ; réglage "Affichage &
+confort" masque/affiche réellement le mesh sur ARCore désormais (avant : forcé) ; repli CameraX non
+affecté. Point non vérifié en cours de route, sans impact sur le résultat final : mesh disparaît
+(perte de détection MediaPipe) tenue tête en bas -- comportement pré-existant et attendu (un visage
+complètement inversé est un cas dégénéré pour la détection de visage), sans rapport avec ce travail.
+
+Leçon methodologique pour une prochaine fois : composer rotation et miroir à la main est une source
+d'erreur récurrente (déjà rencontrée aux points 51/52) -- un balayage empirique direct sur device,
+quand l'espace des solutions est petit et fini (ici 8 symétries), coûte moins cher en aller-retours
+qu'une nouvelle tentative de dérivation à chaque échec.

@@ -124,10 +124,20 @@ qui exige du RGBA et faisait planter l'app au premier lancement réel (voir revu
 `AugmentedFace.centerPose` (récupérée via un callback dédié dans `MainViewModel`, thread
 GL) à la place de `facialTransformationMatrixes()`. Repli automatique et silencieux vers
 CameraX+`CameraController` (comme le palier `STANDARD`) si Augmented Faces s'avère indisponible à
-l'usage, décidé synchrone dès `MainViewModel.initializeTracking()`. Pas d'aperçu caméra live pour ce
-palier dans cette passe (l'overlay du mesh sert de retour visuel à la place, forcé visible dans ce
-cas -- voir `ui/MeshOverlayVisibility.kt`) -- choix assumé, conçu pour ne pas empêcher un futur mode
-"rendu live" (backlog, revue technique point 13).
+l'usage, décidé synchrone dès `MainViewModel.initializeTracking()`.
+
+**Fond caméra live, confirmé sur device le 12 août 2026** (revue technique, point 53) : le
+`GLSurfaceView` de ce palier affiche désormais un quad plein écran texturé avec la texture OES
+qu'ARCore alimente déjà via `Session#setCameraTextureName` (jusque-là jamais échantillonnée),
+comblant le manque d'aperçu live de ce palier par rapport à `PreviewView` sur CameraX -- le mesh
+overlay n'est donc plus forcé visible sur ARCore, il suit désormais le même réglage
+(`faceMeshOverlayEnabled`) que CameraX (`ui/MeshOverlayVisibility.kt`). Masqué en mode économie
+d'énergie comme l'aperçu CameraX (`ArCoreHeadPoseTracker.setBackgroundRenderingEnabled`). Rotation
+du quad **fixe et hold-independent**, exactement comme `cameraRotationDegrees` côté CPU -- trouvée
+par balayage empirique sur device après plusieurs tentatives de dérivation manuelle infructueuses
+(voir revue technique point 53 pour le détail complet) ; latéralité volontairement **non mirorée**
+(comportement natif/anatomique, ce palier n'a pas de `PreviewView` équivalent à qui rester
+cohérent, contrairement au mesh qui reste mirroré pour CameraX).
 
 Classes dédiées : `ArCoreHeadPoseTracker`, `ArCoreFaceSelector` (sélection du visage principal si
 plusieurs détectés, fonction pure testée en JVM : `pickPrimary`). Rotation de l'image caméra

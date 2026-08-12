@@ -95,7 +95,12 @@ can still be used to test it. `OPTIMAL`'s ARCore fusion is merged into `main` an
 on device (revue technique point 3/13) — camera source switching (CameraX ↔ ARCore), rotation
 correction and the image-processing thread split are all implemented; a few minor items (a native
 MediaPipe warning of unconfirmed cause, no Bitmap pooling for the ARCore path) remain open, see the
-revue technique. `isThermalThrottling()` is polled continuously during capture
+revue technique. This tier's `GLSurfaceView` also renders a live camera background (a textured
+full-screen quad sampling the OES texture ARCore already writes via `setCameraTextureName`) —
+confirmed on device across all four holds (portrait, both landscape directions, upside-down) on
+12 Aug 2026 (revue technique point 53) after an empirical sweep found the fixed, hold-independent
+quad orientation; the mesh overlay is no longer forced on this tier, it now follows the same
+`faceMeshOverlayEnabled` setting as CameraX. `isThermalThrottling()` is polled continuously during capture
 (`MainViewModel.startThermalPolling()`, every 5s, tied to `ON_START`/`ON_STOP`) and halves the
 target FPS while throttling (`tracking/ThermalThrottle.kt`, pure and tested), ramping back up once
 it clears — confirmed working end-to-end on device via the debug mock panel (see below), the real
