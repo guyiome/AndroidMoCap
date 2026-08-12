@@ -2615,3 +2615,48 @@ Leçon methodologique pour une prochaine fois : composer rotation et miroir à l
 d'erreur récurrente (déjà rencontrée aux points 51/52) -- un balayage empirique direct sur device,
 quand l'espace des solutions est petit et fini (ici 8 symétries), coûte moins cher en aller-retours
 qu'une nouvelle tentative de dérivation à chaque échec.
+
+### 54. Deux petits correctifs du 12 août 2026 -- avertissement langue tirée simplifié, log de debug resté actif par erreur
+
+Deux changements distincts, tous deux repérés/traités le même jour que le point 53 mais sans lien
+direct avec le fond caméra live -- regroupés ici, sans entrée dédiée chacun, vu leur taille.
+
+**Avertissement "l'appareil peine" (détection langue tirée, point 15) -- ✅ simplifié.**
+`TonguePerformanceWarning` (icône 220dp centrée plein écran, pulsante, superposée à l'aperçu) jugé
+trop imposant par l'utilisateur ("Revoir le visuel de TonguePerformanceWarning (trop imposant)",
+backlog personnel). Remplacé par une extension du petit indicateur de chauffe déjà présent dans
+`MainHud` (bandeau bas, non intrusif, `WarningAmber`) : la même icône se déclenche aussi quand la
+détection de langue tirée sollicite l'appareil (`tongueOutDetectionEnabled && inferenceRunningHigh`),
+pas seulement en cas de chauffe -- les deux causes partagent souvent la même origine (charge
+d'inférence). Cliquable uniquement pour la cause langue tirée (`IconButton` avec `enabled` conditionné
+à cette cause précise, amène à `ExperimentalFeaturesScreen` pour désactiver la fonctionnalité) ; rien
+à régler côté chauffe seule, qui se résorbe automatiquement. Fichier `TonguePerformanceWarning.kt`
+supprimé (plus aucune référence). Confirmé sur device par l'utilisateur le jour même.
+
+**`TONGUE_DIAGNOSTIC_LOGGING` resté actif par erreur -- ✅ corrigé.** Repéré en creusant une
+sensation de légère saccade/latence sur le mesh ARCore signalée par l'utilisateur après le point 53
+(hypothèse initiale de l'utilisateur : "peut-être juste une impression maintenant qu'on a un flux
+vidéo en dessous"). Ce flag de diagnostic (`MainViewModel.kt`) était resté à `true` depuis un commit
+du 11 août 2026 sans rapport (correction d'une course d'initialisation de `TongueEmbeddingHelper`,
+voir plus haut dans ce document) -- son propre commentaire documentait déjà l'intention "`false` par
+défaut, repasser une fois l'étage 3 confirmé fiable", jamais fait. Tant que le toggle langue tirée
+est actif, ce flag fait tourner un log formaté (extraction de région + `String.format` + écriture
+logcat) à **chaque frame traitée** -- jusqu'à 60×/s sur le palier ARCore, en debug build (`AppLog.d`
+n'est un no-op qu'en dehors de `BuildConfig.DEBUG`). Repassé à `false`. L'utilisateur a testé après
+ce correctif seul et signalé qu'il ne changeait rien de perceptible -- la sensation de saccade reste
+donc non expliquée à ce jour ; piste restante non vérifiée (le fond caméra se dessine à la cadence de
+l'écran, potentiellement 90/120 Hz sur ce ROG Phone, alors que le mesh ne se met à jour qu'au débit
+cible du palier, 60 fps sur `OPTIMAL` -- un décalage entre les deux rythmes, invisible avant le point
+53 faute de référence continue à comparer) notée dans le backlog personnel (note attachée au point 37,
+"Lag ARCore, cause non identifiée"), pas creusée plus loin faute de mesure.
+
+**Repéré via une revue de code complète du jour** (agent dédié, 8 angles de recherche + vérification,
+portée : tous les commits locaux non poussés du 12 août 2026) -- 8 constats au total, dont ces deux
+corrections et cinq autres correctifs mineurs de qualité/lisibilité (état GL rejoué inutilement à
+chaque frame dans `ArCoreHeadPoseTracker.drawCameraBackground()`, fuite d'un shader compilé en cas
+d'échec partiel, `computeMeshOverlayVisible` simplifiable, `CameraOrientation.kt` renommé/déplacé en
+`ui/RotationBucket.kt` -- ne contenait plus que `snapToRotationBucket()` après le retrait de la
+piste de rotation dynamique --, `onOpenTongueSettings` renommé `onOpenExperimental` pour suivre la
+convention `onOpen<Écran>` existante). Un huitième constat (mirroring potentiellement incohérent
+entre le mesh, toujours mirroré, et le nouveau fond ARCore, volontairement natif) a été vérifié et
+infirmé par l'utilisateur sur device -- déjà cohérent, aucune action nécessaire.
