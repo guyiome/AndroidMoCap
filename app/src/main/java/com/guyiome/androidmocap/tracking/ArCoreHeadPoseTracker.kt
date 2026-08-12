@@ -40,6 +40,8 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * Source caméra + pose de tête alternative pour le palier [TrackingTier.OPTIMAL], basée sur ARCore
@@ -236,52 +238,45 @@ class ArCoreHeadPoseTracker(
     // jamais échantillonnée par notre propre code. Aucun pattern GL existant ailleurs dans ce repo
     // (ni shader, ni VBO) : implémentation reprise du pattern de référence Google
     // (`BackgroundRenderer.java`, sample ARCore), adaptée au style de ce fichier. Voir revue
-    // technique, point 13 (discussion initiale sur l'aperçu caméra live de ce palier, reportée) et
-    // point 52 (rotation caméra fixe confirmée correcte dans toutes les orientations testées --
-    // rien ici ne dépend d'une rotation dynamique, même hypothèse que maybeSetDisplayGeometry). ---
+    // technique, point 13 (discussion initiale sur l'aperçu caméra live de ce palier, reportée).
+    //
+    // **Orientation, corrigée sur device (12 août 2026)** : deux tentatives basées sur
+    // `Frame#transformCoordinates2d`/`Session#setDisplayGeometry` (rotation caméra->écran calculée
+    // en interne par ARCore) ont toutes les deux échoué sur device pour cette caméra frontale --
+    // fond tourné à 180° dans les deux cas (avec puis sans tentative de miroir), sans qu'aucune
+    // permutation d'UV simple ne corrige le résultat. Plutôt que de continuer à deviner une
+    // troisième combinaison à l'aveugle, abandonné au profit d'une source de vérité déjà prouvée :
+    // [cameraRotationDegrees] (lu via Camera2 `SENSOR_ORIENTATION`, voir
+    // [readCameraSensorOrientation]) est confirmé correct dans toutes les tenues testées (portrait
+    // ET paysage) pour le chemin CPU ([rotateBitmap]), voir revue technique point 52. Ce fond
+    // caméra réutilise directement cette même valeur : [maybeRotateBackgroundQuad] tourne les
+    // POSITIONS du quad par cet angle plutôt que l'image elle-même (texture échantillonnée avec un
+    // UV standard fixe, [backgroundTexCoords]) -- résultat visuel démontré équivalent par calcul
+    // matriciel à une rotation directe de l'image (voir kdoc de cette méthode). ---
 
     private var backgroundProgram: Int = 0
     private var backgroundPositionAttrib: Int = 0
     private var backgroundTexCoordAttrib: Int = 0
     private var backgroundTextureUniform: Int = 0
 
-    // Quad plein écran en NDC (-1..1), dessiné en GL_TRIANGLE_STRIP (ordre : bas-gauche, bas-droite,
-    // haut-gauche, haut-droite) -- jamais modifié après création, sert de a_Position.
+    // Positions du quad (a_Position), en NDC (-1..1) -- valeur initiale ci-dessous purement
+    // transitoire (quad standard non tourné, ordre bas-gauche/bas-droite/haut-gauche/haut-droite),
+    // réécrite en place une fois cameraRotationDegrees connu (voir maybeRotateBackgroundQuad), donc
+    // avant le premier dessin réel dans tous les cas rencontrés en pratique (cameraRotationDegrees
+    // est lu à la création de la session, avant qu'aucune frame ne soit acceptée par onDrawFrame).
     private val backgroundQuadCoords = directFloatBuffer(
         floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f),
     )
+    @Volatile private var backgroundQuadRotated = false
 
-    // Buffer intermédiaire : reçoit les UV "brutes" telles que calculées par transformCoordinates2d
-    // à partir de backgroundQuadCoords SANS modification -- jamais lu directement pour le dessin
-    // (voir updateBackgroundTexCoordsIfNeeded, qui les recopie permutées dans backgroundTexCoords
-    // ci-dessous).
-    private var backgroundRawTexCoords: FloatBuffer = directFloatBuffer(FloatArray(8))
-
-    // UV effectivement utilisées pour le dessin (glVertexAttribPointer). Recalculées uniquement
-    // quand la géométrie d'affichage change (Frame.hasDisplayGeometryChanged(), présent depuis
-    // longtemps dans le SDK ARCore -- confirmé disponible en 1.54.0, version utilisée ici) -- évite
-    // de refaire ce calcul à chaque frame alors qu'onDrawFrame tourne en continu
-    // (RENDERMODE_CONTINUOUSLY) pour un résultat qui ne change qu'au premier appel ou en cas de
-    // rotation d'écran (setDisplayGeometry vient d'être reposé, voir maybeSetDisplayGeometry).
-    //
-    // **Miroir horizontal, corrigé sur device (12 août 2026)** : la première version demandait à
-    // transformCoordinates2d d'évaluer directement un quad de sommets à X négé (comme "source"),
-    // en supposant que mirrorer l'entrée suffirait à mirrorer la sortie -- confirmé faux sur device
-    // (fond affiché tourné à 180°, pas simplement mirroré). Cause : la transformation caméra->écran
-    // qu'ARCore calcule en interne (rotation liée à setDisplayGeometry) ne commute pas avec un
-    // miroir quand elle inclut un échange d'axes (90°/270°) -- mirrorer AVANT de faire évaluer la
-    // rotation par l'API donne un résultat différent (ici : décalé de 180° supplémentaires) que
-    // mirorer APRÈS. Corrigé en éliminant cette composition : transformCoordinates2d n'est appelé
-    // qu'avec le quad réel non mirroré ([backgroundQuadCoords], comme le sample officiel Google) --
-    // les 4 UV obtenues sont donc, par construction, correctes et non mirrorées. Le miroir est
-    // ensuite appliqué par une simple permutation des 4 valeurs déjà calculées (sommets 0<->1, la
-    // paire du bas, et 2<->3, la paire du haut -- géométriquement opposés en X dans
-    // backgroundQuadCoords), qui ne redemande jamais rien à l'API : insensible à toute rotation
-    // qu'elle applique en interne. Même principe que LandmarkProjection.toScreenPoint(mirror=true)
-    // (utilisé par FaceMeshOverlay pour rester cohérent avec PreviewView, qui mirrore
-    // automatiquement la caméra frontale) : mirrorer côté écran, pas dans l'image/texture source.
-    private var backgroundTexCoords: FloatBuffer = directFloatBuffer(FloatArray(8))
-    private var backgroundTexCoordsInitialized = false
+    // UV (a_TexCoord) FIXE, jamais modifiée -- correspond terme à terme à la position D'ORIGINE
+    // (avant rotation) de chaque sommet de backgroundQuadCoords : bas-gauche->(0,0),
+    // bas-droite->(1,0), haut-gauche->(0,1), haut-droite->(1,1). C'est backgroundQuadCoords qui
+    // bouge (tourné par maybeRotateBackgroundQuad), jamais cette table -- voir le kdoc du bloc
+    // ci-dessus pour le raisonnement complet.
+    private val backgroundTexCoords = directFloatBuffer(
+        floatArrayOf(0f, 0f, 1f, 0f, 0f, 1f, 1f, 1f),
+    )
 
     // Coupe le dessin du fond sans toucher au reste du pipeline ARCore (session.update(), pose,
     // blendshapes continuent de tourner) -- utilisé en mode éco, même principe que
@@ -363,6 +358,7 @@ class ArCoreHeadPoseTracker(
             AppLog.i(TAG, "Session ARCore/Augmented Faces démarrée")
             maybeBindCameraTexture()
             maybeSetDisplayGeometry()
+            maybeRotateBackgroundQuad()
         } ?: return
         try {
             currentSession.resume()
@@ -573,49 +569,44 @@ class ArCoreHeadPoseTracker(
     }
 
     /**
-     * Recalcule [backgroundTexCoords] uniquement quand la géométrie d'affichage a changé
-     * (`Frame#hasDisplayGeometryChanged()`) -- évite de refaire ce calcul à chaque frame alors
-     * qu'[onDrawFrame] tourne en continu (RENDERMODE_CONTINUOUSLY) pour un résultat qui ne change
-     * qu'au premier appel ou en cas de rotation d'écran (setDisplayGeometry vient d'être reposé,
-     * voir [maybeSetDisplayGeometry]). Voir le kdoc de [backgroundTexCoords] pour l'historique du
-     * correctif miroir (12 août 2026, fond affiché à 180° avant correction).
+     * Tourne [backgroundQuadCoords] une fois [cameraRotationDegrees] connu (une seule fois --
+     * cette valeur ne change jamais après la création de la session, voir [readCameraSensorOrientation]),
+     * plutôt que de dépendre de `Frame#transformCoordinates2d`/`Session#setDisplayGeometry` --
+     * abandonné après deux tentatives infructueuses sur device pour cette caméra frontale, voir le
+     * kdoc du bloc de champs ci-dessus. [cameraRotationDegrees] est en revanche déjà prouvé correct
+     * dans toutes les tenues testées (portrait ET paysage) pour le chemin CPU ([rotateBitmap]),
+     * revue technique point 52 -- réutilisé ici tel quel.
+     *
+     * Tourner les POSITIONS du quad (texture échantillonnée avec un UV fixe, [backgroundTexCoords])
+     * plutôt que l'image produit le même résultat visuel qu'une rotation directe de l'image :
+     * pour un sommet à la position d'origine Q et un mapping UV(Q) fixe, si le sommet est déplacé en
+     * position R(θ)·Q (rotation horaire d'angle θ) tout en gardant UV(Q) (pas UV(R(θ)·Q)), alors pour
+     * tout point écran S = R(θ)·Q on affiche texture(UV(R(θ)⁻¹·S)) = texture(UV(R(-θ)·S)) -- exactement
+     * ce qu'on obtiendrait en tournant l'image elle-même de θ (horaire) et en l'affichant dans un quad
+     * fixe. Formule de rotation horaire en repère Y vers le haut (NDC), dérivée à la main --
+     * *différente* de son équivalent Y vers le bas (image/bitmap, `Matrix.postRotate`) à cause de cet
+     * axe inversé (même piège CW/CCW que celui déjà rencontré et documenté revue technique point 52) :
+     * (x,y) -> (x·cosθ + y·sinθ, -x·sinθ + y·cosθ). Miroir horizontal appliqué en dernier sur le
+     * résultat (négation du X final) -- même convention que
+     * `LandmarkProjection.toScreenPoint(mirror=true)`, utilisé par `FaceMeshOverlay` pour rester
+     * cohérent avec `PreviewView`, qui mirrore automatiquement la caméra frontale.
      */
-    private fun updateBackgroundTexCoordsIfNeeded(frame: com.google.ar.core.Frame) {
-        if (backgroundTexCoordsInitialized && !frame.hasDisplayGeometryChanged()) return
-        frame.transformCoordinates2d(
-            com.google.ar.core.Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
-            backgroundQuadCoords,
-            com.google.ar.core.Coordinates2d.TEXTURE_NORMALIZED,
-            backgroundRawTexCoords,
-        )
-        // Miroir horizontal + rotation 180° combinés en une seule permutation des 4 UV déjà
-        // correctes (sommets opposés en diagonale : 0<->3, 1<->2) -- voir kdoc de
-        // backgroundTexCoords pour pourquoi ceci remplace l'ancienne approche (mirrorer le tableau
-        // source passé à transformCoordinates2d). Le second test sur device (12 août 2026) a
-        // confirmé qu'un simple miroir horizontal (0<->1, 2<->3) ne suffisait pas -- le fond restait
-        // tête en bas, ce qu'un miroir seul ne peut pas expliquer (il n'inverse jamais haut/bas) :
-        // la sortie brute de transformCoordinates2d pour cette caméra frontale est donc elle-même
-        // déjà tête en bas, indépendamment de tout miroir. Un miroir horizontal ET une rotation
-        // 180° sont deux symétries diagonales (chacune n'inverse le signe que d'un axe à la fois
-        // sur une base tournée) qui commutent entre elles et se combinent en un simple échange par
-        // paires opposées en diagonale plutôt que par paires adjacentes. Si ça ne suffit toujours
-        // pas au prochain test, ne pas re-deviner un troisième réglage à l'aveugle : le signal
-        // manquant est de savoir si le résultat est alors bien mirroré (main droite à gauche) mais
-        // seulement tourné de 90°/270° plutôt que 180°, ce qui pointerait vers un axe X/Y interverti
-        // plutôt qu'un simple signe -- comparer avec cameraRotationDegrees (lu via
-        // CameraCharacteristics.SENSOR_ORIENTATION, déjà confirmé correct sur device pour le chemin
-        // CPU, voir readCameraSensorOrientation) donnerait alors une vraie valeur de référence
-        // plutôt qu'un nouvel essai-erreur.
-        val raw = backgroundRawTexCoords
-        backgroundTexCoords.put(0, raw.get(6))
-        backgroundTexCoords.put(1, raw.get(7))
-        backgroundTexCoords.put(2, raw.get(4))
-        backgroundTexCoords.put(3, raw.get(5))
-        backgroundTexCoords.put(4, raw.get(2))
-        backgroundTexCoords.put(5, raw.get(3))
-        backgroundTexCoords.put(6, raw.get(0))
-        backgroundTexCoords.put(7, raw.get(1))
-        backgroundTexCoordsInitialized = true
+    private fun maybeRotateBackgroundQuad() {
+        if (backgroundQuadRotated) return
+        session ?: return // cameraRotationDegrees pas encore lu (voir tryCreateSession) -- réessayer plus tard
+        val radians = Math.toRadians(cameraRotationDegrees.toDouble())
+        val cos = cos(radians).toFloat()
+        val sin = sin(radians).toFloat()
+        val identityCorners = floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f)
+        for (i in 0 until 4) {
+            val x = identityCorners[i * 2]
+            val y = identityCorners[i * 2 + 1]
+            val rotatedX = x * cos + y * sin
+            val rotatedY = -x * sin + y * cos
+            backgroundQuadCoords.put(i * 2, -rotatedX) // miroir horizontal (négation du X final)
+            backgroundQuadCoords.put(i * 2 + 1, rotatedY)
+        }
+        backgroundQuadRotated = true
     }
 
     private fun drawCameraBackground() {
@@ -653,6 +644,7 @@ class ArCoreHeadPoseTracker(
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
         maybeBindCameraTexture()
         setupBackgroundProgram()
+        maybeRotateBackgroundQuad()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -688,7 +680,6 @@ class ArCoreHeadPoseTracker(
         // OES vient d'être rafraîchie par session.update() ci-dessus, donc toujours à jour ici (le
         // throttle ne gère que le travail EN AVAL, emitCameraImage/emitHeadPose, voir plus haut).
         if (backgroundRenderingEnabled) {
-            updateBackgroundTexCoordsIfNeeded(frame)
             drawCameraBackground()
         }
 
