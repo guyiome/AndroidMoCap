@@ -522,11 +522,27 @@ class ArCoreHeadPoseTracker(
      * simplement non dessiné ([backgroundProgram] reste à 0, voir [drawCameraBackground]) plutôt
      * que de planter tout le renderer -- même philosophie de repli silencieux que
      * [maybeBindCameraTexture].
+     *
+     * Lie aussi les attributs de position/UV ici, une seule fois -- [backgroundQuadCoords]/
+     * [backgroundTexCoords] sont des `val` fixes qui ne changent jamais après construction, et
+     * [drawCameraBackground] tourne à la cadence de l'écran (jusqu'à 60-120 Hz, pas au débit de
+     * tracking) : réémettre `glUseProgram`/`glVertexAttribPointer`/`glEnableVertexAttribArray` à
+     * chaque frame serait un travail GPU/driver redondant pour un état qui ne bouge jamais.
+     * Seul le programme GL de ce fichier existe dans ce contexte GL (aucun autre code ne touche
+     * `glUseProgram`/les tableaux d'attributs génériques) -- rien d'autre ne peut invalider cet
+     * état entre deux frames.
      */
     private fun setupBackgroundProgram() {
         val vertexShader = compileShader(GLES20.GL_VERTEX_SHADER, backgroundVertexShader)
         val fragmentShader = compileShader(GLES20.GL_FRAGMENT_SHADER, backgroundFragmentShader)
-        if (vertexShader == 0 || fragmentShader == 0) return
+        if (vertexShader == 0 || fragmentShader == 0) {
+            // Ne pas fuir le shader qui a réussi si l'autre a échoué -- glDeleteShader(0) est un
+            // no-op silencieux côté GL, donc sûr même pour celui qui a déjà échoué (compileShader
+            // renvoie alors 0).
+            GLES20.glDeleteShader(vertexShader)
+            GLES20.glDeleteShader(fragmentShader)
+            return
+        }
 
         val program = GLES20.glCreateProgram()
         GLES20.glAttachShader(program, vertexShader)
@@ -538,6 +554,7 @@ class ArCoreHeadPoseTracker(
         if (linkStatus[0] != GLES20.GL_TRUE) {
             AppLog.e(TAG, "Échec de liaison du programme GL du fond caméra : ${GLES20.glGetProgramInfoLog(program)}")
             GLES20.glDeleteProgram(program)
+            backgroundProgram = 0 // explicite : repli propre si onSurfaceCreated a déjà tourné une fois
             return
         }
 
@@ -545,6 +562,12 @@ class ArCoreHeadPoseTracker(
         backgroundPositionAttrib = GLES20.glGetAttribLocation(program, "a_Position")
         backgroundTexCoordAttrib = GLES20.glGetAttribLocation(program, "a_TexCoord")
         backgroundTextureUniform = GLES20.glGetUniformLocation(program, "sTexture")
+
+        GLES20.glUseProgram(backgroundProgram)
+        GLES20.glVertexAttribPointer(backgroundPositionAttrib, 2, GLES20.GL_FLOAT, false, 0, backgroundQuadCoords)
+        GLES20.glEnableVertexAttribArray(backgroundPositionAttrib)
+        GLES20.glVertexAttribPointer(backgroundTexCoordAttrib, 2, GLES20.GL_FLOAT, false, 0, backgroundTexCoords)
+        GLES20.glEnableVertexAttribArray(backgroundTexCoordAttrib)
     }
 
     private fun compileShader(type: Int, source: String): Int {
@@ -561,23 +584,18 @@ class ArCoreHeadPoseTracker(
         return shader
     }
 
+    // Programme + attributs de position/UV déjà liés une seule fois dans setupBackgroundProgram()
+    // (voir son kdoc) -- il ne reste ici que ce qui change réellement à chaque frame : la
+    // texture OES (son CONTENU est rafraîchi par ARCore via session.update(), pas son ID) et le
+    // draw call lui-même.
     private fun drawCameraBackground() {
         if (backgroundProgram == 0) return // compilation/liaison a échoué, voir setupBackgroundProgram
-        GLES20.glUseProgram(backgroundProgram)
-
-        GLES20.glVertexAttribPointer(backgroundPositionAttrib, 2, GLES20.GL_FLOAT, false, 0, backgroundQuadCoords)
-        GLES20.glEnableVertexAttribArray(backgroundPositionAttrib)
-        GLES20.glVertexAttribPointer(backgroundTexCoordAttrib, 2, GLES20.GL_FLOAT, false, 0, backgroundTexCoords)
-        GLES20.glEnableVertexAttribArray(backgroundTexCoordAttrib)
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, cameraTextureId)
         GLES20.glUniform1i(backgroundTextureUniform, 0)
 
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
-
-        GLES20.glDisableVertexAttribArray(backgroundPositionAttrib)
-        GLES20.glDisableVertexAttribArray(backgroundTexCoordAttrib)
     }
 
     // --- GLSurfaceView.Renderer : appelé depuis le thread GL dédié créé par GLSurfaceView, donc
