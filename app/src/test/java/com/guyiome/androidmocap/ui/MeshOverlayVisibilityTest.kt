@@ -7,10 +7,9 @@ import org.junit.Test
 class MeshOverlayVisibilityTest {
 
     @Test
-    fun `ni le reglage ni ARCore actifs, hors mode eco -- masque`() {
+    fun `reglage desactive, hors mode eco -- masque`() {
         assertFalse(
             computeMeshOverlayVisible(
-                usingArCoreCameraSource = false,
                 faceMeshOverlayEnabled = false,
                 isPowerSaveActive = false,
                 keepMeshOverlayInPowerSave = false,
@@ -22,7 +21,6 @@ class MeshOverlayVisibilityTest {
     fun `reglage active, hors mode eco -- affiche`() {
         assertTrue(
             computeMeshOverlayVisible(
-                usingArCoreCameraSource = false,
                 faceMeshOverlayEnabled = true,
                 isPowerSaveActive = false,
                 keepMeshOverlayInPowerSave = false,
@@ -31,13 +29,12 @@ class MeshOverlayVisibilityTest {
     }
 
     @Test
-    fun `ARCore actif meme reglage desactive, hors mode eco -- affiche force`() {
-        assertTrue(
+    fun `reglage desactive, mode eco actif, garder-en-eco active -- reste masque`() {
+        assertFalse(
             computeMeshOverlayVisible(
-                usingArCoreCameraSource = true,
                 faceMeshOverlayEnabled = false,
-                isPowerSaveActive = false,
-                keepMeshOverlayInPowerSave = false,
+                isPowerSaveActive = true,
+                keepMeshOverlayInPowerSave = true,
             )
         )
     }
@@ -46,20 +43,7 @@ class MeshOverlayVisibilityTest {
     fun `reglage active mais mode eco actif sans garder-en-eco -- masque quand meme`() {
         assertFalse(
             computeMeshOverlayVisible(
-                usingArCoreCameraSource = false,
                 faceMeshOverlayEnabled = true,
-                isPowerSaveActive = true,
-                keepMeshOverlayInPowerSave = false,
-            )
-        )
-    }
-
-    @Test
-    fun `ARCore actif mais mode eco actif sans garder-en-eco -- masque quand meme`() {
-        assertFalse(
-            computeMeshOverlayVisible(
-                usingArCoreCameraSource = true,
-                faceMeshOverlayEnabled = false,
                 isPowerSaveActive = true,
                 keepMeshOverlayInPowerSave = false,
             )
@@ -70,7 +54,6 @@ class MeshOverlayVisibilityTest {
     fun `reglage active, mode eco actif, garder-en-eco active -- reste affiche`() {
         assertTrue(
             computeMeshOverlayVisible(
-                usingArCoreCameraSource = false,
                 faceMeshOverlayEnabled = true,
                 isPowerSaveActive = true,
                 keepMeshOverlayInPowerSave = true,
@@ -79,24 +62,33 @@ class MeshOverlayVisibilityTest {
     }
 
     @Test
-    fun `ARCore actif, mode eco actif, garder-en-eco active -- reste affiche`() {
-        assertTrue(
+    fun `reglage desactive, mode eco actif, garder-en-eco desactive -- masque`() {
+        assertFalse(
             computeMeshOverlayVisible(
-                usingArCoreCameraSource = true,
                 faceMeshOverlayEnabled = false,
                 isPowerSaveActive = true,
+                keepMeshOverlayInPowerSave = false,
+            )
+        )
+    }
+
+    @Test
+    fun `reglage desactive, hors mode eco, garder-en-eco active -- masque (sans effet hors eco)`() {
+        assertFalse(
+            computeMeshOverlayVisible(
+                faceMeshOverlayEnabled = false,
+                isPowerSaveActive = false,
                 keepMeshOverlayInPowerSave = true,
             )
         )
     }
 
     @Test
-    fun `rien du tout actif, garder-en-eco active mais aucune base visible -- masque`() {
-        assertFalse(
+    fun `reglage active, hors mode eco, garder-en-eco active -- affiche (sans effet hors eco)`() {
+        assertTrue(
             computeMeshOverlayVisible(
-                usingArCoreCameraSource = false,
-                faceMeshOverlayEnabled = false,
-                isPowerSaveActive = true,
+                faceMeshOverlayEnabled = true,
+                isPowerSaveActive = false,
                 keepMeshOverlayInPowerSave = true,
             )
         )

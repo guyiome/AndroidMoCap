@@ -69,10 +69,10 @@ fun MainScreen(
     val context = LocalContext.current
     val previewView = remember { PreviewView(context) }
     // Hébergement de la texture caméra ARCore (palier OPTIMAL, voir ArCoreHeadPoseTracker) --
-    // requis par ARCore même si rien n'y est dessiné visuellement pour l'instant (voir
-    // computeMeshOverlayVisible : le mesh de tracking sert de seul retour visuel dans ce cas).
-    // Toujours créé (même coût que previewView ci-dessus, symétrique) mais seulement attaché à
-    // ArCoreHeadPoseTracker quand uiState.usingArCoreCameraSource est actif, voir plus bas.
+    // le fond caméra live y est dessiné en interne (drawCameraBackground), ce Compose AndroidView
+    // n'est qu'un hôte. Toujours créé (même coût que previewView ci-dessus, symétrique) mais
+    // seulement attaché à ArCoreHeadPoseTracker quand uiState.usingArCoreCameraSource est actif,
+    // voir plus bas.
     val glSurfaceView = remember { GLSurfaceView(context) }
     // Menu des réglages + ses quatre sous-écrans (voir rapport technique, point 21) -- même
     // principe "un booléen par écran conditionnel" que showBlendshapeSelection ci-dessous,
@@ -180,9 +180,9 @@ fun MainScreen(
         if (hasCameraPermission) {
             // Aperçu caméra : PreviewView (CameraX) normalement, ou GLSurfaceView (ARCore) au
             // palier OPTIMAL avec ARCore actif -- les deux ne coexistent jamais (voir revue
-            // technique, point 13). Rien n'est visuellement dessiné dans le GLSurfaceView pour
-            // l'instant (pas de rendu live caméra ARCore dans cette passe, voir MeshOverlayVisibility) --
-            // il n'existe que parce qu'ARCore exige une texture GL pour piloter la caméra.
+            // technique, point 13). Le fond caméra live du GLSurfaceView est dessiné en interne par
+            // ArCoreHeadPoseTracker.onDrawFrame (drawCameraBackground) -- le GLSurfaceView n'est
+            // qu'un hôte AndroidView ici, comme previewView pour CameraX.
             if (uiState.usingArCoreCameraSource) {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
@@ -198,21 +198,20 @@ fun MainScreen(
                 )
             }
 
-            // Overlay du mesh de tracking -- affiché soit sur choix explicite de l'utilisateur
-            // (réglage Affichage & confort), soit forcé quand ARCore est la source caméra active
-            // (aucun aperçu live dans ce cas, le mesh devient le seul retour visuel). Masqué par
+            // Overlay du mesh de tracking -- affiché sur choix explicite de l'utilisateur (réglage
+            // Affichage & confort), même règle sur les deux paliers depuis l'ajout du fond caméra
+            // live ARCore (avant : forcé sur ARCore, faute d'aperçu live sur ce palier). Masqué par
             // défaut en mode éco comme le reste de l'aperçu, sauf si l'utilisateur a choisi de le
             // garder visible même en éco -- voir computeMeshOverlayVisible.
             val meshOverlayVisible = computeMeshOverlayVisible(
-                usingArCoreCameraSource = uiState.usingArCoreCameraSource,
                 faceMeshOverlayEnabled = uiState.faceMeshOverlayEnabled,
                 isPowerSaveActive = uiState.isPowerSaveActive,
                 keepMeshOverlayInPowerSave = uiState.keepMeshOverlayInPowerSave,
             )
 
-            // Mode économie d'énergie : masque l'aperçu (déjà coupé côté CameraX, voir
-            // setPreviewEnabled ; sans objet côté ARCore, qui n'a pas d'aperçu live) et le panneau
-            // blendshapes derrière un fond noir -- les 4 contrôles du HUD restent accessibles
+            // Mode économie d'énergie : masque l'aperçu (CameraX : setPreviewEnabled ; ARCore :
+            // ArCoreHeadPoseTracker.setBackgroundRenderingEnabled) et le panneau blendshapes
+            // derrière un fond noir -- les 4 contrôles du HUD restent accessibles
             // (dont l'icône "Visage détecté"). Le mesh overlay, lui, se dessine PAR-DESSUS ce fond
             // noir plutôt que d'être simplement masqué comme avant, pour permettre
             // keepMeshOverlayInPowerSave -- FaceMeshOverlay a un fond transparent (seuls les
