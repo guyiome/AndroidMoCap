@@ -300,6 +300,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val ROTATION_DIAGNOSTIC_LOGGING = false
         private const val ROTATION_DIAG_TAG = "RotationDiag"
 
+        // Diagnostic ponctuel (12 août 2026, revue technique points 1/15/20) : pose de tête complète
+        // + échantillon de blendshapes, pour comparer la variance entre une tenue immobile en
+        // portrait et en paysage. **Conclu** : la rotation caméra fixe (SENSOR_ORIENTATION, jamais
+        // recalculée selon la tenue physique) n'est PAS en cause -- le vrai souci était une
+        // référence de calibrage de pose de tête restée en portrait pendant que le téléphone passait
+        // en paysage (roll mesuré 98,7°±147,5° avant recalibrage en paysage, 1,05°±2,88° après,
+        // contre -0,12°±1,0° en portrait -- recalibrer suffit, aucun changement de code nécessaire
+        // côté rotation caméra). Repassé à `false`, gardé au cas où un diagnostic similaire (pose/
+        // blendshapes en tenue immobile) redevienne utile plus tard -- même discipline que
+        // ROTATION_DIAGNOSTIC_LOGGING ci-dessus.
+        private const val ROTATION_QUALITY_DIAGNOSTIC_LOGGING = false
+        private const val ROTATION_QUALITY_DIAG_TAG = "RotationQualityDiag"
+
         // Diagnostic de la cascade de détection de la langue tirée (revue technique, point 15) --
         // logue l'état des trois étages (porte jawOpen+mouthGeometric, ratio couleur brut/adaptatif,
         // classification par embedding simOut/simIn) à chaque frame quand tongueOutDetectionEnabled
@@ -971,6 +984,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     final.headEulerDegrees.getOrElse(1) { 0f },
                     final.leftEyeEulerDegrees.getOrElse(1) { 0f },
                     final.rightEyeEulerDegrees.getOrElse(1) { 0f },
+                ),
+            )
+        }
+
+        // Diagnostic temporaire qualité/précision du tracking selon la rotation caméra fixe (voir
+        // ROTATION_QUALITY_DIAGNOSTIC_LOGGING ci-dessus). Pose de tête complète + échantillon de
+        // blendshapes représentatif (mâchoire, bouche, sourcil, yeux, joue) -- comparer la variance
+        // entre une tenue immobile en portrait et une tenue immobile en paysage.
+        if (ROTATION_QUALITY_DIAGNOSTIC_LOGGING && final.faceDetected) {
+            val jawOpen = final.blendshapes.firstOrNull { it.name == "jawOpen" }?.score ?: 0f
+            val mouthClose = final.blendshapes.firstOrNull { it.name == "mouthClose" }?.score ?: 0f
+            val browInnerUp = final.blendshapes.firstOrNull { it.name == "browInnerUp" }?.score ?: 0f
+            val eyeBlinkLeft = final.blendshapes.firstOrNull { it.name == "eyeBlinkLeft" }?.score ?: 0f
+            val eyeBlinkRight = final.blendshapes.firstOrNull { it.name == "eyeBlinkRight" }?.score ?: 0f
+            val cheekPuff = final.blendshapes.firstOrNull { it.name == "cheekPuff" }?.score ?: 0f
+            AppLog.d(
+                ROTATION_QUALITY_DIAG_TAG,
+                "pitch=%.2f yaw=%.2f roll=%.2f jawOpen=%.4f mouthClose=%.4f browInnerUp=%.4f eyeBlinkLeft=%.4f eyeBlinkRight=%.4f cheekPuff=%.4f inferenceMs=%d".format(
+                    final.headEulerDegrees.getOrElse(0) { 0f },
+                    final.headEulerDegrees.getOrElse(1) { 0f },
+                    final.headEulerDegrees.getOrElse(2) { 0f },
+                    jawOpen, mouthClose, browInnerUp, eyeBlinkLeft, eyeBlinkRight, cheekPuff,
+                    final.inferenceTimeMs,
                 ),
             )
         }
