@@ -1270,9 +1270,12 @@ sens. *[main, 6 août : ce risque et son lien avec le point 1/verrouillage portr
 dans `AndroidMoCap_spec_technique.md` §7 -- seul le raisonnement complet et les chiffres d'adoption
 manquaient jusqu'ici à ce journal, maintenant rapatriés ci-dessus.]*
 
-Statut : constat factuel remonté en discussion, aucune décision prise sur la suite (adapter réellement
-l'écran de réglages et revoir la logique de rotation caméra, vs. accepter que le comportement sur
-tablette reste dégradé pour l'instant, l'usage principal visé restant le téléphone).
+Statut : constat factuel remonté en discussion. **Volet correctness (rotation caméra) clos, voir
+point 52** -- hypothèse investiguée sur device le 12 août 2026 et infirmée, la rotation fixe
+fonctionne correctement dans toutes les orientations testées ; le vrai souci trouvé (dégradation de
+la pose de tête en paysage) venait d'un calibrage resté en portrait, pas de l'image caméra. Le volet
+mise en page (adapter réellement l'écran de réglages à l'orientation système sur tablette) reste
+ouvert, aucune décision prise, priorité basse (usage principal visé restant le téléphone).
 
 *[7 août 2026 : une première lecture d'une capture utilisateur avait été rattachée ici par erreur --
 la capture montrait en fait `BlendshapeSelectionScreen` juste pour prouver que `tongueOut` était bien
@@ -2464,3 +2467,71 @@ sandbox de la routine n'a pas d'accès `gh`/API pour agir directement, seulement
   nouvelle **issue #7** créée pour la partie encore ouverte (résolution caméra adaptée au palier --
   `ImageAnalysis.Builder()` ne fixe aucune résolution cible selon `COMPATIBLE`/`STANDARD`/`OPTIMAL`),
   renvoi croisé entre les deux dans les commentaires de fermeture/création.
+
+### 52. Rotation caméra selon la tenue physique (paysage) -- hypothèse investiguée puis infirmée sur device, volet correctness du point 20 clos
+
+Repris du constat du point 15 ("le bitmap ARCore semble tourné ~90°") et du volet correctness du
+point 20 (verrouillage portrait ignoré par le système sur tablette Android 16/17) -- fusionnés le
+12 août 2026 après que l'utilisateur a précisé que **tenir le téléphone en paysage est son cas
+d'usage le plus fréquent**, ce qui rendait le sujet prioritaire plutôt que théorique.
+
+**Hypothèse de départ** : la rotation caméra, figée une seule fois au démarrage sur les deux
+chemins (`CameraController` pour CameraX, `ArCoreHeadPoseTracker` pour ARCore) à partir de
+`CameraCharacteristics.SENSOR_ORIENTATION` (constante matérielle, indépendante de la tenue réelle du
+téléphone), devait être recalculée dynamiquement selon l'orientation physique lue par capteur
+(`sensors/IconOrientationTracker.kt`, déjà utilisé pour la rotation cosmétique des icônes du HUD).
+Plan complet écrit et validé (nouveau module pur `tracking/CameraOrientation.kt`, câblage
+`CameraController.setPhysicalRotationDegrees()`/`ArCoreHeadPoseTracker.setPhysicalRotationDegrees()`
+depuis `MainViewModel`), implémenté en 5 commits, testé unitairement (`./gradlew testDebugUnitTest
+assembleDebug` vert à chaque étape).
+
+**❌ Régression confirmée sur device** : une fois le correctif activé, tenir le téléphone en
+paysage a fait apparaître le mesh "comme en portrait" -- alors que l'utilisateur a précisé que
+**l'affichage caméra/mesh était correct de son côté depuis toujours**, dans toutes les orientations
+testées, ce qui contredisait la prémisse même du correctif. Reverté immédiatement (`git revert`,
+pas de nouvel ajustement à l'aveugle) dès le rapport de régression -- comportement antérieur
+restauré et reconfirmé "revenu à la normal" par l'utilisateur.
+
+**Vérification complémentaire demandée par l'utilisateur, une fois la rotation caméra disculpée sur
+la correction gross-visuelle** : la rotation fixe pourrait-elle malgré tout dégrader la *précision*
+du tracking en paysage (pas visible à l'œil nu, mais mesurable) ? Protocole : téléphone tenu
+immobile, diagnostic temporaire (`MainViewModel.ROTATION_QUALITY_DIAGNOSTIC_LOGGING`, tag
+`RotationQualityDiag`) loggant pose de tête complète + échantillon de blendshapes représentatif,
+capturé via `adb logcat` sur des fenêtres timées, moyenne/écart-type calculés (awk) sur chaque
+session.
+
+- Portrait (référence) : roll -0,12°±1,0°.
+- **Paysage, avant recalibrage** : roll 98,7°±147,5°, pitch ~21°±4° -- dégradation réelle et sévère,
+  pas un artefact de mesure.
+- **Paysage, après un nouveau calibrage ("Mise à zéro") effectué en tenant le téléphone en
+  paysage** : roll 1,05°±2,88°, pitch -2,07°±1,46° -- revenu au niveau de la référence portrait.
+
+**Cause racine réelle** : `sensors/DeviceOrientationTracker.kt` capture, au moment du dernier
+calibrage explicite, une matrice de rotation de référence (`deviceRotationReference`) via
+`snapshotRotationMatrix()`. Si le téléphone est ensuite réorienté significativement (~90°, portrait
+→ paysage) **sans recalibrer**, `RotationMath.composeCalibratedEuler()` compose cette référence
+devenue obsolète avec la matrice courante et produit des angles (surtout le roll) largement
+faux -- un problème de **calibrage de pose**, sans aucun rapport avec la rotation de l'image caméra
+elle-même.
+
+**Conséquence pratique, décidée avec l'utilisateur ("Oui, retire")** : le correctif de rotation
+caméra dynamique a été **entièrement retiré** (commits 3/4/5 revertés, commit 1 réduit à la seule
+fonction indépendante `snapToRotationBucket()` -- qui corrige un vrai bug ad hoc de
+`MainScreen.kt`, sans rapport avec cette hypothèse, voir point 32/`BlendshapePanel`) plutôt que
+gardé "au cas où", cohérent avec la discipline anti-code-mort déjà appliquée ailleurs dans le
+projet. Le diagnostic `ROTATION_QUALITY_DIAGNOSTIC_LOGGING` reste en place, désactivé par défaut,
+au cas où un diagnostic similaire redevienne utile.
+
+**Résolution retenue** : recalibrer ("Mise à zéro") après tout changement significatif de tenue du
+téléphone -- déjà le geste attendu de l'utilisateur pour tout calibrage, aucun changement de code
+nécessaire. `CalibrationAnomalyState` (point 19) est censé détecter ce cas précis (dérive de pose
+>8° soutenue 90 frames au repos, tinte le bouton de calibrage en rouge) -- **pas vérifié pendant ce
+test** (attention portée aux logs, pas au bouton), à vérifier lors d'une session ultérieure.
+
+**Clôt le volet correctness du point 20** (risque de rotation caméra associée au verrouillage
+portrait ignoré sur tablette) : infirmé, la rotation fixe fonctionne correctement dans toutes les
+orientations testées. Le volet mise en page (écran de réglages non adaptatif à l'orientation
+système sur tablette) reste ouvert, priorité basse -- voir point 20 ci-dessus et le backlog privé.
+
+`AndroidMoCap_spec_technique.md` §2/§7 mis à jour en conséquence (réserve levée sur la rotation
+caméra, cause racine et résolution documentées).

@@ -40,7 +40,8 @@ ajouté/retiré indépendamment selon le mode économie d'énergie, sans jamais 
 Par frame acceptée (après filtrage du débit cible, voir §3) : conversion en `Bitmap` via un pool
 réutilisé (évite une allocation par frame, point chaud historique du pipeline), rotation appliquée
 si nécessaire (matrice mise en cache, l'angle étant constant tant que l'app reste verrouillée
-portrait -- voir §7 pour la réserve sur ce point), puis passage à `FaceLandmarkerHelper.detectAsync`
+portrait -- voir §7 ; hypothèse vérifiée sur device, y compris téléphone tenu en paysage, voir revue
+technique point 52), puis passage à `FaceLandmarkerHelper.detectAsync`
 en mode `LIVE_STREAM`. Le bitmap est suivi par timestamp de frame (pas par référence d'objet,
 MediaPipe pouvant envelopper l'image en interne) et repris dans le pool via `releaseFrame()` une
 fois le résultat MediaPipe reçu pour ce timestamp précis.
@@ -211,9 +212,15 @@ en cache la matrice de rotation caméra pour toute la session (calculée une seu
 chaque frame). Réserve documentée (revue technique point 20) : à partir d'Android 16 (API 36), les
 restrictions d'orientation déclarées par une app sont ignorées par défaut sur les écrans de largeur
 minimale ≥ 600dp (tablettes) ; Android 17 (API 37) supprime l'option de désactivation manifeste.
-Le projet ciblant déjà `targetSdk = 37`, cette hypothèse ne tient donc plus sur tablette récente
--- risque identifié sur la mise en page des réglages et, potentiellement, sur la justesse de la
-rotation caméra elle-même. Aucune décision de mise en œuvre prise à ce jour.
+Le projet ciblant déjà `targetSdk = 37`, cette hypothèse ne tient donc plus sur tablette récente --
+risque identifié sur la mise en page des réglages (encore ouvert, priorité basse, mise en page
+seule) et, potentiellement, sur la justesse de la rotation caméra elle-même. **Ce second risque a
+été investigué et infirmé sur device le 12 août 2026** (revue technique point 52) : la rotation
+caméra fixe fonctionne correctement dans toutes les orientations testées, y compris téléphone tenu
+en paysage (le cas d'usage le plus fréquent selon l'utilisateur). La dégradation réelle observée en
+paysage (pose de tête, surtout le roll) venait d'une référence de calibrage restée en portrait
+(`sensors/DeviceOrientationTracker`) et se résout par un nouveau calibrage explicite après tout
+changement significatif de tenue -- aucun changement de code nécessaire côté rotation caméra.
 
 **Budget batterie/chauffe** -- préoccupation centrale de plusieurs choix d'implémentation : pool de
 bitmaps, throttling du débit par palier, mode économie d'énergie qui coupe l'aperçu affiché sans
