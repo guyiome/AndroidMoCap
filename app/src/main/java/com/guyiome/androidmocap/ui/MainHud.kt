@@ -54,6 +54,7 @@ fun MainHud(
     onCalibrate: () -> Unit,
     onToggleConnection: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenTongueSettings: () -> Unit,
 ) {
     // "En cours" par type (revue technique, point 40) :
     // - VMC : résolution DNS/construction du socket (connectVmcTarget) -- généralement bref, mais
@@ -92,18 +93,29 @@ fun MainHud(
                 modifier = Modifier.rotate(-iconRotationDegrees),
             )
 
-            // Débit réduit pour cause de chauffe (voir MainViewModel.startThermalPolling) --
-            // purement informatif, n'apparaît que le temps que la chauffe dure (remonte tout seul
-            // ensuite). Même couleur/icône que l'avertissement "risque de performance" du
-            // sélecteur de palier (DiagnosticsScreen) -- cohérence visuelle, même famille de signal.
-            if (uiState.isThermalThrottling) {
+            // Débit réduit pour cause de chauffe (voir MainViewModel.startThermalPolling) et/ou
+            // appareil qui peine sur la détection de langue tirée (point 15, revue technique) --
+            // même icône pour les deux causes (souvent corrélées), couplée sur ce petit indicateur
+            // déjà existant plutôt que sur un avertissement séparé plein écran (ancien
+            // TonguePerformanceWarning, jugé trop imposant par l'utilisateur, retiré). Cliquable
+            // uniquement pour la cause langue tirée (amène au réglage pour la désactiver) -- rien
+            // à régler côté chauffe, ça se résorbe tout seul. Purement informatif sinon, comme le
+            // reste de ce bandeau.
+            val tongueStrain = uiState.tongueOutDetectionEnabled && uiState.inferenceRunningHigh
+            if (uiState.isThermalThrottling || tongueStrain) {
                 Spacer(Modifier.width(18.dp))
-                Icon(
-                    imageVector = Icons.Filled.WarningAmber,
-                    contentDescription = stringResource(R.string.cd_thermal_throttling),
-                    tint = Color(0xFFFFB74D),
-                    modifier = Modifier.rotate(-iconRotationDegrees),
-                )
+                IconButton(onClick = onOpenTongueSettings, enabled = tongueStrain, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        imageVector = Icons.Filled.WarningAmber,
+                        contentDescription = if (tongueStrain) {
+                            stringResource(R.string.cd_tongue_performance_warning)
+                        } else {
+                            stringResource(R.string.cd_thermal_throttling)
+                        },
+                        tint = Color(0xFFFFB74D),
+                        modifier = Modifier.rotate(-iconRotationDegrees),
+                    )
+                }
             }
             Spacer(Modifier.width(18.dp))
 

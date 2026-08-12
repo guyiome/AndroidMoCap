@@ -271,6 +271,7 @@ fun MainScreen(
                 onCalibrate = { viewModel.startCalibrationCountdown() },
                 onToggleConnection = { viewModel.toggleActiveConnection() },
                 onOpenSettings = { showSettings = true },
+                onOpenTongueSettings = { showExperimentalFeatures = true },
             )
 
             if (showSettings) {
@@ -390,10 +391,6 @@ fun MainScreen(
 
             if (batteryPercent <= uiState.lowBatteryThresholdPercent && !isCharging) {
                 LowBatteryAlert()
-            }
-
-            if (uiState.tongueOutDetectionEnabled && (uiState.isThermalThrottling || uiState.inferenceRunningHigh)) {
-                TonguePerformanceWarning(onClick = { showExperimentalFeatures = true })
             }
         } else {
             Column(
