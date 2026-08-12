@@ -318,11 +318,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // classification par embedding simOut/simIn) à chaque frame quand tongueOutDetectionEnabled
         // est actif. Phase 1 (étages 1+2) close le 11 août 2026 : étage 1 confirmé fiable, étage 2
         // fonctionnel mécaniquement mais son classifieur couleur seul jugé non fiable. Étage 3
-        // (embedding + calibration) implémenté le même jour, encore activement débogué (locale de
-        // calibration, faux positif "bouche pressée" -- voir points 15ter à 15quinquies) -- laisser
-        // à `true` tant que cette investigation n'est pas close, repasser à `false` une fois
-        // l'étage 3 confirmé fiable en usage normal.
-        private const val TONGUE_DIAGNOSTIC_LOGGING = true
+        // (embedding + calibration) implémenté le même jour, activement débogué (locale de
+        // calibration, faux positif "bouche pressée" -- voir points 15ter à 15quinquies) sur le
+        // moment, ce qui justifiait `true` -- **resté actif par erreur après coup** (laissé à `true`
+        // dans un commit du 11 août sans lien avec ce flag, jamais repassé à `false` depuis, retrouvé
+        // le 12 août en creusant une sensation de saccade sur le mesh ARCore -- ce log tourne à
+        // chaque frame traitée quand le toggle langue tirée est actif, avec extraction de région +
+        // formatage de chaîne + écriture logcat, un coût réel maintenant plus perceptible avec le
+        // fond caméra live comme référence visuelle). Repassé à `false`, comme documenté ici depuis
+        // le début -- réactiver ponctuellement pour déboguer un futur souci de ce chemin.
+        private const val TONGUE_DIAGNOSTIC_LOGGING = false
         private const val TONGUE_DIAG_TAG = "TongueDiag"
 
         // Cadence du sondage de throttling thermique (voir startThermalPolling) -- doit rester
