@@ -30,6 +30,10 @@ import com.google.ar.core.exceptions.UnavailableSdkTooOldException
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.MPImage
+import android.content.BroadcastReceiver
+import android.content.Intent
+import android.content.IntentFilter
+import com.guyiome.androidmocap.BuildConfig
 import com.guyiome.androidmocap.camera.CameraController
 import com.guyiome.androidmocap.logging.AppLog
 import com.guyiome.androidmocap.sensors.IconOrientationTracker
@@ -175,6 +179,27 @@ class ArCoreHeadPoseTracker(
         private const val BACKGROUND_ROTATION_DIAGNOSTIC_LOGGING = true
         private const val BACKGROUND_ROTATION_DIAG_TAG = "BackgroundRotationDiag"
 
+        // Action du BroadcastReceiver de balayage (voir debugDihedralOverrideIndex) -- ex. depuis
+        // adb : `adb shell am broadcast -a com.guyiome.androidmocap.DEBUG_CYCLE_BG_ROTATION --ei
+        // index 3` (index -1 pour désactiver et revenir au calcul normal).
+        private const val DEBUG_CYCLE_BG_ROTATION_ACTION = "com.guyiome.androidmocap.DEBUG_CYCLE_BG_ROTATION"
+        private const val DEBUG_CYCLE_BG_ROTATION_EXTRA_INDEX = "index"
+
+        // Les 8 symétries du carré (groupe diédral D4) appliquées à (x,y) -- 4 rotations (0/90/180/
+        // 270°) x miroir horizontal ou non. Index arbitraire, sert uniquement à itérer/identifier
+        // pendant le balayage sur device (voir debugDihedralOverrideIndex) ; aucune signification
+        // "clockwise"/"CCW" présumée ici, justement pour éviter de re-deviner un sens.
+        private val DIHEDRAL_TRANSFORMS: List<(Float, Float) -> Pair<Float, Float>> = listOf(
+            { x, y -> x to y }, // 0: identité
+            { x, y -> y to -x }, // 1: rotation A
+            { x, y -> -x to -y }, // 2: rotation 180°
+            { x, y -> -y to x }, // 3: rotation B (sens opposé à 1)
+            { x, y -> -x to y }, // 4: miroir horizontal seul
+            { x, y -> -y to -x }, // 5: miroir + rotation A
+            { x, y -> x to -y }, // 6: miroir + rotation 180° (= miroir vertical seul)
+            { x, y -> y to x }, // 7: miroir + rotation B
+        )
+
         // Nombre de conversions YUV->Bitmap tolérées "en vol" (soumises à imageProcessingExecutor,
         // pas encore terminées) avant de laisser tomber une frame plutôt que d'empiler du travail
         // en retard -- même philosophie que CameraController.MAX_TRACKED_BITMAPS. Fixé à 1 (pas 2
@@ -242,6 +267,17 @@ class ArCoreHeadPoseTracker(
     // Palier {0,90,180,270} le plus proche de la tenue physique réelle, horaire (même convention
     // que cameraRotationDegrees) -- voir physicalOrientationTracker ci-dessus.
     @Volatile private var physicalHoldDegrees: Int = 0
+
+    // Balayage empirique temporaire (12 août 2026) : après plusieurs tentatives de dérivation à la
+    // main de la formule combinant rotation + miroir + tenue physique, toutes fausses sur device
+    // (voir historique git), abandon de la dérivation au profit d'un test direct des 8 symétries
+    // possibles du carré (4 rotations x miroir ou non -- groupe diédral D4), pilotable en direct
+    // via adb sans reconstruire. -1 = désactivé (utilise le calcul normal de
+    // maybeRotateBackgroundQuad) ; 0-7 = index dans DIHEDRAL_TRANSFORMS ci-dessous, appliqué
+    // directement à la place. Build debug uniquement (BuildConfig.DEBUG) -- jamais dans une release.
+    @Volatile private var debugDihedralOverrideIndex: Int = -1
+    private var debugDihedralAppliedIndex: Int = -2 // force le premier recalcul (-1 est une valeur valide)
+    private var debugRotationReceiver: BroadcastReceiver? = null
 
     @Volatile private var targetFps: Int = initialTargetFps.coerceAtLeast(1)
     @Volatile private var minFrameIntervalMs: Long = 1000L / targetFps
@@ -409,6 +445,7 @@ class ArCoreHeadPoseTracker(
         // alors par attachTo() lui-même.
         glSurfaceView?.onResume()
         physicalOrientationTracker.enable()
+        maybeRegisterDebugRotationReceiver()
     }
 
     /**
@@ -424,8 +461,36 @@ class ArCoreHeadPoseTracker(
      */
     fun stop() {
         physicalOrientationTracker.disable()
+        debugRotationReceiver?.let { context.unregisterReceiver(it) }
+        debugRotationReceiver = null
         glSurfaceView?.onPause()
         session?.pause()
+    }
+
+    /**
+     * Balayage empirique temporaire (voir [debugDihedralOverrideIndex]) -- build debug uniquement,
+     * jamais enregistré en release. `registerReceiver` dynamique (pas de déclaration manifeste,
+     * portée limitée à la durée de vie de ce tracker) ; `RECEIVER_NOT_EXPORTED` requis à partir
+     * d'Android 13 pour un receiver dynamique qui n'a pas vocation à recevoir de broadcasts
+     * d'autres apps -- seul `adb shell am broadcast` (qui tourne avec les privilèges shell, pas
+     * soumis à cette restriction) doit pouvoir le déclencher pendant cette session de debug.
+     */
+    private fun maybeRegisterDebugRotationReceiver() {
+        if (!BuildConfig.DEBUG || debugRotationReceiver != null) return
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(receivedContext: Context?, intent: Intent?) {
+                val index = intent?.getIntExtra(DEBUG_CYCLE_BG_ROTATION_EXTRA_INDEX, -1) ?: -1
+                debugDihedralOverrideIndex = index
+                AppLog.d(BACKGROUND_ROTATION_DIAG_TAG, "debugDihedralOverrideIndex = $index")
+            }
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(receiver, IntentFilter(DEBUG_CYCLE_BG_ROTATION_ACTION), Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            context.registerReceiver(receiver, IntentFilter(DEBUG_CYCLE_BG_ROTATION_ACTION))
+        }
+        debugRotationReceiver = receiver
     }
 
     /** À appeler à la fermeture du ViewModel (voir `MainViewModel.onCleared`). */
@@ -649,6 +714,28 @@ class ArCoreHeadPoseTracker(
      * correctif, inverser le signe est le premier réflexe, pas une nouvelle combinaison à deviner).
      */
     private fun maybeRotateBackgroundQuad() {
+        // Balayage empirique (voir debugDihedralOverrideIndex) : prioritaire sur le calcul normal
+        // tant qu'un index valide est actif, recalculé dès qu'il change (indépendamment de
+        // backgroundQuadRotated, qui ne suit que l'état "normal").
+        if (debugDihedralOverrideIndex in DIHEDRAL_TRANSFORMS.indices) {
+            if (debugDihedralAppliedIndex == debugDihedralOverrideIndex) return
+            val transform = DIHEDRAL_TRANSFORMS[debugDihedralOverrideIndex]
+            val identityCorners = floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f)
+            for (i in 0 until 4) {
+                val (tx, ty) = transform(identityCorners[i * 2], identityCorners[i * 2 + 1])
+                backgroundQuadCoords.put(i * 2, tx)
+                backgroundQuadCoords.put(i * 2 + 1, ty)
+            }
+            debugDihedralAppliedIndex = debugDihedralOverrideIndex
+            return
+        }
+        if (debugDihedralAppliedIndex != -2) {
+            // Override venait d'être désactivé (repassé à -1) -- force le calcul normal ci-dessous
+            // à se réexécuter au moins une fois.
+            debugDihedralAppliedIndex = -2
+            backgroundQuadRotated = false
+        }
+
         if (backgroundQuadRotated) return
         session ?: return // cameraRotationDegrees pas encore lu (voir tryCreateSession) -- réessayer plus tard
         val totalDegrees = cameraRotationDegrees + physicalHoldDegrees
