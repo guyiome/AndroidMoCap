@@ -1531,11 +1531,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun enterPowerSave() {
         _uiState.update { it.copy(isPowerSaveActive = true) }
         cameraController?.setPreviewEnabled(false)
+        arCoreHeadPoseTracker?.setBackgroundRenderingEnabled(false)
     }
 
     private fun exitPowerSave() {
         _uiState.update { it.copy(isPowerSaveActive = false) }
         cameraController?.setPreviewEnabled(true)
+        arCoreHeadPoseTracker?.setBackgroundRenderingEnabled(true)
     }
 
     /**
