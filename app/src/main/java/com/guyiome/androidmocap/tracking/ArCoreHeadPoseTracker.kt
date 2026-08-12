@@ -163,6 +163,23 @@ class ArCoreHeadPoseTracker(
     companion object {
         private const val TAG = "ArCoreHeadPoseTracker"
 
+        // Diagnostic ponctuel (12 août 2026) : le fond caméra GL (maybeRotateBackgroundQuad,
+        // hold-independent -- aucune lecture capteur, juste cameraRotationDegrees, une constante de
+        // session) s'est révélé correct en portrait mais faux en paysage, sur le MÊME device et la
+        // MÊME session -- paradoxe logique : un code qui ne lit jamais l'orientation physique ne
+        // peut pas produire un résultat différent entre deux tenues, SAUF si la texture OES
+        // elle-même (écrite par ARCore via setCameraTextureName, jamais par notre propre code) est
+        // déjà pré-tournée en interne par ARCore selon l'orientation physique réelle -- hypothèse à
+        // confirmer avant tout nouveau correctif à l'aveugle (déjà 3 tentatives infructueuses).
+        // Log throttlé (~1/s) : cameraRotationDegrees (doit rester constant), hasDisplayGeometryChanged()
+        // (devrait ne jamais redevenir true après le setup initial si rien ne change côté ARCore),
+        // dimensions de surface connues, et la sortie BRUTE de transformCoordinates2d (recalculée ici
+        // uniquement pour ce log, indépendamment du rendu réel qui ne l'utilise plus) -- si cette
+        // dernière diffère entre une capture en portrait et une capture en paysage sur la même
+        // session, ça confirme l'hypothèse et donne les vrais chiffres pour le correctif suivant.
+        private const val BACKGROUND_ROTATION_DIAGNOSTIC_LOGGING = true
+        private const val BACKGROUND_ROTATION_DIAG_TAG = "BackgroundRotationDiag"
+
         // Nombre de conversions YUV->Bitmap tolérées "en vol" (soumises à imageProcessingExecutor,
         // pas encore terminées) avant de laisser tomber une frame plutôt que d'empiler du travail
         // en retard -- même philosophie que CameraController.MAX_TRACKED_BITMAPS. Fixé à 1 (pas 2
@@ -213,6 +230,11 @@ class ArCoreHeadPoseTracker(
     @Volatile private var targetFps: Int = initialTargetFps.coerceAtLeast(1)
     @Volatile private var minFrameIntervalMs: Long = 1000L / targetFps
     private var lastAcceptedFrameElapsedMs: Long = 0L
+
+    // Throttle du diagnostic BACKGROUND_ROTATION_DIAGNOSTIC_LOGGING ci-dessus (~1/s) -- indépendant
+    // de lastAcceptedFrameElapsedMs (débit cible du palier), ce diagnostic doit tourner même si le
+    // palier est lent.
+    private var lastBackgroundDiagLogElapsedMs: Long = 0L
 
     // Rotation (degrés, horaire) à appliquer à l'image YUV brute pour l'amener à l'orientation
     // portrait attendue par MediaPipe -- lue une fois la caméra ARCore sélectionnée (voir
@@ -609,6 +631,46 @@ class ArCoreHeadPoseTracker(
         backgroundQuadRotated = true
     }
 
+    /**
+     * Voir [BACKGROUND_ROTATION_DIAGNOSTIC_LOGGING] pour le contexte complet -- log throttlé
+     * (~1/s) de tout ce qui pourrait expliquer un résultat différent entre deux tenues physiques du
+     * téléphone sur la même session : [cameraRotationDegrees] (doit rester constant),
+     * `hasDisplayGeometryChanged()`, les dimensions de surface connues, et la sortie BRUTE de
+     * `transformCoordinates2d` -- recalculée ici uniquement pour ce log (buffer local, jamais
+     * réutilisé par [drawCameraBackground], qui n'appelle plus cette API depuis le commit
+     * précédent).
+     */
+    private fun logBackgroundRotationDiagnosticIfDue(frame: com.google.ar.core.Frame) {
+        val nowElapsed = SystemClock.elapsedRealtime()
+        if (nowElapsed - lastBackgroundDiagLogElapsedMs < 1000L) return
+        lastBackgroundDiagLogElapsedMs = nowElapsed
+
+        val identityCorners = directFloatBuffer(floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f))
+        val rawUv = directFloatBuffer(FloatArray(8))
+        val transformOk = try {
+            frame.transformCoordinates2d(
+                com.google.ar.core.Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
+                identityCorners,
+                com.google.ar.core.Coordinates2d.TEXTURE_NORMALIZED,
+                rawUv,
+            )
+            true
+        } catch (e: Exception) {
+            AppLog.w(BACKGROUND_ROTATION_DIAG_TAG, "transformCoordinates2d a échoué", e)
+            false
+        }
+        val uvString = if (transformOk) {
+            (0 until 4).joinToString(" ") { i -> "(%.2f,%.2f)".format(rawUv.get(i * 2), rawUv.get(i * 2 + 1)) }
+        } else {
+            "N/A"
+        }
+        AppLog.d(
+            BACKGROUND_ROTATION_DIAG_TAG,
+            "cameraRotationDegrees=$cameraRotationDegrees hasDisplayGeometryChanged=${frame.hasDisplayGeometryChanged()} " +
+                "surface=${lastKnownSurfaceWidth}x$lastKnownSurfaceHeight rawTransformUv[v0,v1,v2,v3]=$uvString",
+        )
+    }
+
     private fun drawCameraBackground() {
         if (backgroundProgram == 0) return // compilation/liaison a échoué, voir setupBackgroundProgram
         GLES20.glUseProgram(backgroundProgram)
@@ -674,6 +736,10 @@ class ArCoreHeadPoseTracker(
             // GLSurfaceView.onPause() avant session.pause() dans stop() réduit déjà la fréquence
             // de ce cas, sans l'éliminer totalement (course intrinsèque, pas garantie par l'API).
             return
+        }
+
+        if (BACKGROUND_ROTATION_DIAGNOSTIC_LOGGING) {
+            logBackgroundRotationDiagnosticIfDue(frame)
         }
 
         // Dessiné à chaque onDrawFrame, pas soumis au throttle targetFps ci-dessous -- la texture
