@@ -1101,6 +1101,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // que calibrationAnomalyFlagged) : ceil() pour un décompte 3,2,1 naturel plutôt que
                 // de sauter directement à 2 dès la première frame.
                 val phaseDurationMs = when (tongueCalibrationRecordingState.phase) {
+                    TongueCalibrationPhase.PREPARE_TONGUE_OUT,
                     TongueCalibrationPhase.PREPARE_TONGUE_IN -> DEFAULT_CALIBRATION_PREPARE_DURATION_MS
                     TongueCalibrationPhase.RECORDING_TONGUE_IN -> tongueInDurationMs
                     else -> tongueOutDurationMs
@@ -1480,18 +1481,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Bouton "Démarrer" de `TongueCalibrationScreen` -- lance la première phase ("langue dehors").
-     * `tongueCalibrationLastTimestampMs` remis à `null` : la toute première frame de calibration
-     * n'a pas de delta de temps significatif, voir son usage dans `handleTrackingResult()`.
+     * Bouton "Démarrer" de `TongueCalibrationScreen` -- lance la première phase, désormais une
+     * pause de préparation avant "langue dehors" (voir `newTongueCalibrationRecording`, ajoutée le
+     * 13 août 2026). `tongueCalibrationLastTimestampMs` remis à `null` : la toute première frame de
+     * calibration n'a pas de delta de temps significatif, voir son usage dans
+     * `handleTrackingResult()`.
      */
     fun startTongueCalibration() {
         tongueCalibrationRecordingState = newTongueCalibrationRecording()
         tongueCalibrationLastTimestampMs = null
-        // Démarre directement en RECORDING_TONGUE_OUT (voir newTongueCalibrationRecording) -- même
-        // multiplicateur que handleTrackingResult() applique ensuite à chaque tick, pour un premier
-        // affichage cohérent avec le décompte réel plutôt qu'un saut visible au premier tick.
-        val initialDurationMs = _uiState.value.tongueCalibrationRecordingDurationMs * TONGUE_OUT_RECORDING_MULTIPLIER
-        val initialSecondsRemaining = kotlin.math.ceil(initialDurationMs / 1000f).toInt()
+        // Démarre en PREPARE_TONGUE_OUT (voir newTongueCalibrationRecording) -- décompte initial
+        // sur la durée de pause, pas d'enregistrement, pour un premier affichage cohérent avec le
+        // décompte réel plutôt qu'un saut visible au premier tick.
+        val initialSecondsRemaining = kotlin.math.ceil(DEFAULT_CALIBRATION_PREPARE_DURATION_MS / 1000f).toInt()
         _uiState.update {
             it.copy(
                 tongueCalibrationPhase = tongueCalibrationRecordingState.phase,

@@ -2,7 +2,7 @@ package com.guyiome.androidmocap.tracking
 
 /** Publique (pas `internal`) : exposée dans `MainUiState`, elle-même publique -- même précédent que
  *  `TrackingTier`. */
-enum class TongueCalibrationPhase { IDLE, RECORDING_TONGUE_OUT, PREPARE_TONGUE_IN, RECORDING_TONGUE_IN, DONE }
+enum class TongueCalibrationPhase { IDLE, PREPARE_TONGUE_OUT, RECORDING_TONGUE_OUT, PREPARE_TONGUE_IN, RECORDING_TONGUE_IN, DONE }
 
 /**
  * Machine à état pure pilotant l'enregistrement d'une calibration de l'étage 3 (revue technique,
@@ -11,13 +11,14 @@ enum class TongueCalibrationPhase { IDLE, RECORDING_TONGUE_OUT, PREPARE_TONGUE_I
  * (temps écoulé + embedding optionnel de la frame) depuis `MainViewModel` plutôt que d'implémenter
  * cette logique de comptage directement dans le ViewModel.
  *
- * Une pause [TongueCalibrationPhase.PREPARE_TONGUE_IN] sépare les deux enregistrements (ajoutée le
- * 11 août 2026, retour utilisateur après un premier essai de calibration faible) : sans elle, la
- * transition entre les deux phases est instantanée dès que la durée de la première est atteinte,
- * risquant de capturer des frames de transition (langue en train de rentrer, pas encore stabilisée)
- * dans l'accumulateur "langue rentrée" -- et inversement, une préparation insuffisante avant "langue
- * dehors" pouvait déjà expliquer une référence peu discriminante. Aucune accumulation pendant cette
- * pause.
+ * Une pause précède chaque phase d'enregistrement -- motif uniforme "pause / capture / pause /
+ * capture" : [TongueCalibrationPhase.PREPARE_TONGUE_IN] entre les deux enregistrements (ajoutée le
+ * 11 août 2026, retour utilisateur après un premier essai de calibration faible) et
+ * [TongueCalibrationPhase.PREPARE_TONGUE_OUT] avant le tout premier enregistrement (ajoutée le
+ * 13 août 2026, même demande explicite pour la même raison : laisser le temps de prendre la pose
+ * plutôt que de commencer à accumuler dès l'appui sur le bouton). Sans pause, la transition vers un
+ * enregistrement est instantanée, risquant de capturer des frames de transition (pose pas encore
+ * stabilisée) dans l'accumulateur qui suit. Aucune accumulation pendant une pause.
  */
 internal data class TongueCalibrationRecordingState(
     val phase: TongueCalibrationPhase = TongueCalibrationPhase.IDLE,
@@ -34,9 +35,13 @@ internal data class TongueCalibrationRecordingState(
  *  [DEFAULT_TONGUE_IN_RECORDING_DURATION_MS]. */
 internal const val DEFAULT_CALIBRATION_RECORDING_DURATION_MS = 3000L
 
-/** Durée par défaut de la pause entre les deux phases d'enregistrement -- pas encore réglable
- *  depuis le panneau debug (contrairement à la durée d'enregistrement), jugé moins critique. */
-internal const val DEFAULT_CALIBRATION_PREPARE_DURATION_MS = 2000L
+/** Durée par défaut de chaque pause de préparation (avant "langue dehors" ET entre les deux
+ *  enregistrements) -- pas encore réglable depuis le panneau debug (contrairement à la durée
+ *  d'enregistrement), jugé moins critique. Portée à 3000ms le 13 août 2026 (était 2000ms, utilisée
+ *  alors uniquement entre les deux phases) au moment d'ajouter la pause avant "langue dehors" --
+ *  demande explicite de l'utilisateur, valeur reprise telle quelle plutôt que d'introduire une
+ *  troisième durée à régler séparément. */
+internal const val DEFAULT_CALIBRATION_PREPARE_DURATION_MS = 3000L
 
 /**
  * Multiplicateur appliqué à l'unité de base pour obtenir la durée de la phase "langue dehors" --
@@ -84,22 +89,27 @@ internal const val TONGUE_IN_RECORDING_MULTIPLIER = 2L
 internal const val DEFAULT_TONGUE_IN_RECORDING_DURATION_MS =
     DEFAULT_CALIBRATION_RECORDING_DURATION_MS * TONGUE_IN_RECORDING_MULTIPLIER
 
-/** Démarre l'enregistrement -- toujours par la phase "langue dehors" en premier. Nommée
- *  différemment de `MainViewModel.startTongueCalibration()` (qui l'appelle) pour éviter une
- *  collision de noms qui bouclerait sur la méthode membre plutôt que cette fonction top-level. */
+/** Démarre par la pause de préparation avant "langue dehors" (voir kdoc de classe, ajoutée le
+ *  13 août 2026) -- plus de saut direct en enregistrement. Nommée différemment de
+ *  `MainViewModel.startTongueCalibration()` (qui l'appelle) pour éviter une collision de noms qui
+ *  bouclerait sur la méthode membre plutôt que cette fonction top-level. */
 internal fun newTongueCalibrationRecording(): TongueCalibrationRecordingState =
-    TongueCalibrationRecordingState(phase = TongueCalibrationPhase.RECORDING_TONGUE_OUT)
+    TongueCalibrationRecordingState(phase = TongueCalibrationPhase.PREPARE_TONGUE_OUT)
 
 /**
  * Avance la machine d'un pas de temps [elapsedMs], en intégrant [embedding] si non-null (ignoré
- * pendant [TongueCalibrationPhase.PREPARE_TONGUE_IN], qui n'accumule jamais) -- peut être `null` si
- * aucun embedding n'a pu être calculé pour ce tick (visage non détecté, étages 1/2 fermés le temps
- * d'une frame -- rare mais possible même en calibration guidée) : le sample est alors simplement
- * sauté, la durée continue de s'écouler sans lui. Transition automatique
- * `RECORDING_TONGUE_OUT` -> `PREPARE_TONGUE_IN` -> `RECORDING_TONGUE_IN` -> `DONE` une fois
- * [durationMs]/[prepareDurationMs]/[tongueInDurationMs] atteint ou dépassé pour la phase courante
- * (`>=`, pas `==` : robuste à un pas de temps qui dépasse la frontière sans tomber pile dessus).
- * No-op si déjà `IDLE` ou `DONE`.
+ * pendant les deux phases `PREPARE_*`, qui n'accumulent jamais) -- peut être `null` si aucun
+ * embedding n'a pu être calculé pour ce tick (visage non détecté, étages 1/2 fermés le temps d'une
+ * frame -- rare mais possible même en calibration guidée) : le sample est alors simplement sauté,
+ * la durée continue de s'écouler sans lui. Transition automatique
+ * `PREPARE_TONGUE_OUT` -> `RECORDING_TONGUE_OUT` -> `PREPARE_TONGUE_IN` -> `RECORDING_TONGUE_IN` ->
+ * `DONE` une fois [prepareDurationMs]/[durationMs]/[tongueInDurationMs] atteint ou dépassé pour la
+ * phase courante (`>=`, pas `==` : robuste à un pas de temps qui dépasse la frontière sans tomber
+ * pile dessus). No-op si déjà `IDLE` ou `DONE`.
+ *
+ * [prepareDurationMs] partagé par les deux pauses (`PREPARE_TONGUE_OUT` ET `PREPARE_TONGUE_IN`) --
+ * une seule durée à régler plutôt que deux qui pourraient diverger sans raison, voir kdoc de
+ * [DEFAULT_CALIBRATION_PREPARE_DURATION_MS].
  *
  * [tongueInDurationMs] distinct de [durationMs] depuis le 13 août 2026 -- voir le kdoc de
  * [DEFAULT_TONGUE_IN_RECORDING_DURATION_MS] pour le raisonnement (la phase "langue rentrée" a
@@ -115,6 +125,14 @@ internal fun TongueCalibrationRecordingState.tick(
     tongueInDurationMs: Long = DEFAULT_TONGUE_IN_RECORDING_DURATION_MS,
 ): TongueCalibrationRecordingState = when (phase) {
     TongueCalibrationPhase.IDLE, TongueCalibrationPhase.DONE -> this
+    TongueCalibrationPhase.PREPARE_TONGUE_OUT -> {
+        val nextElapsed = elapsedMsInPhase + elapsedMs
+        if (nextElapsed >= prepareDurationMs) {
+            copy(phase = TongueCalibrationPhase.RECORDING_TONGUE_OUT, elapsedMsInPhase = 0L)
+        } else {
+            copy(elapsedMsInPhase = nextElapsed)
+        }
+    }
     TongueCalibrationPhase.RECORDING_TONGUE_OUT -> {
         val nextAccumulator = if (embedding != null) tongueOutAccumulator.accumulate(embedding) else tongueOutAccumulator
         val nextElapsed = elapsedMsInPhase + elapsedMs

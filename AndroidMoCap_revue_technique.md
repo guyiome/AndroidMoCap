@@ -2902,3 +2902,29 @@ phase "langue dehors" est désormais traitée en symétrie :
 
 Pas encore testé sur device (changement de calibration, à valider à la prochaine recalibration) --
 16 tests JVM (`TongueCalibrationRecordingStateTest.kt`, +2 depuis la version précédente).
+
+**Retour utilisateur immédiat sur device -- pause manquante avant "langue dehors".** Une fois cette
+version installée, l'utilisateur a signalé un timer de 3 secondes seulement sur "langue dehors" et a
+demandé un timer AVANT la langue tirée, pour laisser le temps de prendre la pose ("3sec wait / x
+secondes captures / 3 secondes wait, etc..."). Deux choses à noter :
+- Ce timer de 3s observé était en fait l'**ancienne** build (avant les deux commits ci-dessus) --
+  l'app avait été recompilée (`assembleDebug`) mais jamais réinstallée sur device (`adb install`)
+  cette session, erreur de suivi de ma part. Corrigé : `adb install -r` fait après ce correctif.
+- La demande elle-même est indépendante de ce qui précède et légitime : `PREPARE_TONGUE_IN` existait
+  déjà (ajoutée le 11 août, point 15ter) entre les deux enregistrements, mais rien n'équivalent
+  n'existait avant le tout premier -- la calibration démarrait l'accumulation "langue dehors" dès
+  l'appui sur le bouton "Démarrer", sans laisser le temps de sortir la langue.
+
+**Correctif -- `PREPARE_TONGUE_OUT` (nouvelle valeur d'enum, `TongueCalibrationRecordingState.kt`)** :
+la machine à état démarre désormais par cette pause plutôt que directement en
+`RECORDING_TONGUE_OUT` (`newTongueCalibrationRecording()` modifiée en conséquence). Motif uniforme
+"pause / capture / pause / capture" sur toute la calibration. `DEFAULT_CALIBRATION_PREPARE_DURATION_MS`
+partagé par les deux pauses plutôt qu'une constante séparée pour chacune (une seule durée à régler) --
+porté de 2000ms à 3000ms au passage, demande explicite de l'utilisateur ("3sec wait"), appliqué aux
+deux pauses pour rester cohérent plutôt que de n'allonger que la nouvelle. Câblage `MainViewModel.kt` :
+`phaseDurationMs` (calcul du décompte affiché) et `startTongueCalibration()` (décompte initial, qui
+affichait à tort la durée d'enregistrement au lieu de la pause) mis à jour. UI
+(`TongueCalibrationScreen.kt`) : nouveau statut affiché (`tongue_calibration_status_prepare_out`,
+FR/EN, symétrique à `prepare_in`), bouton "Annuler" étendu à cette nouvelle phase. 20 tests JVM (+4)
+-- toutes les phases `PREPARE_*` couvertes de façon symétrique désormais. Build + tests
+`BUILD SUCCESSFUL`, installé sur device cette fois.

@@ -17,17 +17,51 @@ class TongueCalibrationRecordingStateTest {
     // distincte de durationMs, passe en DONE`.
     private val tongueInDuration = 1500L
 
+    /** Traverse PREPARE_TONGUE_OUT en un seul tick déterministe (elapsedMs == prepareDurationMs)
+     *  pour atterrir directement en RECORDING_TONGUE_OUT, elapsedMsInPhase = 0 -- évite de répéter
+     *  ce saut dans chaque test qui ne porte pas spécifiquement sur cette pause. */
+    private fun startRecordingTongueOut(): TongueCalibrationRecordingState =
+        newTongueCalibrationRecording().tick(
+            elapsedMs = prepare, embedding = null, durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration,
+        )
+
     @Test
-    fun `newTongueCalibrationRecording demarre par langue dehors, accumulateurs vides`() {
+    fun `newTongueCalibrationRecording demarre en PREPARE_TONGUE_OUT, accumulateurs vides`() {
         val state = newTongueCalibrationRecording()
-        assertEquals(TongueCalibrationPhase.RECORDING_TONGUE_OUT, state.phase)
+        assertEquals(TongueCalibrationPhase.PREPARE_TONGUE_OUT, state.phase)
         assertEquals(0, state.tongueOutAccumulator.sampleCount)
         assertEquals(0, state.tongueInAccumulator.sampleCount)
     }
 
     @Test
-    fun `tick pendant la phase 1 accumule uniquement dans tongueOutAccumulator`() {
+    fun `PREPARE_TONGUE_OUT n'accumule jamais, meme avec un embedding non-null`() {
         val state = newTongueCalibrationRecording().tick(
+            elapsedMs = 100, embedding = floatArrayOf(9f), durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration,
+        )
+        assertEquals(TongueCalibrationPhase.PREPARE_TONGUE_OUT, state.phase)
+        assertEquals(0, state.tongueOutAccumulator.sampleCount)
+    }
+
+    @Test
+    fun `transition juste avant la frontiere de PREPARE_TONGUE_OUT reste dans la pause`() {
+        val state = newTongueCalibrationRecording().tick(
+            elapsedMs = prepare - 1, embedding = null, durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration,
+        )
+        assertEquals(TongueCalibrationPhase.PREPARE_TONGUE_OUT, state.phase)
+        assertEquals(prepare - 1, state.elapsedMsInPhase)
+    }
+
+    @Test
+    fun `transition a la frontiere exacte de PREPARE_TONGUE_OUT passe en RECORDING_TONGUE_OUT`() {
+        val state = startRecordingTongueOut()
+        assertEquals(TongueCalibrationPhase.RECORDING_TONGUE_OUT, state.phase)
+        assertEquals(0L, state.elapsedMsInPhase)
+        assertEquals(0, state.tongueOutAccumulator.sampleCount)
+    }
+
+    @Test
+    fun `tick pendant la phase 1 accumule uniquement dans tongueOutAccumulator`() {
+        val state = startRecordingTongueOut().tick(
             elapsedMs = 100, embedding = floatArrayOf(1f), durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration,
         )
         assertEquals(1, state.tongueOutAccumulator.sampleCount)
@@ -36,8 +70,8 @@ class TongueCalibrationRecordingStateTest {
     }
 
     @Test
-    fun `transition juste avant la frontiere reste dans la phase 1`() {
-        val state = newTongueCalibrationRecording().tick(
+    fun `transition juste avant la frontiere de la phase 1 reste dans la phase 1`() {
+        val state = startRecordingTongueOut().tick(
             elapsedMs = 999, embedding = floatArrayOf(1f), durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration,
         )
         assertEquals(TongueCalibrationPhase.RECORDING_TONGUE_OUT, state.phase)
@@ -46,7 +80,7 @@ class TongueCalibrationRecordingStateTest {
 
     @Test
     fun `transition a la frontiere exacte de la phase 1 passe en pause PREPARE_TONGUE_IN`() {
-        val state = newTongueCalibrationRecording()
+        val state = startRecordingTongueOut()
             .tick(elapsedMs = 999, embedding = floatArrayOf(1f), durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration)
             .tick(elapsedMs = 1, embedding = floatArrayOf(2f), durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration)
         assertEquals(TongueCalibrationPhase.PREPARE_TONGUE_IN, state.phase)
@@ -56,7 +90,7 @@ class TongueCalibrationRecordingStateTest {
 
     @Test
     fun `PREPARE_TONGUE_IN n'accumule jamais, meme avec un embedding non-null`() {
-        val state = newTongueCalibrationRecording()
+        val state = startRecordingTongueOut()
             .tick(elapsedMs = duration, embedding = floatArrayOf(1f), durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration) // -> PREPARE_TONGUE_IN
             .tick(elapsedMs = 100, embedding = floatArrayOf(9f), durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration)
         assertEquals(TongueCalibrationPhase.PREPARE_TONGUE_IN, state.phase)
@@ -65,8 +99,8 @@ class TongueCalibrationRecordingStateTest {
     }
 
     @Test
-    fun `transition a la frontiere de la pause passe en phase 2`() {
-        val state = newTongueCalibrationRecording()
+    fun `transition a la frontiere de la pause PREPARE_TONGUE_IN passe en phase 2`() {
+        val state = startRecordingTongueOut()
             .tick(elapsedMs = duration, embedding = floatArrayOf(1f), durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration) // -> PREPARE_TONGUE_IN
             .tick(elapsedMs = prepare, embedding = null, durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration) // -> RECORDING_TONGUE_IN
         assertEquals(TongueCalibrationPhase.RECORDING_TONGUE_IN, state.phase)
@@ -75,7 +109,7 @@ class TongueCalibrationRecordingStateTest {
 
     @Test
     fun `tick pendant la phase 2 accumule uniquement dans tongueInAccumulator`() {
-        val state = newTongueCalibrationRecording()
+        val state = startRecordingTongueOut()
             .tick(elapsedMs = duration, embedding = floatArrayOf(1f), durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration) // -> PREPARE_TONGUE_IN
             .tick(elapsedMs = prepare, embedding = null, durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration) // -> RECORDING_TONGUE_IN
             .tick(elapsedMs = 100, embedding = floatArrayOf(9f), durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration)
@@ -89,7 +123,7 @@ class TongueCalibrationRecordingStateTest {
         // Preuve que la phase 2 respecte sa propre duree (tongueInDuration = 1500) plutot que
         // celle de la phase 1 (duration = 1000) -- narrivait pas a DONE avant ce correctif du 13
         // aout 2026, les deux phases partageaient la meme constante.
-        val justBefore = newTongueCalibrationRecording()
+        val justBefore = startRecordingTongueOut()
             .tick(elapsedMs = duration, embedding = floatArrayOf(1f), durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration) // -> PREPARE_TONGUE_IN
             .tick(elapsedMs = prepare, embedding = null, durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration) // -> RECORDING_TONGUE_IN
             .tick(elapsedMs = duration, embedding = floatArrayOf(9f), durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration) // elapsed=1000 < 1500
@@ -115,10 +149,12 @@ class TongueCalibrationRecordingStateTest {
     fun `tick sans durationMs explicite utilise desormais DEFAULT_TONGUE_OUT_RECORDING_DURATION_MS, pas l'unite de base`() {
         // Reproduit ce qui a change le 13 aout 2026 : avant, le defaut de durationMs valait
         // DEFAULT_CALIBRATION_RECORDING_DURATION_MS (l'unite de base, non multipliee) -- desormais
-        // il vaut le double, en symetrie avec tongueInDurationMs.
-        val justBeforeBase = newTongueCalibrationRecording().tick(
-            elapsedMs = DEFAULT_CALIBRATION_RECORDING_DURATION_MS - 1, embedding = floatArrayOf(1f),
-        )
+        // il vaut le double, en symetrie avec tongueInDurationMs. prepareDurationMs=0 pour sauter
+        // la pause PREPARE_TONGUE_OUT en un seul tick, hors du champ de ce test précis.
+        val recording = newTongueCalibrationRecording().tick(elapsedMs = 0, embedding = null, prepareDurationMs = 0L)
+        assertEquals(TongueCalibrationPhase.RECORDING_TONGUE_OUT, recording.phase)
+
+        val justBeforeBase = recording.tick(elapsedMs = DEFAULT_CALIBRATION_RECORDING_DURATION_MS - 1, embedding = floatArrayOf(1f))
         assertEquals(TongueCalibrationPhase.RECORDING_TONGUE_OUT, justBeforeBase.phase)
 
         val stillRecordingPastBase = justBeforeBase.tick(elapsedMs = 2, embedding = floatArrayOf(1f))
@@ -126,8 +162,24 @@ class TongueCalibrationRecordingStateTest {
     }
 
     @Test
+    fun `PREPARE_TONGUE_OUT et PREPARE_TONGUE_IN partagent le meme parametre prepareDurationMs`() {
+        // Ajoutée le 13 août 2026 (revue technique, point 56) : les deux pauses utilisent le même
+        // paramètre plutôt que deux durées indépendantes -- vérifie que prepareDurationMs contrôle
+        // bien les deux frontières, pas seulement celle entre les deux enregistrements.
+        val stillPreparingOut = newTongueCalibrationRecording().tick(
+            elapsedMs = prepare - 1, embedding = null, durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration,
+        )
+        assertEquals(TongueCalibrationPhase.PREPARE_TONGUE_OUT, stillPreparingOut.phase)
+
+        val recordingOut = stillPreparingOut.tick(
+            elapsedMs = 1, embedding = null, durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration,
+        )
+        assertEquals(TongueCalibrationPhase.RECORDING_TONGUE_OUT, recordingOut.phase)
+    }
+
+    @Test
     fun `result null avant DONE`() {
-        val state = newTongueCalibrationRecording().tick(
+        val state = startRecordingTongueOut().tick(
             elapsedMs = 100, embedding = floatArrayOf(1f), durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration,
         )
         assertNull(state.result())
@@ -135,7 +187,7 @@ class TongueCalibrationRecordingStateTest {
 
     @Test
     fun `result correct une fois DONE`() {
-        val state = newTongueCalibrationRecording()
+        val state = startRecordingTongueOut()
             .tick(elapsedMs = duration, embedding = floatArrayOf(1f, 0f), durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration) // -> PREPARE_TONGUE_IN
             .tick(elapsedMs = prepare, embedding = null, durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration) // -> RECORDING_TONGUE_IN
             .tick(elapsedMs = tongueInDuration, embedding = floatArrayOf(0f, 1f), durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration) // -> DONE
@@ -147,16 +199,16 @@ class TongueCalibrationRecordingStateTest {
 
     @Test
     fun `tick a embedding null avance quand meme le temps sans accumuler`() {
-        val state = newTongueCalibrationRecording().tick(
-            elapsedMs = 500, embedding = null, durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration,
+        val state = startRecordingTongueOut().tick(
+            elapsedMs = 100, embedding = null, durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration,
         )
         assertEquals(0, state.tongueOutAccumulator.sampleCount)
-        assertEquals(500L, state.elapsedMsInPhase)
+        assertEquals(100L, state.elapsedMsInPhase)
     }
 
     @Test
     fun `tick apres DONE est un no-op`() {
-        val done = newTongueCalibrationRecording()
+        val done = startRecordingTongueOut()
             .tick(elapsedMs = duration, embedding = floatArrayOf(1f), durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration)
             .tick(elapsedMs = prepare, embedding = null, durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration)
             .tick(elapsedMs = tongueInDuration, embedding = floatArrayOf(1f), durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration)

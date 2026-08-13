@@ -100,6 +100,7 @@ fun TongueCalibrationScreen(
                     } else {
                         stringResource(R.string.tongue_calibration_status_never)
                     }
+                TongueCalibrationPhase.PREPARE_TONGUE_OUT -> stringResource(R.string.tongue_calibration_status_prepare_out)
                 TongueCalibrationPhase.RECORDING_TONGUE_OUT -> stringResource(R.string.tongue_calibration_status_recording_out)
                 TongueCalibrationPhase.PREPARE_TONGUE_IN -> stringResource(R.string.tongue_calibration_status_prepare_in)
                 TongueCalibrationPhase.RECORDING_TONGUE_IN -> stringResource(R.string.tongue_calibration_status_recording_in)
@@ -132,7 +133,10 @@ fun TongueCalibrationScreen(
                         )
                     }
                 }
-                TongueCalibrationPhase.RECORDING_TONGUE_OUT, TongueCalibrationPhase.PREPARE_TONGUE_IN, TongueCalibrationPhase.RECORDING_TONGUE_IN -> {
+                TongueCalibrationPhase.PREPARE_TONGUE_OUT,
+                TongueCalibrationPhase.RECORDING_TONGUE_OUT,
+                TongueCalibrationPhase.PREPARE_TONGUE_IN,
+                TongueCalibrationPhase.RECORDING_TONGUE_IN -> {
                     OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.tongue_calibration_button_cancel))
                     }
