@@ -117,7 +117,10 @@ class VmcOscSender(
     // depuis sendExecutor (thread unique), donc sans besoin de synchronisation.
     private val serializerBuilder = OSCSerializerAndParserBuilder()
     private val sendBuffer = ByteBuffer.allocate(SEND_BUFFER_SIZE)
-    private var socket: DatagramSocket? = null
+    // Lu/écrit depuis 3 threads (celui qui appelle connect(), sendExecutor, la sonde de vivacité
+    // démarrée par connect()) -- @Volatile nécessaire pour la visibilité inter-thread, même
+    // raisonnement que targetAddress/sendSocket dans IFacialMocapSender.
+    @Volatile private var socket: DatagramSocket? = null
 
     // Vrai après le premier PortUnreachableException détecté (voir send()) -- garde onConnectionLost
     // à un seul appel (pas un par frame en échec) et évite de retenter des envois voués à échouer
