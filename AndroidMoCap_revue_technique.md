@@ -2928,3 +2928,54 @@ affichait à tort la durée d'enregistrement au lieu de la pause) mis à jour. U
 FR/EN, symétrique à `prepare_in`), bouton "Annuler" étendu à cette nouvelle phase. 20 tests JVM (+4)
 -- toutes les phases `PREPARE_*` couvertes de façon symétrique désormais. Build + tests
 `BUILD SUCCESSFUL`, installé sur device cette fois.
+
+**Revue de code globale de la feature (13 août 2026), 5 findings corrigés.**
+
+1. **Correctif principal -- l'anti-rebond d'injection pouvait quasi ne jamais se confirmer.**
+   `tongueOutInjectionState.next(...)` était appelé à chaque frame caméra traitée, mais
+   `tongueOutClassification` n'est non-null que sur les frames où `embed()` a réellement tourné
+   (throttlé à ~150ms, `TONGUE_EMBEDDING_MIN_INTERVAL_MS`) -- chaque frame intermédiaire passait
+   `null`, remettant `consecutiveOutFrames` à zéro exactement comme une vraie classification
+   négative. Or les frames caméra arrivent à 20-60Hz (16-50ms) alors qu'une classification fraîche
+   n'est disponible que toutes les ~150-230ms (cohérent avec les 262 appels mesurés en moyenne
+   ~229ms d'écart, session précédente) -- deux frames *littéralement consécutives* avec
+   classification fraîche sont donc rares, rendant `confirmed()` (seuil à 2) quasi impossible à
+   atteindre en pratique malgré une classification qui revient pourtant correctement et
+   régulièrement `TONGUE_OUT`. Explication plausible du "ça clignote un peu" encore observé après
+   tous les correctifs précédents.
+
+   **Correctif retenu** : distinguer "pas de tentative cette frame" (throttle, pas encore calibré,
+   échec de recadrage -- aucune information) de "vrai signal négatif" (étage 1 fermé -- bouche trop
+   fermée pour qu'une langue soit visible -- ou classification réellement tentée mais
+   `TONGUE_IN`/`UNDECIDED`). Nouvelle fonction pure `tongueOutInjectionShouldUpdate(stage1Open,
+   classification)` (`TongueOutInjectionGate.kt`) : `!stage1Open || classification != null`.
+   `MainViewModel.kt` n'appelle `next()` que si cette fonction renvoie `true`, sinon l'état est gelé
+   plutôt que réinitialisé à tort. Le contrat de `TongueOutInjectionState.next()` lui-même reste
+   inchangé (déjà bien testé) -- seule la décision "quand l'appeler" change, dans la couche
+   d'orchestration. 5 tests JVM ajoutés, dont un reproduisant explicitement le scénario throttle
+   (`TongueOutInjectionGateTest.kt`, 15 tests au total).
+
+2-3. **Deux docs mensongères sur l'envoi réseau corrigées** : `TongueOutDisplaySmoothing.kt`
+   (kdoc de classe) et `MainViewModel.kt` (kdoc de `MainUiState.tongueOutDetectionEnabled`)
+   affirmaient tous les deux encore que `tongueOut` n'est "jamais envoyé au réseau"/"affiché
+   localement uniquement" -- oublié lors du nettoyage doc de l'activation de l'injection (commit
+   `3ada1d0`, même journée). Corrigés pour refléter l'état réel.
+
+4. **Référence de seuil obsolète** : `MainViewModel.kt` (kdoc de `TONGUE_EMBEDDING_MIN_INTERVAL_MS`)
+   citait encore `DEFAULT_TONGUE_OUT_INJECTION_CONSECUTIVE_FRAMES = 3` (valeur d'avant
+   l'abaissement à 2 le même jour). Corrigé, et étoffé pour documenter l'interaction avec le
+   correctif du point 1 ci-dessus.
+
+5. **`embed()` pouvait tourner deux fois par frame en recalibration** : pendant une session
+   "Recalibrer" (calibration existante encore chargée dans `tongueCalibrationResult` tant que la
+   nouvelle n'est pas `DONE`) avec le toggle actif, l'appel de calibration (non throttlé,
+   accumulateur) et l'appel de la cascade live (throttlé à 150ms, contre l'ancienne référence sur
+   le point d'être remplacée) tournaient tous les deux sur la même frame. Corrigé en sautant la
+   classification live de la cascade tant qu'une calibration est activement en cours d'enregistrement
+   (`!tongueCalibrationRecordingActive`, nouvelle variable partagée entre les deux blocs).
+
+Au passage, `jawOpenGateOpen(jawOpen)` était appelé trois fois indépendamment sur la même frame
+(le gate lui-même, le log de diagnostic, et maintenant `tongueOutInjectionShouldUpdate`) -- extrait
+en `val stage1Open` calculé une fois, réutilisé aux trois endroits.
+
+Build + tests `BUILD SUCCESSFUL` (15 tests `TongueOutInjectionGateTest.kt`, +5), installé sur device.

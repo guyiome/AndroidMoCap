@@ -59,6 +59,7 @@ import com.guyiome.androidmocap.tracking.TongueEmbeddingClassification
 import com.guyiome.androidmocap.tracking.TongueOutDisplayState
 import com.guyiome.androidmocap.tracking.TongueOutInjectionState
 import com.guyiome.androidmocap.tracking.confirmed
+import com.guyiome.androidmocap.tracking.tongueOutInjectionShouldUpdate
 import com.guyiome.androidmocap.tracking.jawOpenGateOpen
 import com.guyiome.androidmocap.tracking.mouthGeometricGateOpen
 import com.guyiome.androidmocap.tracking.mirrorFaceTrackingResult
@@ -225,9 +226,11 @@ data class MainUiState(
     val mirrorModeEnabled: Boolean = true,
     // Détection expérimentale de la langue tirée (point 15) -- collecté en continu, effet immédiat.
     // Désactivée par défaut, rangée dans "Fonctionnalités expérimentales" (voir
-    // AppSettingsStore.tongueOutDetectionEnabled). Valeur affichée localement uniquement (panneau
-    // de blendshapes, si tongueOut est coché) -- jamais injectée dans "final"/corrected.blendshapes
-    // ni envoyée aux protocoles réseau tant que la fiabilité de l'étage 3 n'est pas confirmée.
+    // AppSettingsStore.tongueOutDetectionEnabled). Affichée dans le panneau de blendshapes local
+    // (si tongueOut est coché) ET, depuis le 13 août 2026 (revue technique, point 15/56), réellement
+    // injectée dans "finalToSend" et envoyée aux trois protocoles réseau une fois calibré -- ce
+    // toggle gouverne donc désormais détection ET injection ensemble, plus de distinction entre les
+    // deux comme avant l'activation.
     val tongueOutDetectionEnabled: Boolean = false,
     // Étage 3 (point 15) : calibration personnelle par embedding. Phase de la machine à état
     // (IDLE hors calibration), poussée dans _uiState seulement aux transitions (pas à chaque
@@ -340,9 +343,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         // Intervalle minimal entre deux appels à TongueEmbeddingHelper.embed() (natif, synchrone,
         // coûteux) -- voir tongueEmbeddingLastCallTimestampMs pour le contexte complet (ANR confirmé
-        // sur device sans cette limite). ~6-7 Hz max, largement suffisant pour ce signal (comparer à
-        // DEFAULT_TONGUE_OUT_INJECTION_CONSECUTIVE_FRAMES = 3 côté anti-rebond, qui a de toute façon
-        // besoin de plusieurs échantillons dans la durée, pas d'un débit élevé).
+        // sur device sans cette limite). ~6-7 Hz max. Ce débit réduit interagit directement avec
+        // l'anti-rebond côté injection (DEFAULT_TONGUE_OUT_INJECTION_CONSECUTIVE_FRAMES = 2,
+        // TongueOutInjectionGate.kt) : une classification fraîche n'arrive qu'à ce débit, pas à
+        // celui de la caméra -- voir tongueOutInjectionShouldUpdate() pour la garde ajoutée en
+        // conséquence (revue de code, 13 août 2026) plutôt que de compter des frames caméra brutes.
         private const val TONGUE_EMBEDDING_MIN_INTERVAL_MS = 150L
 
         // Cadence du sondage de throttling thermique (voir startThermalPolling) -- doit rester
@@ -1052,9 +1057,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // tient le geste sur commande (TongueCalibrationScreen), gater sur jawOpen/couleur ici serait
         // contre-productif. Temps écoulé depuis le tick précédent (pas un compte de frames), même
         // discipline que eyeBlinkCorrectionLastTimestampMs plus haut.
-        if (tongueCalibrationRecordingState.phase != TongueCalibrationPhase.IDLE &&
+        // Réutilisé plus bas (cascade) pour éviter un double appel à embed() -- voir son usage.
+        val tongueCalibrationRecordingActive = tongueCalibrationRecordingState.phase != TongueCalibrationPhase.IDLE &&
             tongueCalibrationRecordingState.phase != TongueCalibrationPhase.DONE
-        ) {
+        if (tongueCalibrationRecordingActive) {
             val calibrationElapsedMs = tongueCalibrationLastTimestampMs?.let { corrected.timestampMs - it } ?: 0L
             tongueCalibrationLastTimestampMs = corrected.timestampMs
             val embedding = sampleMouthTongueEmbedding(
@@ -1152,7 +1158,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // aval (probablement classé UNDECIDED/TONGUE_IN plutôt que confondu avec TONGUE_OUT,
             // hypothèse à confirmer sur device -- à revenir en arrière si le faux positif d'origine
             // réapparaît).
-            if (jawOpenGateOpen(jawOpen)) {
+            // Calculé une seule fois, réutilisé pour le if ci-dessous, le log de diagnostic de la
+            // branche else, et tongueOutInjectionShouldUpdate() plus bas (revue de code, 13 août
+            // 2026 -- évite trois appels équivalents à jawOpenGateOpen(jawOpen) sur la même frame).
+            val stage1Open = jawOpenGateOpen(jawOpen)
+            if (stage1Open) {
                 val ratio = sampleMouthTonguePixelRatio(
                     corrected.timestampMs,
                     corrected.faceLandmarks,
@@ -1196,7 +1206,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val embeddingThrottled = tongueEmbeddingLastCallTimestampMs?.let {
                     corrected.timestampMs - it < TONGUE_EMBEDDING_MIN_INTERVAL_MS
                 } ?: false
-                if (calibrationResult != null && !embeddingThrottled) {
+                // !tongueCalibrationRecordingActive (revue de code, 13 août 2026) : sans cette
+                // garde, une recalibration ("Recalibrer", calibration précédente encore chargée
+                // dans tongueCalibrationResult tant que la nouvelle n'est pas DONE) appelait embed()
+                // deux fois par frame -- une fois ici (contre l'ancienne référence, gaspillé : sur
+                // le point de devenir obsolète) et une fois non-throttlée pour l'accumulateur de
+                // calibration (voir plus haut) -- même coût natif que celui protégé par
+                // TONGUE_EMBEDDING_MIN_INTERVAL_MS contre l'ANR, sur un chemin que ce throttle ne
+                // couvrait pas.
+                if (calibrationResult != null && !embeddingThrottled && !tongueCalibrationRecordingActive) {
                     tongueEmbeddingLastCallTimestampMs = corrected.timestampMs
                     val embedding = sampleMouthTongueEmbedding(
                         corrected.timestampMs,
@@ -1237,7 +1255,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 AppLog.d(
                     TONGUE_DIAG_TAG,
                     "jawOpen=%.3f mouthGeo=%.3f etage1=NON (jawOpenOk=%s mouthGeoOk=%s)".format(
-                        jawOpen, mouthGeometric, jawOpenGateOpen(jawOpen), mouthGeometricGateOpen(mouthGeometric),
+                        jawOpen, mouthGeometric, stage1Open, mouthGeometricGateOpen(mouthGeometric),
                     ),
                 )
             }
@@ -1248,7 +1266,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // mouvement de mâchoire (voir son kdoc pour le détail des deux sessions de test). Le
             // panneau LOCAL de test et la valeur réellement envoyée au réseau partagent désormais ce
             // même signal debouncé -- plus de distinction "ce qu'on voit" / "ce qui part".
-            tongueOutInjectionState = tongueOutInjectionState.next(tongueOutClassification)
+            //
+            // ⚠️ N'appelle next() que si tongueOutInjectionShouldUpdate() dit que cette frame apporte
+            // une vraie information (revue de code du 13 août 2026, même jour) -- sans cette garde,
+            // une frame où l'étage 1 reste ouvert mais où embed() a été sauté par le throttle
+            // (TONGUE_EMBEDDING_MIN_INTERVAL_MS, ~150ms) remettait le compteur à zéro comme une
+            // vraie classification négative, alors qu'aucune classification n'avait été tentée --
+            // rendait la confirmation à 2 frames consécutives quasi impossible dès que la caméra
+            // tourne plus vite que le throttle (20-60Hz typique contre ~150-230ms entre deux
+            // tentatives réussies mesuré sur device), malgré une classification qui revenait
+            // pourtant correctement et régulièrement TONGUE_OUT. Voir kdoc de
+            // tongueOutInjectionShouldUpdate().
+            if (tongueOutInjectionShouldUpdate(stage1Open, tongueOutClassification)) {
+                tongueOutInjectionState = tongueOutInjectionState.next(tongueOutClassification)
+            }
             val debouncedClassification =
                 if (tongueOutInjectionState.confirmed()) TongueEmbeddingClassification.TONGUE_OUT else null
 

@@ -35,3 +35,31 @@ internal fun TongueOutInjectionState.next(classification: TongueEmbeddingClassif
 internal fun TongueOutInjectionState.confirmed(
     requiredConsecutiveFrames: Int = DEFAULT_TONGUE_OUT_INJECTION_CONSECUTIVE_FRAMES,
 ): Boolean = consecutiveOutFrames >= requiredConsecutiveFrames
+
+/**
+ * `true` si cette frame apporte une information exploitable pour l'anti-rebond -- auquel cas
+ * l'appelant doit appeler [next] ; `false` si l'appelant doit laisser l'état inchangé plutôt que
+ * de le réinitialiser à tort.
+ *
+ * ⚠️ **Ajouté le 13 août 2026** (revue technique, point 15/56, revue de code) : avant cette
+ * fonction, `next()` était appelé à *chaque frame caméra traitée*, y compris celles où aucune
+ * classification n'avait été tentée -- une frame où l'étage 1 (`jawOpenGateOpen`) est ouvert mais
+ * où `embed()` a été sauté par la contre-pression anti-ANR
+ * (`MainViewModel.TONGUE_EMBEDDING_MIN_INTERVAL_MS`, ~150ms) passait alors `null` à `next()`,
+ * remettant [TongueOutInjectionState.consecutiveOutFrames] à zéro exactement comme une vraie
+ * classification négative. Or les frames caméra arrivent à 20-60Hz (16-50ms) tandis qu'une
+ * classification fraîche n'est disponible que toutes les ~150-230ms (mesuré sur device) --
+ * presque toutes les frames entre deux tentatives réussies remettaient donc le compteur à zéro
+ * avant qu'il puisse jamais atteindre [DEFAULT_TONGUE_OUT_INJECTION_CONSECUTIVE_FRAMES], rendant
+ * la confirmation quasi impossible en pratique malgré une classification correcte et répétée.
+ *
+ * Distinction retenue : [stage1Open] `false` (bouche géométriquement trop fermée pour qu'une
+ * langue soit visible) est un vrai signal négatif -- doit réinitialiser, comme avant. [stage1Open]
+ * `true` mais [classification] `null` (throttle, pas encore calibré, échec de recadrage/bitmap)
+ * n'apporte aucune information -- ne doit pas réinitialiser, l'état doit attendre la prochaine
+ * vraie tentative.
+ */
+internal fun tongueOutInjectionShouldUpdate(
+    stage1Open: Boolean,
+    classification: TongueEmbeddingClassification?,
+): Boolean = !stage1Open || classification != null
