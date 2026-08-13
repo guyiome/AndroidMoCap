@@ -26,6 +26,16 @@ internal fun jawOpenGateOpen(jawOpenScore: Float, threshold: Float = DEFAULT_JAW
  * `MIN_CROP_DIMENSION_PX`), sépare nettement les deux cas sur toutes les données collectées ce
  * jour-là : bouche pressée/fermée ≈ 0,001-0,12, bouche réellement ouverte (avec ou sans langue) ≈
  * 0,44+. Seuil choisi à mi-chemin avec une marge confortable des deux côtés, pas finement calé.
+ *
+ * ⚠️ **Retiré de la porte dure le 13 août 2026** (`MainViewModel`, revue technique point 15/56) :
+ * confirmé sur device qu'une VRAIE tenue "langue dehors" peut produire exactement la même
+ * signature que "bouche pressée" (`jawOpen` confiant, `mouthGeometricRatio` très bas -- la langue
+ * elle-même semble perturber le suivi des landmarks internes utilisés par [mouthOpennessRatio]) --
+ * chevauchement quasi total des deux plages, aucun seuil ne peut les séparer proprement. La
+ * fonction reste ici (pure, testée) et son calcul reste loggé en diagnostic, mais elle ne bloque
+ * plus l'étage 1 -- l'étage 3 (calibration personnelle + anti-rebond d'injection, nettement
+ * renforcé depuis) s'est montré capable de rejeter seul le cas "bouche pressée" (confirmé sur
+ * device : classé `TONGUE_IN`, pas confondu avec `TONGUE_OUT`).
  */
 internal const val DEFAULT_MOUTH_GEOMETRIC_GATE_THRESHOLD = 0.2f
 

@@ -329,13 +329,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // chaque frame traitée quand le toggle langue tirée est actif, avec extraction de région +
         // formatage de chaîne + écriture logcat, un coût réel maintenant plus perceptible avec le
         // fond caméra live comme référence visuelle).
-        // Réactivé ponctuellement le 13 août 2026 pour capturer simOut/simIn réels pendant deux
-        // sessions de reproduction de la dérive "langue rentrée + mâchoire -> faux TONGUE_OUT" (revue
-        // technique, point 15ter/15quinquies) -- données recueillies, calibration élargie au
-        // mouvement de mâchoire + anti-rebond d'injection ajoutés en conséquence (voir
-        // TongueCalibrationRecordingState.kt/TongueOutInjectionGate.kt), repassé à `false`.
+        // Investigation complète du 13 août 2026 (revue technique, point 15/56) : ANR corrigé
+        // (contre-pression sur embed()), gate géométrique étage 1 retiré, gate couleur étage 2
+        // retiré, seuil d'anti-rebond abaissé à 2 -- confirmé sur device (streak de 48 TONGUE_OUT
+        // consécutifs sur une tenue continue, charge embed() mesurée ~9,6ms en moyenne, largement
+        // dans le budget). Repassé à `false`.
         private const val TONGUE_DIAGNOSTIC_LOGGING = false
         private const val TONGUE_DIAG_TAG = "TongueDiag"
+
+        // Intervalle minimal entre deux appels à TongueEmbeddingHelper.embed() (natif, synchrone,
+        // coûteux) -- voir tongueEmbeddingLastCallTimestampMs pour le contexte complet (ANR confirmé
+        // sur device sans cette limite). ~6-7 Hz max, largement suffisant pour ce signal (comparer à
+        // DEFAULT_TONGUE_OUT_INJECTION_CONSECUTIVE_FRAMES = 3 côté anti-rebond, qui a de toute façon
+        // besoin de plusieurs échantillons dans la durée, pas d'un débit élevé).
+        private const val TONGUE_EMBEDDING_MIN_INTERVAL_MS = 150L
 
         // Cadence du sondage de throttling thermique (voir startThermalPolling) -- doit rester
         // cohérente avec ThermalThrottleState.SUSTAINED_THROTTLE_TICKS (12 sondages consécutifs,
@@ -453,6 +460,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // point 15) -- remplace un seuil absolu fixe qui s'est révélé instable d'une session à l'autre
     // sur device (11 août 2026).
     private var tongueColorBaselineState = TongueColorBaseline()
+    // Contre-pression sur l'étage 3 (embed() natif, synchrone, coûteux -- MediaPipe ImageEmbedder),
+    // ajoutée le 13 août 2026 suite à un ANR confirmé sur device ("Input dispatching timed out")
+    // pendant une session où l'utilisateur enchaînait des mouvements de mâchoire/lèvres rapides et
+    // variés pour tester la cascade : rien ne limitait jusqu'ici la fréquence d'appel de embed(),
+    // qui tournait à chaque frame franchissant les étages 1+2 -- jusqu'au débit caméra complet
+    // (30-60 Hz) si les portes restaient ouvertes en continu. Même famille de correctif que
+    // ArCoreHeadPoseTracker.MAX_PENDING_CONVERSIONS (contre-pression explicite plutôt que
+    // d'espérer que ça ne pose jamais problème). Voir son utilisation plus bas.
+    private var tongueEmbeddingLastCallTimestampMs: Long? = null
     // Garde contre un double appel à initializeTracking() (ex. permission caméra révoquée puis
     // ré-accordée sans destruction de l'Activity) -- sans cette garde, un second appel recréait un
     // FaceLandmarkerHelper et un CameraController complets par-dessus les précédents, sans jamais
@@ -1118,11 +1134,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // perturbe le suivi des landmarks mâchoire) ou un vrai relâchement de la bouche.
             val mouthGeometric = mouthOpennessRatio(corrected.faceLandmarks)
             var tongueOutClassification: TongueEmbeddingClassification? = null
-            // jawOpen (ML) ET mouthGeometric (géométrique) requis ensemble depuis le 11 août 2026 --
-            // jawOpen seul peut être trompé (bouche pressée/lèvre mordue lit un jawOpen élevé malgré
-            // une bouche géométriquement fermée), reproduit deux fois sur device le même jour (revue
-            // technique, point 15quinquies). Voir kdoc de mouthGeometricGateOpen (TongueOutGate.kt).
-            if (jawOpenGateOpen(jawOpen) && mouthGeometricGateOpen(mouthGeometric)) {
+            // ⚠️ mouthGeometricGateOpen retiré de la porte dure le 13 août 2026 (revue technique,
+            // point 15/56) -- gardé en jawOpen seul. Ajouté le 11 août pour bloquer un faux positif
+            // "bouche pressée" (jawOpen 0,3-0,5+ malgré une bouche géométriquement fermée, point
+            // 15quinquies), mais confirmé sur device qu'une VRAIE tenue "langue dehors" produit
+            // exactement la même signature (jawOpen 0,43-0,73 ET mouthGeo très bas, 0,005-0,199 --
+            // la langue elle-même semble perturber le suivi des landmarks internes 13/14 utilisés
+            // par mouthOpennessRatio) : chevauchement quasi total des deux plages, aucun seuil ne
+            // peut les séparer. mouthGeometric reste calculé et loggé (diagnostic), mais ne bloque
+            // plus l'étage 1 -- pari que les étages 2/3 (nettement renforcés depuis, calibration
+            // élargie + anti-rebond d'injection) suffisent à rejeter le cas "bouche pressée" en
+            // aval (probablement classé UNDECIDED/TONGUE_IN plutôt que confondu avec TONGUE_OUT,
+            // hypothèse à confirmer sur device -- à revenir en arrière si le faux positif d'origine
+            // réapparaît).
+            if (jawOpenGateOpen(jawOpen)) {
                 val ratio = sampleMouthTonguePixelRatio(
                     corrected.timestampMs,
                     corrected.faceLandmarks,
@@ -1147,17 +1172,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     tongueColorBaselineState = tongueColorBaselineState.next(ratio)
                 }
 
-                // Étage 3 (embedding + calibration personnelle, revue technique point 15) -- ne se
-                // déclenche que si l'étage 2 a lui-même donné un indice positif (adaptiveFired,
-                // retenu comme le moins mauvais des deux signaux étage 2 -- colorFired seul jugé
-                // trop instable sur device) ET qu'une calibration existe. Toute la cascade garde le
-                // même principe : chaque étage ne se déclenche que si le précédent a déjà donné un
-                // indice positif. Purement diagnostique -- aucune injection dans "final"/
-                // corrected.blendshapes tant qu'un test device n'a pas confirmé l'étage 3 lui-même.
+                // Étage 3 (embedding + calibration personnelle, revue technique point 15) -- ne
+                // dépend plus d'un indice positif de l'étage 2 depuis le 13 août 2026 (adaptiveFired
+                // retiré du gate, comme mouthGeometricGateOpen à l'étage 1 le même jour) : constaté
+                // sur device qu'il bloquait 63% des frames où la mâchoire était pourtant ouverte
+                // (276/435 sur une session de tenue continue), l'étage 3 ne recevant alors jamais sa
+                // chance de trancher. adaptiveFired/colorFired restent calculés et loggés
+                // (diagnostic), ne bloquent plus rien -- ne reste que jawOpenGateOpen (étage 1) ET
+                // une calibration existante.
                 var simOut: Float? = null
                 var simIn: Float? = null
                 val calibrationResult = tongueCalibrationResult
-                if (adaptiveFired && calibrationResult != null) {
+                // Contre-pression (TONGUE_EMBEDDING_MIN_INTERVAL_MS, voir kdoc de
+                // tongueEmbeddingLastCallTimestampMs) -- embed() natif synchrone, ne pas le rappeler
+                // plus vite que ce débit même si l'étage 1 reste ouvert en continu sur des dizaines
+                // de frames d'affilée (ANR confirmé sur device sans cette garde) -- d'autant plus
+                // important maintenant que l'étage 2 ne filtre plus rien en amont.
+                val embeddingThrottled = tongueEmbeddingLastCallTimestampMs?.let {
+                    corrected.timestampMs - it < TONGUE_EMBEDDING_MIN_INTERVAL_MS
+                } ?: false
+                if (calibrationResult != null && !embeddingThrottled) {
+                    tongueEmbeddingLastCallTimestampMs = corrected.timestampMs
                     val embedding = sampleMouthTongueEmbedding(
                         corrected.timestampMs,
                         corrected.faceLandmarks,

@@ -21,9 +21,9 @@ class TongueOutInjectionGateTest {
     }
 
     @Test
-    fun `confirme a partir de 3 TONGUE_OUT consecutifs (seuil par defaut)`() {
+    fun `confirme a partir de 2 TONGUE_OUT consecutifs (seuil par defaut, abaisse le 13 aout 2026)`() {
         var state = TongueOutInjectionState()
-        repeat(2) { state = state.next(TongueEmbeddingClassification.TONGUE_OUT) }
+        state = state.next(TongueEmbeddingClassification.TONGUE_OUT)
         assertFalse(state.confirmed())
         state = state.next(TongueEmbeddingClassification.TONGUE_OUT)
         assertTrue(state.confirmed())
@@ -39,11 +39,13 @@ class TongueOutInjectionGateTest {
     }
 
     @Test
-    fun `une paire consecutive ne suffit pas non plus -- reproduit l'autre residu observe`() {
+    fun `une paire consecutive confirme desormais -- compromis assume, seuil abaisse a 2 le 13 aout 2026`() {
+        // Contrairement au seuil d'origine (3) : ce cas precis (comme 16:00:10.759/10.888) est
+        // reste un residu connu et accepte, voir kdoc de DEFAULT_TONGUE_OUT_INJECTION_CONSECUTIVE_FRAMES.
         var state = TongueOutInjectionState()
             .next(TongueEmbeddingClassification.TONGUE_OUT)
-            .next(TongueEmbeddingClassification.TONGUE_OUT) // paire, comme 16:00:10.759/10.888
-        assertFalse(state.confirmed())
+            .next(TongueEmbeddingClassification.TONGUE_OUT)
+        assertTrue(state.confirmed())
     }
 
     @Test
@@ -84,7 +86,7 @@ class TongueOutInjectionGateTest {
         var state = TongueOutInjectionState()
         repeat(10) {
             state = state.next(TongueEmbeddingClassification.TONGUE_OUT)
-            if (it >= 2) assertTrue("frame $it devrait etre confirmee", state.confirmed())
+            if (it >= 1) assertTrue("frame $it devrait etre confirmee", state.confirmed())
         }
     }
 }

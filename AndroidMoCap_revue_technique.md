@@ -2761,10 +2761,12 @@ une feature taguée comme pas très fiable" (rangée dans "Fonctionnalités exp�
 mis à jour en conséquence).
 
 **Filet de sécurité ajouté en complément** (`TongueOutInjectionGate.kt`, nouveau) : anti-rebond
-exigeant `DEFAULT_TONGUE_OUT_INJECTION_CONSECUTIVE_FRAMES = 3` classements `TONGUE_OUT` consécutifs
-avant de considérer l'état confirmé pour l'injection -- filtre spécifiquement les deux motifs de
-résidu observés (une frame isolée, une paire consécutive), sans retarder significativement une vraie
-détection (jamais de coupure de 3 frames ou plus dans une vraie tenue sur les deux sessions).
+exigeant initialement `DEFAULT_TONGUE_OUT_INJECTION_CONSECUTIVE_FRAMES = 3` classements `TONGUE_OUT`
+consécutifs avant de considérer l'état confirmé pour l'injection -- filtre spécifiquement les deux
+motifs de résidu observés (une frame isolée, une paire consécutive), sans retarder significativement
+une vraie détection (jamais de coupure de 3 frames ou plus dans une vraie tenue sur les deux
+sessions). **Seuil abaissé à 2 le jour même après retour utilisateur sur device, voir plus bas -- ne
+plus se fier à ce paragraphe seul pour la valeur actuelle.**
 
 **Câblage réseau** (`MainViewModel.kt`) : l'envoi vers `vmcSender`/`iFacialMocapSender`/
 `vtubeStudioSender` (auparavant avant la cascade langue tirée dans le flot de la fonction, donc
@@ -2782,3 +2784,79 @@ observés en parallèle sur un sujet différent, voir point 55). Contournement f
 fichier de logs persistant de l'app directement (`adb shell run-as ... cat files/logs/app_logs.txt`,
 niveau "Info" réglé dans Réglages → Journalisation) plutôt que d'insister sur un flux logcat en
 direct -- à retenir pour un futur diagnostic sur ce device si logcat se montre à nouveau capricieux.
+
+**Suite le même jour -- retour utilisateur "énormément difficile à déclencher" une fois l'injection
+réelle activée, y compris en local.** Ce qui précède avait été validé sur les logs de calibration,
+pas sur l'usage réel une fois l'injection branchée -- l'écart s'est révélé important. Quatre pistes
+ont été creusées dans l'ordre, une abandonnée, trois retenues.
+
+**Piste abandonnée -- hypothèse "ratio lèvre externe".** En cherchant un signal géométrique
+alternatif à `mouthOpennessRatio` (landmarks internes 13/14), tentative d'utiliser les landmarks 61/291
+comme repères haut/bas de lèvre externe (`mouthOpennessRatioOuter()`, `LipLandmarks.kt`). Sur device,
+résultat inversé par rapport à l'attendu (élevé bouche fermée, bas bouche réellement ouverte) --
+conclusion : ces indices sont vraisemblablement les coins de bouche (gauche/droite), pas des repères
+haut/bas externes. Fonction, tests et câblage entièrement retirés, `LipLandmarks.kt` revenu à son état
+d'origine (seul `mouthOpennessRatio()` subsiste).
+
+**ANR (gel applicatif) découvert et corrigé.** Pendant les tests répétés de ce diagnostic, l'app a
+gelé au point de nécessiter un arrêt forcé (`adb shell am force-stop`) -- confirmé via logcat comme un
+authentique ANR ("Input dispatching timed out", 5001ms). Cause : `TongueEmbeddingHelper.embed()`
+(appel natif synchrone) n'avait aucune limite de fréquence et pouvait être appelé à chaque frame
+qualifiante, créant un engorgement lors de gestes soutenus/rapides. Corrigé par une garde de
+contre-pression (`MainViewModel.kt`, `TONGUE_EMBEDDING_MIN_INTERVAL_MS = 150L` +
+`tongueEmbeddingLastCallTimestampMs`) -- même principe que le précédent de
+`ArCoreHeadPoseTracker.MAX_PENDING_CONVERSIONS`. Confirmé sur device : plus aucun gel lors des tests
+suivants, même en sollicitant le geste en continu.
+
+**Étage 1 (porte géométrique) retiré du filtre dur.** Une fois l'ANR corrigé, tests device répétés :
+une VRAIE tenue "langue dehors" peut produire exactement la même signature que "bouche pressée"
+(`jawOpen` confiant, `mouthGeometricRatio` très bas -- la langue elle-même semble perturber le suivi
+des landmarks internes utilisés par `mouthOpennessRatio`). Chevauchement quasi total des deux plages,
+confirmé par les données diagnostiques du jour -- aucun seuil ne peut les séparer proprement (voir
+kdoc mis à jour de `mouthGeometricGateOpen`, `TongueOutGate.kt`). Retiré de la porte dure dans
+`MainViewModel.kt` (l'étage 1 ne teste plus que `jawOpenGateOpen`) ; la fonction reste en place,
+pure et testée, et continue d'être calculée pour le diagnostic. Validé sur device : le cas "bouche
+pressée" reste classé `TONGUE_IN` par l'étage 3 seul, sans confusion, sur un test de 19s continu
+(100% correct).
+
+**Seuil d'anti-rebond abaissé de 3 à 2** (`TongueOutInjectionGate.kt`,
+`DEFAULT_TONGUE_OUT_INJECTION_CONSECUTIVE_FRAMES`). Malgré le retrait de l'étage 1, retour direct de
+l'utilisateur : "aucune différence de mon côté" sur un geste tenu ~9s en continu depuis le lancement
+de l'app. Les logs ont confirmé qu'une tenue déclarée continue n'est en pratique pas aussi
+ininterrompue que ce que les deux sessions de calibrage avaient laissé penser -- à un seuil de 3, la
+détection devenait très difficile à déclencher en usage normal. Seuil abaissé à 2 sur validation
+explicite de l'utilisateur ("Oui essaye"). Cela rouvre délibérément le résidu "paire consécutive"
+observé lors du calage de la calibration (1 cas sur 103 échantillons, voir plus haut) -- seule la
+frame isolée reste filtrée désormais. Compromis assumé, documenté dans le kdoc de la constante et
+dans `TongueOutInjectionGateTest.kt` (tests renommés en conséquence, toujours 9 tests).
+
+**Étage 2 (porte couleur/baseline adaptative) retiré du filtre dur.** Le seuil abaissé n'ayant
+toujours pas suffi (retour utilisateur : "stop. J'ai tiré la langue NON STOP depuis l'allumage de
+l'app" -- toujours aucune injection observée), diagnostic réactivé et réinstallé pour une session
+soutenue complète. Analyse du log complet : sur les frames où l'étage 1 (jawOpen) était déjà ouvert,
+**63% (276/435) étaient bloquées par l'étage 2** (`adaptiveFired`, seuil de couleur + baseline
+adaptative) avant même d'atteindre l'étage 3 -- devenu le goulot dominant une fois l'étage 1 assoupli.
+Sur instruction explicite de l'utilisateur ("On tente comme ca, mais mesure la charge sur
+l'appareil"), l'exigence `adaptiveFired` a été retirée du déclenchement de l'étage 3 dans
+`MainViewModel.kt` (le calcul du gate couleur reste fait et loggé pour diagnostic, simplement plus
+utilisé comme filtre bloquant).
+
+**Résultats de la session de validation finale sur device :**
+- Détection nettement améliorée : 167/300 classifications `TONGUE_OUT` sur la session, streak maximal
+  de 48 frames consécutives (contre des coupures fréquentes avant ce changement).
+- Retour utilisateur : "Nettement mieux, ca 'clignotte' un peu" -- un résidu de scintillement reste
+  perceptible mais l'injection est désormais réellement utilisable, contrairement à l'état précédent.
+- **Charge device mesurée** (instrumentation temporaire autour de `sampleMouthTongueEmbedding()`,
+  retirée après mesure) : n=262 appels à `embed()`, moyenne 9,57ms, maximum 28ms -- largement dans le
+  budget du throttle de 150ms posé plus haut contre l'ANR. Aucun signe de charge excessive avec les
+  étages 1 et 2 retirés du filtre dur ; le coût réel de la cascade reste dominé par l'appel natif
+  `embed()` lui-même, pas par les calculs géométriques/couleur retirés (négligeables en comparaison).
+
+**Bilan de ce point à l'issue de cette session** : cascade à 3 étages toujours en place pour le
+diagnostic et le calcul (aucun code supprimé hors la fonction `mouthOpennessRatioOuter` abandonnée),
+mais seul l'étage 3 (classification par calibration personnelle) bloque réellement l'injection
+réseau désormais, épaulé par l'anti-rebond à 2 frames. `TONGUE_DIAGNOSTIC_LOGGING` repassé à `false`
+en fin de session (build propre installée sur device). Le risque résiduel reste le même qu'accepté
+plus haut (feature taguée "expérimentale", faux positifs occasionnels possibles) -- pas de nouvelle
+piste ouverte pour l'instant, la priorité était de rendre la fonctionnalité réellement déclenchable
+en usage normal, objectif atteint selon le retour utilisateur.

@@ -8,15 +8,20 @@ package com.guyiome.androidmocap.tracking
  * Ces deux sessions ont confirmé une nette amélioration (5/8 faux `TONGUE_OUT` sur l'ancienne
  * calibration statique, contre 0/98 puis 3/103 sur la nouvelle) mais **pas un zéro absolu** -- le
  * résidu observé est fait d'erreurs isolées (une frame seule, ou deux consécutives au maximum),
- * jamais une tenue soutenue. Exiger [DEFAULT_TONGUE_OUT_INJECTION_CONSECUTIVE_FRAMES] classements
- * `TONGUE_OUT` d'affilée avant de considérer l'état confirmé filtre ce résidu (constaté : 1 frame
- * isolée + 1 paire consécutive, aucune tenue de 3 frames ou plus dans le mauvais sens sur les deux
- * sessions) sans retarder significativement une vraie détection (une vraie tenue "langue dehors"
- * classait en continu sur les deux sessions, jamais de coupure de 3 frames ou plus une fois lancée).
- * Accepté comme risque résiduel raisonnable par l'utilisateur plutôt que de viser un impossible zéro
- * absolu -- voir la revue technique pour le détail des deux sessions.
+ * jamais une tenue soutenue.
+ *
+ * ⚠️ **Seuil abaissé de 3 à 2 le 13 août 2026, retour utilisateur immédiat** : à 3, la détection
+ * devenait très difficile à déclencher en usage normal (retour direct : "aucune différence de mon
+ * côté", confirmé dans les logs -- un geste "langue dehors" déclaré tenu ~9s n'a confirmé qu'une
+ * seule fois sur toute la fenêtre, la tenue soutenue n'étant pas aussi ininterrompue en pratique
+ * que ce qu'avaient laissé penser les deux sessions de calibrage). Exiger seulement
+ * [DEFAULT_TONGUE_OUT_INJECTION_CONSECUTIVE_FRAMES] classements consécutifs **rouvre
+ * explicitement** le résidu "paire consécutive" observé lors du calage de la calibration (1 cas sur
+ * 103 échantillons) -- seule la frame isolée reste filtrée. Compromis assumé : mieux vaut une
+ * détection réellement utilisable avec un risque résiduel connu et faible, qu'un filtre trop
+ * strict pour être exploitable au quotidien.
  */
-internal const val DEFAULT_TONGUE_OUT_INJECTION_CONSECUTIVE_FRAMES = 3
+internal const val DEFAULT_TONGUE_OUT_INJECTION_CONSECUTIVE_FRAMES = 2
 
 internal data class TongueOutInjectionState(val consecutiveOutFrames: Int = 0)
 
