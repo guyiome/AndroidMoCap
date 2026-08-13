@@ -75,16 +75,37 @@ class IFacialMocapSender(
     @Volatile private var sendSocket: DatagramSocket? = null
 
     /**
-     * Connecté à [address]/[PORT] (revue de code, 13 août 2026 : l'icône restait "connecté"
-     * indéfiniment si VBridger se fermait sans envoyer [STOP_HANDSHAKE], ex. fermeture forcée/crash
-     * plutôt qu'un arrêt propre) -- même principe que `VmcOscSender.connect()`, voir son kdoc pour
-     * le détail du mécanisme ICMP/[PortUnreachableException] et ses limites.
+     * Tente de connecter ce socket à [address]/[PORT] (revue de code, 13 août 2026 : l'icône
+     * restait "connecté" indéfiniment si VBridger se fermait sans envoyer [STOP_HANDSHAKE], ex.
+     * fermeture forcée/crash plutôt qu'un arrêt propre) -- même principe que
+     * `VmcOscSender.connect()`, voir son kdoc pour le détail du mécanisme ICMP/
+     * [PortUnreachableException], ses limites, **et la régression du même jour** (`connect()` sur
+     * une cible avec laquelle le socket n'a jamais échangé de trafic peut échouer immédiatement sur
+     * ce réseau) -- corrigée ici de la même façon : `connect()` en best-effort, un échec dégrade en
+     * mode non connecté (voir [DatagramSocket.isConnected] dans [send]) plutôt que d'empêcher tout
+     * envoi silencieusement (contrairement à VMC, un échec ici n'aurait pas fait échouer la
+     * connexion visiblement -- [startListening] appelle [onStatusChanged] avec l'IP quoi qu'il
+     * arrive -- juste plus aucune donnée envoyée, sans erreur visible : plus sournois, pas moins
+     * grave).
      */
-    private fun openSendSocket(address: InetAddress): DatagramSocket? = try {
-        DatagramSocket().apply { connect(address, PORT) }
-    } catch (e: Exception) {
-        AppLog.w(TAG, "Impossible d'ouvrir le socket UDP d'envoi vers $address:$PORT", e)
-        null
+    private fun openSendSocket(address: InetAddress): DatagramSocket? {
+        val newSocket = try {
+            DatagramSocket()
+        } catch (e: Exception) {
+            AppLog.w(TAG, "Impossible d'ouvrir le socket UDP d'envoi vers $address:$PORT", e)
+            return null
+        }
+        try {
+            newSocket.connect(address, PORT)
+        } catch (e: Exception) {
+            AppLog.w(
+                TAG,
+                "Connexion socket UDP échouée vers $address:$PORT, poursuite en mode non connecté " +
+                    "(pas de détection de déconnexion pour cette session)",
+                e,
+            )
+        }
+        return newSocket
     }
 
     /** Démarre l'écoute du handshake sur le port 49983. Idempotent. */
@@ -133,9 +154,13 @@ class IFacialMocapSender(
         if (!result.faceDetected || result.blendshapes.isEmpty()) return
         sendExecutor.execute {
             val out = sendSocket ?: return@execute
+            val address = targetAddress ?: return@execute
             try {
                 val bytes = buildMessage(result).toByteArray(Charsets.UTF_8)
-                out.send(DatagramPacket(bytes, bytes.size))
+                // Le socket n'est connecté à address/PORT que si openSendSocket() a réussi (voir son
+                // kdoc) -- sinon repli sur l'adresse explicite par paquet, comme avant ce correctif.
+                val packet = if (out.isConnected) DatagramPacket(bytes, bytes.size) else DatagramPacket(bytes, bytes.size, address, PORT)
+                out.send(packet)
             } catch (e: PortUnreachableException) {
                 // Identité vérifiée : si un nouveau handshake est arrivé entretemps (autre thread,
                 // voir startListening()), sendSocket pointe déjà vers une connexion différente --

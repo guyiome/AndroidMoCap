@@ -147,7 +147,7 @@ class VmcOscSender(
      * local éphémère, aucun aller-retour réseau ici) : ressources système épuisées, permission
      * réseau refusée. Loggé -- voir [isConnected] pour la doc complète du raisonnement.
      *
-     * Le socket est explicitement `connect()`-é à [host]/[port] (contrairement à avant, un socket
+     * Tente ensuite de `connect()`-er ce socket à [host]/[port] (contrairement à avant, un socket
      * UDP non connecté) -- ça ne fait toujours aucun aller-retour réseau (UDP reste sans connexion,
      * l'OS ne peut pas savoir si la cible est joignable à cet instant), mais ça permet à l'OS de
      * délivrer au socket un paquet ICMP "port injoignable" si un jour aucun processus n'écoute plus
@@ -155,14 +155,37 @@ class VmcOscSender(
      * Fonctionne de façon fiable sur un même réseau local (cas d'usage principal de l'app) ; peut ne
      * pas se déclencher à travers certains routeurs/pare-feux qui filtrent l'ICMP -- signal du même
      * type que la coupure TCP de VTubeStudioSender, pas une garantie absolue comme un vrai handshake.
+     *
+     * ⚠️ **Régression confirmée sur device et corrigée (13 août 2026)** : sur ce réseau, `connect()`
+     * pouvait lui-même échouer immédiatement (route pas encore résolue vers une cible avec laquelle
+     * le socket n'a jamais échangé de trafic -- comportement Android, contrairement à un `send()`
+     * classique qui s'en sortait très bien) -- traité par erreur comme un échec de connexion complet
+     * (`isConnected` à `false`), empêchant toute connexion VMC de fonctionner. `connect()` est donc
+     * maintenant tenté en best-effort, séparément de l'ouverture du socket : un échec dégrade en mode
+     * non connecté (comportement d'avant ce correctif -- fonctionne, juste sans détection de
+     * déconnexion pour cette session-là) plutôt que de faire échouer la connexion entière. Voir
+     * [DatagramSocket.isConnected] utilisé dans [send] pour adapter la construction du paquet aux
+     * deux cas.
      */
     private fun connect() {
-        socket = try {
-            DatagramSocket().apply { connect(host, port) }
+        val newSocket = try {
+            DatagramSocket()
         } catch (e: Exception) {
             AppLog.w(TAG, "Impossible d'ouvrir le socket UDP local pour la cible VMC $host:$port", e)
-            null
+            socket = null
+            return
         }
+        try {
+            newSocket.connect(host, port)
+        } catch (e: Exception) {
+            AppLog.w(
+                TAG,
+                "Connexion socket UDP échouée pour la cible VMC $host:$port, poursuite en mode non " +
+                    "connecté (pas de détection de déconnexion pour cette session)",
+                e,
+            )
+        }
+        socket = newSocket
     }
 
     fun send(result: FaceTrackingResult) {
@@ -172,9 +195,10 @@ class VmcOscSender(
             val out = socket ?: return@execute
             try {
                 val bytes = serializeToBytes(buildBundle(result), serializerBuilder, sendBuffer)
-                // Socket connect()-é (voir connect()) -- adresse déjà fixée, ne pas la repréciser ici
-                // (DatagramPacket(bytes, bytes.size) suffit, voir kdoc de connect()).
-                out.send(DatagramPacket(bytes, bytes.size))
+                // Le socket n'est connecté à host/port que si connect() a réussi (voir son kdoc) --
+                // sinon repli sur l'adresse explicite par paquet, comme avant ce correctif.
+                val packet = if (out.isConnected) DatagramPacket(bytes, bytes.size) else DatagramPacket(bytes, bytes.size, host, port)
+                out.send(packet)
             } catch (e: PortUnreachableException) {
                 if (connectionLost.compareAndSet(false, true)) {
                     AppLog.i(TAG, "Cible VMC $host:$port injoignable (ICMP port injoignable) -- déconnexion détectée")
