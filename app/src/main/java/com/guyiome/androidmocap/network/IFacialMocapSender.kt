@@ -5,6 +5,7 @@ import com.guyiome.androidmocap.tracking.FaceTrackingResult
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import java.net.PortUnreachableException
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -66,6 +67,26 @@ class IFacialMocapSender(
     // PAS sur le port source (souvent éphémère) du paquet de handshake reçu.
     @Volatile private var targetAddress: InetAddress? = null
 
+    // Socket dédié à l'envoi, distinct de [socket] (qui écoute sur le port fixe 49983 et doit
+    // rester non connecté pour pouvoir recevoir un handshake de n'importe quelle IP) -- connecté à
+    // la cible (voir [openSendSocket]) uniquement pour détecter sa déconnexion via
+    // [PortUnreachableException], voir [send]. Muté depuis deux threads (écoute + envoi), d'où
+    // @Volatile plutôt qu'un accès protégé, cohérent avec [targetAddress] juste au-dessus.
+    @Volatile private var sendSocket: DatagramSocket? = null
+
+    /**
+     * Connecté à [address]/[PORT] (revue de code, 13 août 2026 : l'icône restait "connecté"
+     * indéfiniment si VBridger se fermait sans envoyer [STOP_HANDSHAKE], ex. fermeture forcée/crash
+     * plutôt qu'un arrêt propre) -- même principe que `VmcOscSender.connect()`, voir son kdoc pour
+     * le détail du mécanisme ICMP/[PortUnreachableException] et ses limites.
+     */
+    private fun openSendSocket(address: InetAddress): DatagramSocket? = try {
+        DatagramSocket().apply { connect(address, PORT) }
+    } catch (e: Exception) {
+        AppLog.w(TAG, "Impossible d'ouvrir le socket UDP d'envoi vers $address:$PORT", e)
+        null
+    }
+
     /** Démarre l'écoute du handshake sur le port 49983. Idempotent. */
     fun startListening() {
         if (running.getAndSet(true)) return
@@ -86,10 +107,14 @@ class IFacialMocapSender(
                     when {
                         text.startsWith(HANDSHAKE) -> {
                             targetAddress = packet.address
+                            sendSocket?.close()
+                            sendSocket = openSendSocket(packet.address)
                             onStatusChanged(packet.address.hostAddress)
                         }
                         text.startsWith(STOP_HANDSHAKE) -> {
                             targetAddress = null
+                            sendSocket?.close()
+                            sendSocket = null
                             onStatusChanged(null)
                         }
                     }
@@ -104,13 +129,24 @@ class IFacialMocapSender(
     }
 
     fun send(result: FaceTrackingResult) {
-        val address = targetAddress ?: return
+        if (targetAddress == null) return
         if (!result.faceDetected || result.blendshapes.isEmpty()) return
         sendExecutor.execute {
-            val sock = socket ?: return@execute
+            val out = sendSocket ?: return@execute
             try {
                 val bytes = buildMessage(result).toByteArray(Charsets.UTF_8)
-                sock.send(DatagramPacket(bytes, bytes.size, address, PORT))
+                out.send(DatagramPacket(bytes, bytes.size))
+            } catch (e: PortUnreachableException) {
+                // Identité vérifiée : si un nouveau handshake est arrivé entretemps (autre thread,
+                // voir startListening()), sendSocket pointe déjà vers une connexion différente --
+                // ce callback appartient alors à une connexion déjà abandonnée, à ignorer.
+                if (sendSocket === out) {
+                    targetAddress = null
+                    sendSocket = null
+                    AppLog.i(TAG, "Cible UDP/VBridger injoignable (ICMP port injoignable) -- déconnexion détectée")
+                    onStatusChanged(null)
+                }
+                out.close()
             } catch (e: Exception) {
                 // Cible momentanément injoignable : on laisse tomber cette frame plutôt que de bloquer.
             }
@@ -121,6 +157,8 @@ class IFacialMocapSender(
         if (!running.getAndSet(false)) return
         socket?.close()
         socket = null
+        sendSocket?.close()
+        sendSocket = null
         targetAddress = null
     }
 }

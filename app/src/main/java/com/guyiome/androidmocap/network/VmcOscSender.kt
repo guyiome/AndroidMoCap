@@ -10,9 +10,11 @@ import com.illposed.osc.OSCSerializerAndParserBuilder
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import java.net.PortUnreachableException
 import java.nio.ByteBuffer
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Envoie les blendshapes en protocole VMC (OSC over UDP) : `/VMC/Ext/Blend/Val` par blendshape
@@ -53,6 +55,11 @@ import java.util.concurrent.Executors
 class VmcOscSender(
     private val host: InetAddress,
     private val port: Int = DEFAULT_PORT,
+    /**
+     * Appelé au plus une fois (voir [connectionLost]), depuis [sendExecutor] (pas le thread
+     * appelant), si un envoi révèle que plus personne n'écoute côté cible -- voir [send].
+     */
+    private val onConnectionLost: () -> Unit = {},
 ) {
     companion object {
         private const val TAG = "VmcOscSender"
@@ -112,12 +119,21 @@ class VmcOscSender(
     private val sendBuffer = ByteBuffer.allocate(SEND_BUFFER_SIZE)
     private var socket: DatagramSocket? = null
 
+    // Vrai après le premier PortUnreachableException détecté (voir send()) -- garde onConnectionLost
+    // à un seul appel (pas un par frame en échec) et évite de retenter des envois voués à échouer
+    // jusqu'au prochain appel explicite de connect() par MainViewModel.connectVmcTarget().
+    private val connectionLost = AtomicBoolean(false)
+
     /**
      * Reflète si le socket UDP local a bien pu être ouvert (voir [connect]) -- à vérifier par
      * l'appelant juste après construction plutôt que de supposer la connexion établie : le
      * constructeur ne propage jamais d'exception (voir [connect]), un échec silencieux passerait
      * sinon inaperçu. Relecture globale du 7 août 2026, point 2 : jusqu'ici `MainViewModel`
      * affichait "connecté" inconditionnellement après construction, y compris en cas d'échec.
+     *
+     * Ne couvre que l'ouverture locale, pas la joignabilité de la cible -- voir [onConnectionLost]
+     * pour la détection de perte de connexion en cours de route (revue de code, 13 août 2026 :
+     * l'icône restait "connecté" indéfiniment si l'app réceptrice (Blender/Unity) se fermait).
      */
     val isConnected: Boolean
         get() = socket != null
@@ -130,10 +146,19 @@ class VmcOscSender(
      * Échec possible mais rare (`DatagramSocket()` sans argument se contente de réserver un port
      * local éphémère, aucun aller-retour réseau ici) : ressources système épuisées, permission
      * réseau refusée. Loggé -- voir [isConnected] pour la doc complète du raisonnement.
+     *
+     * Le socket est explicitement `connect()`-é à [host]/[port] (contrairement à avant, un socket
+     * UDP non connecté) -- ça ne fait toujours aucun aller-retour réseau (UDP reste sans connexion,
+     * l'OS ne peut pas savoir si la cible est joignable à cet instant), mais ça permet à l'OS de
+     * délivrer au socket un paquet ICMP "port injoignable" si un jour aucun processus n'écoute plus
+     * sur ce port -- surfacé côté Java par [PortUnreachableException] au prochain envoi, voir [send].
+     * Fonctionne de façon fiable sur un même réseau local (cas d'usage principal de l'app) ; peut ne
+     * pas se déclencher à travers certains routeurs/pare-feux qui filtrent l'ICMP -- signal du même
+     * type que la coupure TCP de VTubeStudioSender, pas une garantie absolue comme un vrai handshake.
      */
     private fun connect() {
         socket = try {
-            DatagramSocket()
+            DatagramSocket().apply { connect(host, port) }
         } catch (e: Exception) {
             AppLog.w(TAG, "Impossible d'ouvrir le socket UDP local pour la cible VMC $host:$port", e)
             null
@@ -141,12 +166,20 @@ class VmcOscSender(
     }
 
     fun send(result: FaceTrackingResult) {
+        if (connectionLost.get()) return
         if (!result.faceDetected || result.blendshapes.isEmpty()) return
         sendExecutor.execute {
             val out = socket ?: return@execute
             try {
                 val bytes = serializeToBytes(buildBundle(result), serializerBuilder, sendBuffer)
-                out.send(DatagramPacket(bytes, bytes.size, host, port))
+                // Socket connect()-é (voir connect()) -- adresse déjà fixée, ne pas la repréciser ici
+                // (DatagramPacket(bytes, bytes.size) suffit, voir kdoc de connect()).
+                out.send(DatagramPacket(bytes, bytes.size))
+            } catch (e: PortUnreachableException) {
+                if (connectionLost.compareAndSet(false, true)) {
+                    AppLog.i(TAG, "Cible VMC $host:$port injoignable (ICMP port injoignable) -- déconnexion détectée")
+                    onConnectionLost()
+                }
             } catch (e: Exception) {
                 // Réseau momentanément indisponible : on laisse tomber cette frame plutôt que de bloquer.
             }

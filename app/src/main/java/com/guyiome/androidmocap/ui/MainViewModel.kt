@@ -1615,7 +1615,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val address = InetAddress.getByName(hostText)
                 vmcSender?.close()
-                val sender = VmcOscSender(address, port)
+                lateinit var sender: VmcOscSender
+                sender = VmcOscSender(address, port, onConnectionLost = { onVmcConnectionLost(sender) })
                 // Vérifié explicitement (relecture globale du 7 août 2026, point 2) : le
                 // constructeur ne propage jamais d'exception même si l'ouverture du port UDP
                 // local échoue (voir VmcOscSender.connect()) -- sans cette vérification, l'UI
@@ -1647,6 +1648,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         vmcSender = null
         _uiState.update { it.copy(vmcEnabled = false, vmcConnecting = false, vmcTargetLabel = "") }
         if (wasConnected) AppLog.i(TAG, "VMC déconnecté")
+    }
+
+    /**
+     * Callback de [VmcOscSender.onConnectionLost] (voir son kdoc) -- déclenché depuis le thread
+     * d'envoi dédié de [VmcOscSender] quand un envoi révèle que plus personne n'écoute côté cible
+     * (ex. Blender/Unity fermé). Revue de code, 13 août 2026 : l'icône restait "connecté"
+     * indéfiniment jusqu'ici, [vmcEnabled][MainUiState.vmcEnabled] n'étant qu'un interrupteur local
+     * jamais remis à jour par une vraie perte de connexion.
+     *
+     * Vérifie l'identité de [sender] avant de toucher à l'état : si l'utilisateur s'est reconnecté
+     * entretemps ([vmcSender] a changé), ce callback appartient à une connexion déjà abandonnée.
+     */
+    private fun onVmcConnectionLost(sender: VmcOscSender) {
+        if (vmcSender !== sender) return
+        vmcSender?.close()
+        vmcSender = null
+        _uiState.update { it.copy(vmcEnabled = false, vmcConnecting = false, vmcTargetLabel = "") }
+        AppLog.i(TAG, "VMC déconnecté (cible injoignable)")
     }
 
     // --- VTube Studio : intégration directe via l'API Plugin (point 39) ---
@@ -1720,12 +1739,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun startIFacialMocapListening() {
         val sender = iFacialMocapSender ?: IFacialMocapSender { connectedTo ->
             _uiState.update { it.copy(iFacialMocapConnectedTo = connectedTo) }
-            // connectedTo non-nul = handshake reçu (voir IFacialMocapSender) ; nul = arrêt côté PC
-            // (STOP_HANDSHAKE), distinct de stopIFacialMocapListening() ci-dessous (arrêt côté app).
+            // connectedTo non-nul = handshake reçu (voir IFacialMocapSender) ; nul = déconnexion,
+            // soit un arrêt propre côté PC (STOP_HANDSHAKE), soit une cible devenue injoignable
+            // détectée au prochain envoi (revue de code, 13 août 2026 -- voir IFacialMocapSender.send()
+            // pour le détail, déjà loggé côté sender dans ce second cas) -- distinct de
+            // stopIFacialMocapListening() ci-dessous (arrêt côté app).
             if (connectedTo != null) {
                 AppLog.i(TAG, "UDP/VBridger connecté depuis $connectedTo")
             } else {
-                AppLog.i(TAG, "UDP/VBridger déconnecté (arrêt côté PC)")
+                AppLog.i(TAG, "UDP/VBridger déconnecté")
             }
         }.also { iFacialMocapSender = it }
         sender.startListening()
