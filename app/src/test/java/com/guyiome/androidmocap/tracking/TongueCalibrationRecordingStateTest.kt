@@ -107,6 +107,25 @@ class TongueCalibrationRecordingStateTest {
     }
 
     @Test
+    fun `DEFAULT_TONGUE_OUT_RECORDING_DURATION_MS vaut le double de DEFAULT_CALIBRATION_RECORDING_DURATION_MS -- symetrie ajoutee le 13 aout 2026`() {
+        assertEquals(DEFAULT_CALIBRATION_RECORDING_DURATION_MS * TONGUE_OUT_RECORDING_MULTIPLIER, DEFAULT_TONGUE_OUT_RECORDING_DURATION_MS)
+    }
+
+    @Test
+    fun `tick sans durationMs explicite utilise desormais DEFAULT_TONGUE_OUT_RECORDING_DURATION_MS, pas l'unite de base`() {
+        // Reproduit ce qui a change le 13 aout 2026 : avant, le defaut de durationMs valait
+        // DEFAULT_CALIBRATION_RECORDING_DURATION_MS (l'unite de base, non multipliee) -- desormais
+        // il vaut le double, en symetrie avec tongueInDurationMs.
+        val justBeforeBase = newTongueCalibrationRecording().tick(
+            elapsedMs = DEFAULT_CALIBRATION_RECORDING_DURATION_MS - 1, embedding = floatArrayOf(1f),
+        )
+        assertEquals(TongueCalibrationPhase.RECORDING_TONGUE_OUT, justBeforeBase.phase)
+
+        val stillRecordingPastBase = justBeforeBase.tick(elapsedMs = 2, embedding = floatArrayOf(1f))
+        assertEquals(TongueCalibrationPhase.RECORDING_TONGUE_OUT, stillRecordingPastBase.phase)
+    }
+
+    @Test
     fun `result null avant DONE`() {
         val state = newTongueCalibrationRecording().tick(
             elapsedMs = 100, embedding = floatArrayOf(1f), durationMs = duration, prepareDurationMs = prepare, tongueInDurationMs = tongueInDuration,

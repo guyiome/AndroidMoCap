@@ -259,11 +259,14 @@ class AppSettingsStore(private val context: Context) {
     }
 
     /**
-     * Durée d'enregistrement par phase de calibration ("langue dehors"/"langue rentrée") --
-     * réglable depuis un panneau debug plutôt que codée en dur (voir
+     * Unité de base pour la durée d'enregistrement de calibration -- réglable depuis un panneau
+     * debug plutôt que codée en dur (voir
      * `TongueCalibrationRecordingState.DEFAULT_CALIBRATION_RECORDING_DURATION_MS`) : les étages 1/2
      * ont demandé sept sessions de réglage sur device, éviter le même cycle rebuild+reinstall pour
-     * chaque essai ici.
+     * chaque essai ici. Les deux phases ("langue dehors"/"langue rentrée") en dérivent chacune par
+     * leur propre multiplicateur depuis le 13 août 2026 (point 56) -- voir
+     * `TONGUE_OUT_RECORDING_MULTIPLIER`/`TONGUE_IN_RECORDING_MULTIPLIER`, pas la valeur brute
+     * directement.
      */
     val tongueCalibrationRecordingDurationMs: Flow<Long> = context.appSettingsDataStore.data.map { prefs ->
         prefs[Keys.TONGUE_CALIBRATION_RECORDING_DURATION_MS] ?: DEFAULT_CALIBRATION_RECORDING_DURATION_MS

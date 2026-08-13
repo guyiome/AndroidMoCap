@@ -54,6 +54,7 @@ import com.guyiome.androidmocap.tracking.DEFAULT_CALIBRATION_PREPARE_DURATION_MS
 import com.guyiome.androidmocap.tracking.DEFAULT_CALIBRATION_RECORDING_DURATION_MS
 import com.guyiome.androidmocap.tracking.DEFAULT_CLASSIFICATION_MARGIN
 import com.guyiome.androidmocap.tracking.TONGUE_IN_RECORDING_MULTIPLIER
+import com.guyiome.androidmocap.tracking.TONGUE_OUT_RECORDING_MULTIPLIER
 import com.guyiome.androidmocap.tracking.TongueEmbeddingClassification
 import com.guyiome.androidmocap.tracking.TongueOutDisplayState
 import com.guyiome.androidmocap.tracking.TongueOutInjectionState
@@ -1064,14 +1065,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             val previousPhase = tongueCalibrationRecordingState.phase
             val recordingDurationMs = _uiState.value.tongueCalibrationRecordingDurationMs
-            // Phase "langue rentrée" volontairement plus longue (multiplicateur partagé, voir son
-            // kdoc dans TongueCalibrationRecordingState.kt) -- couvre plusieurs cycles de mouvement
-            // de mâchoire pendant l'enregistrement, pas juste une pose statique bouche fermée.
+            // Les deux phases dérivent de la même unité de base réglable par un multiplicateur
+            // dédié (voir kdoc TONGUE_OUT_RECORDING_MULTIPLIER/TONGUE_IN_RECORDING_MULTIPLIER,
+            // TongueCalibrationRecordingState.kt) -- couvre plusieurs cycles de variation pendant
+            // l'enregistrement (mouvement de mâchoire côté "in", légère variation de
+            // position/profondeur de la langue côté "out"), pas juste une pose statique.
+            val tongueOutDurationMs = recordingDurationMs * TONGUE_OUT_RECORDING_MULTIPLIER
             val tongueInDurationMs = recordingDurationMs * TONGUE_IN_RECORDING_MULTIPLIER
             tongueCalibrationRecordingState = tongueCalibrationRecordingState.tick(
                 calibrationElapsedMs,
                 embedding,
-                recordingDurationMs,
+                tongueOutDurationMs,
                 tongueInDurationMs = tongueInDurationMs,
             )
             if (tongueCalibrationRecordingState.phase == TongueCalibrationPhase.DONE) {
@@ -1099,7 +1103,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val phaseDurationMs = when (tongueCalibrationRecordingState.phase) {
                     TongueCalibrationPhase.PREPARE_TONGUE_IN -> DEFAULT_CALIBRATION_PREPARE_DURATION_MS
                     TongueCalibrationPhase.RECORDING_TONGUE_IN -> tongueInDurationMs
-                    else -> recordingDurationMs
+                    else -> tongueOutDurationMs
                 }
                 val secondsRemaining = kotlin.math.ceil(
                     (phaseDurationMs - tongueCalibrationRecordingState.elapsedMsInPhase) / 1000f
@@ -1483,7 +1487,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun startTongueCalibration() {
         tongueCalibrationRecordingState = newTongueCalibrationRecording()
         tongueCalibrationLastTimestampMs = null
-        val initialSecondsRemaining = kotlin.math.ceil(_uiState.value.tongueCalibrationRecordingDurationMs / 1000f).toInt()
+        // Démarre directement en RECORDING_TONGUE_OUT (voir newTongueCalibrationRecording) -- même
+        // multiplicateur que handleTrackingResult() applique ensuite à chaque tick, pour un premier
+        // affichage cohérent avec le décompte réel plutôt qu'un saut visible au premier tick.
+        val initialDurationMs = _uiState.value.tongueCalibrationRecordingDurationMs * TONGUE_OUT_RECORDING_MULTIPLIER
+        val initialSecondsRemaining = kotlin.math.ceil(initialDurationMs / 1000f).toInt()
         _uiState.update {
             it.copy(
                 tongueCalibrationPhase = tongueCalibrationRecordingState.phase,

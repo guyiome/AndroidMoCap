@@ -147,8 +147,10 @@ fun TongueCalibrationScreen(
                     style = MaterialTheme.typography.titleMedium,
                 )
 
-                // Durée d'enregistrement par phase -- pas de rebuild pour retenter un autre réglage,
-                // vu le nombre de sessions de réglage qu'ont demandé les étages 1/2.
+                // Unité de base, pas la durée réelle d'une phase (chaque phase la multiplie par son
+                // propre facteur -- ×2 pour les deux depuis le 13 août 2026, voir kdoc
+                // TONGUE_OUT_RECORDING_MULTIPLIER/TONGUE_IN_RECORDING_MULTIPLIER) -- pas de rebuild
+                // pour retenter un autre réglage, vu le nombre de sessions qu'ont demandé les étages 1/2.
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     Text(

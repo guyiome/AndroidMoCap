@@ -145,17 +145,17 @@
 
     <!-- Tongue calibration screen -->
     <string name="tongue_calibration_title">Tongue-out calibration</string>
-    <string name="tongue_calibration_explanation">Records two short samples -- tongue out, then tongue in -- used to personally calibrate stage 3 of the detection cascade. Still diagnostic only: the result is not sent over the network yet.</string>
+    <string name="tongue_calibration_explanation">Records two short samples -- tongue out, then tongue in -- used to personally calibrate stage 3 of the detection cascade. Also sent over the network once calibrated -- experimental, occasional false positives are still possible.</string>
     <string name="tongue_calibration_status_never">Never calibrated yet.</string>
     <string name="tongue_calibration_status_calibrated">Calibrated ✓</string>
-    <string name="tongue_calibration_status_recording_out">Stick your tongue out and hold…</string>
+    <string name="tongue_calibration_status_recording_out">Stick your tongue out -- move it slightly (up/down, side to side) while holding it out…</string>
     <string name="tongue_calibration_status_prepare_in">Get ready to relax your tongue back in…</string>
     <string name="tongue_calibration_status_recording_in">Tongue in -- open and close your jaw a few times, tongue always in…</string>
     <string name="tongue_calibration_button_start">Start calibration</string>
     <string name="tongue_calibration_button_recalibrate">Recalibrate</string>
     <string name="tongue_calibration_button_cancel">Cancel</string>
     <string name="tongue_calibration_debug_section_title">Debug (7-tap unlock)</string>
-    <string name="tongue_calibration_debug_duration">Recording duration per phase: %.1fs</string>
+    <string name="tongue_calibration_debug_duration">Base duration (each phase = ×2): %.1fs</string>
     <string name="tongue_calibration_debug_margin">Classification margin: %.2f</string>
     <string name="tongue_calibration_debug_hint">Applies immediately, no rebuild needed. Tap the title 7 times again to hide this section.</string>
 

@@ -26,11 +26,12 @@ internal data class TongueCalibrationRecordingState(
     val elapsedMsInPhase: Long = 0L,
 )
 
-/** Durée par défaut de la phase "langue dehors" -- provisoire, réglable en pratique via
- *  `AppSettingsStore.tongueCalibrationRecordingDurationMs` (panneau debug) plutôt que codée en dur,
- *  vu le nombre de sessions de réglage qu'ont demandé les étages 1/2. Pose statique, pas besoin de
- *  plus de temps -- voir [DEFAULT_TONGUE_IN_RECORDING_DURATION_MS] pour la phase "langue rentrée",
- *  volontairement plus longue depuis le 13 août 2026. */
+/** Unité de base pour les durées d'enregistrement de calibration -- provisoire, réglable en
+ *  pratique via `AppSettingsStore.tongueCalibrationRecordingDurationMs` (panneau debug) plutôt que
+ *  codée en dur, vu le nombre de sessions de réglage qu'ont demandé les étages 1/2. Ne pilote plus
+ *  directement la durée d'une phase depuis le 13 août 2026 (point 56) : les deux phases en dérivent
+ *  désormais par multiplicateur, voir [DEFAULT_TONGUE_OUT_RECORDING_DURATION_MS] et
+ *  [DEFAULT_TONGUE_IN_RECORDING_DURATION_MS]. */
 internal const val DEFAULT_CALIBRATION_RECORDING_DURATION_MS = 3000L
 
 /** Durée par défaut de la pause entre les deux phases d'enregistrement -- pas encore réglable
@@ -38,7 +39,29 @@ internal const val DEFAULT_CALIBRATION_RECORDING_DURATION_MS = 3000L
 internal const val DEFAULT_CALIBRATION_PREPARE_DURATION_MS = 2000L
 
 /**
- * Multiplicateur appliqué à la durée "langue dehors" pour obtenir celle de "langue rentrée" --
+ * Multiplicateur appliqué à l'unité de base pour obtenir la durée de la phase "langue dehors" --
+ * source unique de vérité, utilisée à la fois pour [DEFAULT_TONGUE_OUT_RECORDING_DURATION_MS] et
+ * par `MainViewModel` pour dériver la durée réelle (réglable) de cette phase.
+ *
+ * Doublé le 13 août 2026 (revue technique, point 56), en symétrie avec
+ * [TONGUE_IN_RECORDING_MULTIPLIER] : jusque-là seule la phase "langue rentrée" avait été allongée
+ * (voir son kdoc) pour couvrir une variation pendant l'enregistrement plutôt qu'une pose statique.
+ * Une fois les étages 1/2 retirés du filtre dur (voir kdoc de `mouthGeometricGateOpen`,
+ * `TongueOutGate.kt`), toute la discrimination repose sur l'étage 3 seul -- une référence "langue
+ * dehors" plus riche (couvrant une légère variation de position/profondeur de la langue pendant la
+ * tenue, pas seulement une pose figée) est le seul levier de fiabilité qui reste vraiment
+ * pertinent, la marge de classification elle-même ne pouvant pas séparer un chevauchement réel
+ * entre les deux classes (confirmé sur les données du 13 août 2026, voir kdoc de
+ * `TongueEmbeddingClassifier.DEFAULT_CLASSIFICATION_MARGIN`).
+ */
+internal const val TONGUE_OUT_RECORDING_MULTIPLIER = 2L
+
+/** Durée par défaut de la phase "langue dehors" -- voir kdoc de [TONGUE_OUT_RECORDING_MULTIPLIER]. */
+internal const val DEFAULT_TONGUE_OUT_RECORDING_DURATION_MS =
+    DEFAULT_CALIBRATION_RECORDING_DURATION_MS * TONGUE_OUT_RECORDING_MULTIPLIER
+
+/**
+ * Multiplicateur appliqué à l'unité de base pour obtenir la durée de la phase "langue rentrée" --
  * source unique de vérité, utilisée à la fois pour [DEFAULT_TONGUE_IN_RECORDING_DURATION_MS] et
  * par `MainViewModel` pour dériver la durée réelle (réglable) de cette phase, plutôt que deux
  * constantes indépendantes qui pourraient diverger.
@@ -46,17 +69,17 @@ internal const val DEFAULT_CALIBRATION_PREPARE_DURATION_MS = 2000L
 internal const val TONGUE_IN_RECORDING_MULTIPLIER = 2L
 
 /**
- * Durée par défaut de la phase "langue rentrée" -- volontairement le double de
- * [DEFAULT_CALIBRATION_RECORDING_DURATION_MS] (revue technique, point 15 -- session de diagnostic
- * du 13 août 2026, confirmée sur device) : la référence "langue rentrée" enregistrée jusqu'ici
- * était une pose statique, bouche fermée -- jamais avec mouvement de mâchoire. Or une bouche
- * ouverte par un mouvement de mâchoire (langue toujours rentrée) s'est révélée visuellement
- * confondue avec "langue dehors" par le classifieur, avec un chevauchement réel des deux classes
- * en similarité cosinus (pas un simple problème de seuil de marge, voir
- * `TongueEmbeddingClassifier.DEFAULT_CLASSIFICATION_MARGIN`). Élargir la référence pour qu'elle
- * couvre aussi cette variation demande plusieurs cycles d'ouverture/fermeture de mâchoire pendant
- * l'enregistrement, d'où une durée doublée -- la phase "langue dehors", elle, reste une pose
- * statique tenue immobile, pas besoin de plus de temps.
+ * Durée par défaut de la phase "langue rentrée" -- volontairement le double de l'unité de base
+ * (revue technique, point 15 -- session de diagnostic du 13 août 2026, confirmée sur device) : la
+ * référence "langue rentrée" enregistrée jusqu'ici était une pose statique, bouche fermée -- jamais
+ * avec mouvement de mâchoire. Or une bouche ouverte par un mouvement de mâchoire (langue toujours
+ * rentrée) s'est révélée visuellement confondue avec "langue dehors" par le classifieur, avec un
+ * chevauchement réel des deux classes en similarité cosinus (pas un simple problème de seuil de
+ * marge, voir `TongueEmbeddingClassifier.DEFAULT_CLASSIFICATION_MARGIN`). Élargir la référence pour
+ * qu'elle couvre aussi cette variation demande plusieurs cycles d'ouverture/fermeture de mâchoire
+ * pendant l'enregistrement, d'où une durée doublée. La phase "langue dehors" reçoit désormais le
+ * même traitement (même multiplicateur sur la même unité de base) -- voir
+ * [TONGUE_OUT_RECORDING_MULTIPLIER].
  */
 internal const val DEFAULT_TONGUE_IN_RECORDING_DURATION_MS =
     DEFAULT_CALIBRATION_RECORDING_DURATION_MS * TONGUE_IN_RECORDING_MULTIPLIER
@@ -80,12 +103,14 @@ internal fun newTongueCalibrationRecording(): TongueCalibrationRecordingState =
  *
  * [tongueInDurationMs] distinct de [durationMs] depuis le 13 août 2026 -- voir le kdoc de
  * [DEFAULT_TONGUE_IN_RECORDING_DURATION_MS] pour le raisonnement (la phase "langue rentrée" a
- * besoin de plus de temps pour couvrir plusieurs cycles de mouvement de mâchoire).
+ * besoin de plus de temps pour couvrir plusieurs cycles de mouvement de mâchoire). [durationMs]
+ * (phase "langue dehors") reçoit le même traitement depuis la même date -- voir
+ * [DEFAULT_TONGUE_OUT_RECORDING_DURATION_MS].
  */
 internal fun TongueCalibrationRecordingState.tick(
     elapsedMs: Long,
     embedding: FloatArray?,
-    durationMs: Long = DEFAULT_CALIBRATION_RECORDING_DURATION_MS,
+    durationMs: Long = DEFAULT_TONGUE_OUT_RECORDING_DURATION_MS,
     prepareDurationMs: Long = DEFAULT_CALIBRATION_PREPARE_DURATION_MS,
     tongueInDurationMs: Long = DEFAULT_TONGUE_IN_RECORDING_DURATION_MS,
 ): TongueCalibrationRecordingState = when (phase) {

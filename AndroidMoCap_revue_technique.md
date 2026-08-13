@@ -2860,3 +2860,45 @@ en fin de session (build propre installée sur device). Le risque résiduel rest
 plus haut (feature taguée "expérimentale", faux positifs occasionnels possibles) -- pas de nouvelle
 piste ouverte pour l'instant, la priorité était de rendre la fonctionnalité réellement déclenchable
 en usage normal, objectif atteint selon le retour utilisateur.
+
+**Question posée en clôture -- paramétrage utilisateur supplémentaire encore pertinent ?** Une fois
+les étages 1/2 retirés du filtre dur, l'utilisateur a demandé si un écran de réglages exposant des
+seuils bruts (idée notée dans le backlog, "Calibrage personnalisé + seuils, écran dédié") restait
+justifié. Réponse retenue : **non, plus autant qu'avant** -- les trois paramètres qui restent
+réglables ne sont pas de bons candidats à un réglage manuel :
+- Le seuil `jawOpen` (étage 1) n'est plus le goulot ni la source des faux positifs observés -- le
+  mal régler ne recrée pas le problème déjà résolu.
+- La marge de classification (étage 3, `DEFAULT_CLASSIFICATION_MARGIN`) est explicitement
+  disqualifiée par les données de calage de la calibration ci-dessus : les faux positifs résiduels
+  avaient un `diff` de +0,051 à +0,093, alors que de vraies détections descendaient jusqu'à +0,033
+  -- ces deux plages se chevauchent, aucune valeur de marge n'aurait pu les séparer. Un curseur ici
+  donnerait une illusion de contrôle sans jamais pouvoir corriger ce cas précis.
+- La profondeur d'anti-rebond (2 frames) est un curseur latence/robustesse, pas un vrai réglage de
+  précision, et déjà ajusté par retour direct cette session.
+
+L'étage 3 compare déjà à la calibration propre à l'utilisateur -- c'est déjà le mécanisme de
+personnalisation, implicite plutôt qu'exposé en sliders. Cohérent avec ce que dit déjà le backlog
+sur l'écran de seuils exposés ("illisible sans contexte de session de debug", confirmé par
+l'épisode de surcorrection 15px→25px→15px sur un tout autre seuil pendant cette même investigation,
+voir plus haut). **Piste "écran de réglages avancés" marquée comme probablement caduque** dans le
+backlog privé -- pas fermée définitivement, mais plus la priorité.
+
+**Correctif retenu à la place -- symétrie de calibration.** Le bon levier de fiabilité restant est
+la richesse de la référence "langue dehors" elle-même, pas un seuil ajustable. Jusqu'ici seule la
+phase "langue rentrée" avait été allongée + enrichie (mouvement de mâchoire, voir plus haut) ; la
+phase "langue dehors" est désormais traitée en symétrie :
+- `TONGUE_OUT_RECORDING_MULTIPLIER = 2` (nouveau, `TongueCalibrationRecordingState.kt`), même
+  principe que `TONGUE_IN_RECORDING_MULTIPLIER` -- la phase "langue dehors" passe de 3s à 6s par
+  défaut (même durée que "langue rentrée" désormais, les deux multiplicateurs valant 2).
+  `DEFAULT_CALIBRATION_RECORDING_DURATION_MS` (réglage panneau debug) devient une unité de base
+  commune aux deux phases plutôt que la durée littérale de la phase 1.
+- Instruction affichée mise à jour (`tongue_calibration_status_recording_out`, FR/EN) : demande
+  explicitement de bouger légèrement la langue (haut/bas, gauche/droite) pendant la tenue, au lieu
+  d'une pose figée -- même logique que l'instruction de mouvement de mâchoire côté "langue rentrée".
+- Au passage, deux textes obsolètes corrigés : l'explication de l'écran de calibration et le libellé
+  du réglage debug affichaient encore l'état d'avant l'activation de l'injection réseau ("le
+  résultat n'est pas encore envoyé sur le réseau" / "durée d'enregistrement par phase" alors que la
+  valeur affichée est maintenant une unité de base commune).
+
+Pas encore testé sur device (changement de calibration, à valider à la prochaine recalibration) --
+16 tests JVM (`TongueCalibrationRecordingStateTest.kt`, +2 depuis la version précédente).
