@@ -8,6 +8,7 @@ import java.net.InetAddress
 import java.net.PortUnreachableException
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Implémente le protocole iFacialMocap (le même que celui utilisé par MeowFace sur Android),
@@ -70,9 +71,16 @@ class IFacialMocapSender(
     // Socket dédié à l'envoi, distinct de [socket] (qui écoute sur le port fixe 49983 et doit
     // rester non connecté pour pouvoir recevoir un handshake de n'importe quelle IP) -- connecté à
     // la cible (voir [openSendSocket]) uniquement pour détecter sa déconnexion via
-    // [PortUnreachableException], voir [send]. Muté depuis deux threads (écoute + envoi), d'où
-    // @Volatile plutôt qu'un accès protégé, cohérent avec [targetAddress] juste au-dessus.
-    @Volatile private var sendSocket: DatagramSocket? = null
+    // [PortUnreachableException], voir [send]. Muté depuis deux threads (écoute + envoi).
+    //
+    // AtomicReference plutôt que @Volatile var (revue de code, 13 août 2026) : contrairement à
+    // VmcOscSender (un seul connect() par instance, jamais réassigné), ce socket change plusieurs
+    // fois sur la même instance (un nouveau handshake à chaque reconnexion VBridger) -- la détection
+    // de déconnexion peut être déclenchée en même temps par [send] et par la sonde de vivacité pour
+    // le même socket ; sans opération atomique de type "compare-and-set" pour la transition
+    // socket -> null, les deux pourraient passer un simple test `sendSocket === source` avant que
+    // l'un des deux ne le mette à null, doublant l'appel à [onStatusChanged]. Voir [onSendSocketUnreachable].
+    private val sendSocket = AtomicReference<DatagramSocket?>(null)
 
     /**
      * Tente de connecter ce socket à [address]/[PORT] (revue de code, 13 août 2026 : l'icône
@@ -117,15 +125,17 @@ class IFacialMocapSender(
     /**
      * Point d'entrée unique pour signaler une cible devenue injoignable, que ce soit détecté par
      * [send] (le chemin d'origine, insuffisant seul -- voir le kdoc de [openSendSocket]) ou par la
-     * sonde dédiée ([startUdpLivenessProbe]). Vérifie l'identité de [source] : si un nouveau
-     * handshake est arrivé entretemps ([sendSocket] a changé), cet appel appartient à une connexion
-     * déjà abandonnée -- l'état n'est alors pas touché, mais [source] est quand même fermé (évite de
-     * laisser fuir ce socket devenu orphelin).
+     * sonde dédiée ([startUdpLivenessProbe]) -- les deux peuvent se déclencher pour le même socket
+     * quasi simultanément. `compareAndSet(source, null)` (plutôt qu'un simple test suivi d'une
+     * affectation, revue de code du 13 août 2026) garantit qu'un seul des deux appelants gagne la
+     * transition socket -> null et exécute donc la suite une seule fois -- si un nouveau handshake
+     * est arrivé entretemps ([sendSocket] a déjà changé), ou si l'autre appelant a gagné la course,
+     * le `compareAndSet` échoue et cet appel n'a plus d'effet sur l'état. [source] est dans tous les
+     * cas fermé (évite de laisser fuir ce socket devenu orphelin).
      */
     private fun onSendSocketUnreachable(source: DatagramSocket) {
-        if (sendSocket === source) {
+        if (sendSocket.compareAndSet(source, null)) {
             targetAddress = null
-            sendSocket = null
             AppLog.i(TAG, "Cible UDP/VBridger injoignable (ICMP port injoignable) -- déconnexion détectée")
             onStatusChanged(null)
         }
@@ -152,14 +162,17 @@ class IFacialMocapSender(
                     when {
                         text.startsWith(HANDSHAKE) -> {
                             targetAddress = packet.address
-                            sendSocket?.close()
-                            sendSocket = openSendSocket(packet.address)
+                            // Nouveau socket ouvert AVANT l'échange atomique (plutôt que fermer
+                            // l'ancien puis rouvrir) : sendSocket ne passe jamais par null pendant
+                            // la transition, un send() concurrent voit toujours un socket utilisable
+                            // (l'ancien jusqu'à l'échange, le nouveau ensuite) plutôt qu'un court
+                            // instant sans aucun socket.
+                            sendSocket.getAndSet(openSendSocket(packet.address))?.close()
                             onStatusChanged(packet.address.hostAddress)
                         }
                         text.startsWith(STOP_HANDSHAKE) -> {
                             targetAddress = null
-                            sendSocket?.close()
-                            sendSocket = null
+                            sendSocket.getAndSet(null)?.close()
                             onStatusChanged(null)
                         }
                     }
@@ -177,7 +190,7 @@ class IFacialMocapSender(
         if (targetAddress == null) return
         if (!result.faceDetected || result.blendshapes.isEmpty()) return
         sendExecutor.execute {
-            val out = sendSocket ?: return@execute
+            val out = sendSocket.get() ?: return@execute
             val address = targetAddress ?: return@execute
             try {
                 val bytes = buildMessage(result).toByteArray(Charsets.UTF_8)
@@ -197,8 +210,7 @@ class IFacialMocapSender(
         if (!running.getAndSet(false)) return
         socket?.close()
         socket = null
-        sendSocket?.close()
-        sendSocket = null
+        sendSocket.getAndSet(null)?.close()
         targetAddress = null
     }
 }

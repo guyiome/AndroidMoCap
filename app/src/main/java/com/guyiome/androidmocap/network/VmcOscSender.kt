@@ -123,8 +123,13 @@ class VmcOscSender(
     @Volatile private var socket: DatagramSocket? = null
 
     // Vrai après le premier PortUnreachableException détecté (voir send()) -- garde onConnectionLost
-    // à un seul appel (pas un par frame en échec) et évite de retenter des envois voués à échouer
-    // jusqu'au prochain appel explicite de connect() par MainViewModel.connectVmcTarget().
+    // à un seul appel (pas un par frame en échec) et évite de retenter des envois voués à échouer.
+    // Toujours false pour la durée de vie de cette instance une fois passé à true : connect() est
+    // privée, appelée une seule fois depuis init{}, il n'existe pas de chemin de reconnexion sur le
+    // même objet -- une reconnexion (MainViewModel.connectVmcTarget()) construit une toute nouvelle
+    // instance de VmcOscSender (avec son propre connectionLost frais à false) plutôt que d'appeler
+    // connect() à nouveau ici (revue de code, 13 août 2026 : commentaire précédent suggérait à tort
+    // l'inverse).
     private val connectionLost = AtomicBoolean(false)
 
     /**

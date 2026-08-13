@@ -2979,3 +2979,21 @@ Au passage, `jawOpenGateOpen(jawOpen)` était appelé trois fois indépendamment
 en `val stage1Open` calculé une fois, réutilisé aux trois endroits.
 
 Build + tests `BUILD SUCCESSFUL` (15 tests `TongueOutInjectionGateTest.kt`, +5), installé sur device.
+
+**Petite revue globale du reste du diff (13 août 2026)** -- 2 findings mineurs sur le travail de
+détection de déconnexion VMC/UDP du même jour (points 54/55), non liés à la langue tirée :
+
+1. `IFacialMocapSender.onSendSocketUnreachable()` n'avait pas le verrou atomique que sa jumelle
+   `VmcOscSender.onSocketUnreachable()` a (`AtomicBoolean.compareAndSet`) -- sous une course où
+   `send()` et la sonde de vivacité détectent la même déconnexion presque simultanément,
+   `onStatusChanged(null)` pouvait être appelé deux fois. Corrigé : `sendSocket` passe de
+   `@Volatile var` à `AtomicReference<DatagramSocket?>`, `onSendSocketUnreachable()` utilise
+   `compareAndSet(source, null)` pour garantir un seul déclenchement. Au passage, le remplacement du
+   socket sur un nouveau handshake (`startListening()`) utilise désormais `getAndSet()` plutôt que
+   fermer puis rouvrir séparément -- `sendSocket` ne passe plus jamais par `null` pendant la
+   transition.
+2. Commentaire trompeur dans `VmcOscSender.kt` (`connectionLost`) suggérant que `connect()` (privée,
+   appelée une seule fois depuis `init{}`) serait rappelée par `MainViewModel.connectVmcTarget()` --
+   en réalité une reconnexion construit une toute nouvelle instance. Corrigé.
+
+Build + tests `BUILD SUCCESSFUL`, installé sur device.
