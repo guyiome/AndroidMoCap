@@ -2660,3 +2660,53 @@ piste de rotation dynamique --, `onOpenTongueSettings` renommé `onOpenExperimen
 convention `onOpen<Écran>` existante). Un huitième constat (mirroring potentiellement incohérent
 entre le mesh, toujours mirroré, et le nouveau fond ARCore, volontairement natif) a été vérifié et
 infirmé par l'utilisateur sur device -- déjà cohérent, aucune action nécessaire.
+
+### 55. Détection de déconnexion VMC/UDP -- implémentée, confirmée non fiable sur le réseau de test, acceptée telle quelle
+
+Signalé par l'utilisateur (13 août 2026) : fermer l'app réceptrice (Blender/Unity pour VMC,
+VBridger pour UDP) laissait l'icône de connexion bloquée sur "connecté" indéfiniment. Deux causes
+distinctes identifiées à l'origine :
+- **VMC/OSC** : `isConnected`/`vmcEnabled` ne reflétaient que l'ouverture du socket UDP local,
+  jamais la joignabilité de la cible -- protocole VMC standard sans poignée de main.
+- **UDP/VBridger** : dépendait entièrement d'un `STOP_HANDSHAKE` explicite envoyé par VBridger en
+  se fermant proprement -- une fermeture forcée/crash n'envoie jamais ce message.
+
+**Mécanisme tenté** : `DatagramSocket.connect(host, port)` plutôt qu'un socket non connecté --
+permet en théorie à l'OS de délivrer un paquet ICMP "port injoignable" au socket dès que plus
+personne n'écoute côté cible, surfacé côté Java par `PortUnreachableException`.
+
+**Régression en cours de route, corrigée** : `connect()` pouvait lui-même échouer immédiatement sur
+ce réseau (route pas encore résolue vers une cible avec laquelle le socket n'a jamais échangé de
+trafic -- comportement Android, un `send()` classique sans `connect()` préalable s'en sortait très
+bien). Traité par erreur comme un échec de connexion complet au premier essai, empêchant toute
+connexion VMC de fonctionner -- corrigé en rendant `connect()` best-effort, un échec dégradant en
+mode non connecté (comportement d'origine, sans détection) plutôt que de faire échouer la connexion
+entière (voir `VmcOscSender.connect()`/`IFacialMocapSender.openSendSocket()`).
+
+**Deux mécanismes de surfaçage testés, aucun ne fonctionne sur ce réseau, confirmé avec des logs
+propres (fichier persistant, niveau Info) montrant `connect()` réussi et les données bien reçues
+côté PC** :
+1. Catch de `PortUnreachableException` directement dans `send()` -- jamais déclenché après
+   fermeture du récepteur.
+2. Sonde dédiée (`network/NetworkUtils.kt#startUdpLivenessProbe`, thread séparé du chemin d'envoi,
+   `receive()` à timeout court une fois par seconde sur le socket connecté) -- hypothèse que le
+   noyau ne posait l'erreur ICMP en attente qu'au prochain `receive()`, pas juste `send()`. Confirmé
+   démarrée (log), aucun crash, toujours rien détecté.
+
+**Conclusion** : ni `send()` ni `receive()` ne voient jamais l'erreur sur ce réseau -- l'explication
+la plus probable est que le paquet ICMP "port injoignable" n'atteint tout simplement jamais le
+téléphone (filtré par la box/le pare-feu quelque part entre le PC et le téléphone), pas un problème
+de surfaçage côté Java/Android. **Confirmé également** : se connecter alors qu'aucun récepteur n'a
+jamais tourné affiche quand même "connecté" (le tout premier envoi ne peut pas encore avoir reçu de
+réponse ICMP, cohérent avec le fonctionnement même du mécanisme) -- `isConnected` ne vérifie que
+l'envoi possible, jamais la réception effective côté cible, une limite assumée depuis l'origine
+(voir son kdoc), pas une régression de ce chantier.
+
+**Décision de l'utilisateur (13 août 2026)** : on en reste là, pas d'investigation supplémentaire
+pour l'instant. Le code des trois correctifs reste en place (`connect()` best-effort + sonde dédiée)
+-- fonctionne pour l'envoi réel dans tous les cas testés, la détection de déconnexion reste
+best-effort et peut ne rien détecter selon le réseau, sans jamais casser l'envoi lui-même. VTube
+Studio n'est pas concerné (WebSocket/TCP, coupure détectée nativement, jamais eu ce bug). Piste pour
+plus tard si le sujet revient : abandonner l'approche ICMP pour VMC/UDP et ajuster plutôt le libellé
+UI ("Connecté" sur-promet une garantie que le protocole ne peut pas tenir) plutôt que de continuer à
+chercher un mécanisme de détection fiable côté OS.

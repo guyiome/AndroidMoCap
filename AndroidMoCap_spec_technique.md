@@ -158,11 +158,18 @@ blendshape (~52) suivi d'un `/Apply` -- un seul appel réseau par frame plutôt 
 blendshape (correctif appliqué, voir revue technique point 4). IP/port cible saisis manuellement
 côté app (le téléphone est l'émetteur, il doit connaître sa destination).
 
+Détection de déconnexion best-effort (socket `connect()`-é + sonde `receive()` dédiée, revue
+technique point 55) : fonctionne en principe (ICMP "port injoignable"), **confirmé non fiable sur
+au moins un réseau de test** (le paquet ICMP n'atteint jamais le téléphone) -- l'icône "connecté"
+peut donc rester allumée même sans récepteur actif selon le réseau. N'affecte jamais l'envoi
+lui-même (best-effort, jamais bloquant).
+
 ### iFacialMocap/UDP (`IFacialMocapSender`)
 
 Cible : VBridger. Modèle inversé : le téléphone écoute passivement et affiche sa propre IP locale
 dans les réglages ; c'est VBridger qui initie la connexion vers cette IP. Aucune saisie réseau
-requise côté téléphone pour ce chemin.
+requise côté téléphone pour ce chemin. Même détection de déconnexion best-effort que VMC ci-dessus,
+même limite confirmée.
 
 ### VTube Studio Plugin API (`VTubeStudioSender`) -- point 39
 
