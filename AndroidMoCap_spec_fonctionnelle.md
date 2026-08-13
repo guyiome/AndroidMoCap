@@ -52,10 +52,10 @@ l'avatar affiché côté PC qui sert de retour visuel.
   mitigation pour l'instant (voir §4, point 16).
 - **Détection expérimentale de la langue tirée** (`tongueOut`) -- cascade dédiée (porte géométrique
   bouche ouverte → recadrage/couleur → comparaison à une calibration personnelle par embedding),
-  activable dans "Fonctionnalités expérimentales" (§3.4). Fiabilité en cours de validation, pas
-  encore confirmée (voir revue technique, point 15) -- la valeur reste affichée localement
-  uniquement (panneau de sélection des blendshapes, si `tongueOut` est coché) et n'est **jamais**
-  envoyée aux protocoles réseau (§3.3) tant que la fiabilité n'est pas confirmée.
+  activable dans "Fonctionnalités expérimentales" (§3.4). Depuis le 13 août 2026, également envoyée
+  aux protocoles réseau (§3.3), pas seulement affichée localement -- fiabilité nettement améliorée
+  (calibration élargie au mouvement de mâchoire + anti-rebond avant injection) mais un risque
+  résiduel faible reste assumé, d'où le rangement en "Expérimental" (voir revue technique, point 15/56).
 - Estimation de la direction du regard (par œil, pitch/yaw) reconstruite à partir des blendshapes
   directionnels (`eyeLookUp/Down/In/OutLeft/Right`), MediaPipe ne fournissant pas cette donnée
   nativement.

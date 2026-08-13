@@ -26,14 +26,40 @@ internal data class TongueCalibrationRecordingState(
     val elapsedMsInPhase: Long = 0L,
 )
 
-/** Durée par défaut de chaque phase d'enregistrement -- provisoire, réglable en pratique via
+/** Durée par défaut de la phase "langue dehors" -- provisoire, réglable en pratique via
  *  `AppSettingsStore.tongueCalibrationRecordingDurationMs` (panneau debug) plutôt que codée en dur,
- *  vu le nombre de sessions de réglage qu'ont demandé les étages 1/2. */
+ *  vu le nombre de sessions de réglage qu'ont demandé les étages 1/2. Pose statique, pas besoin de
+ *  plus de temps -- voir [DEFAULT_TONGUE_IN_RECORDING_DURATION_MS] pour la phase "langue rentrée",
+ *  volontairement plus longue depuis le 13 août 2026. */
 internal const val DEFAULT_CALIBRATION_RECORDING_DURATION_MS = 3000L
 
 /** Durée par défaut de la pause entre les deux phases d'enregistrement -- pas encore réglable
  *  depuis le panneau debug (contrairement à la durée d'enregistrement), jugé moins critique. */
 internal const val DEFAULT_CALIBRATION_PREPARE_DURATION_MS = 2000L
+
+/**
+ * Multiplicateur appliqué à la durée "langue dehors" pour obtenir celle de "langue rentrée" --
+ * source unique de vérité, utilisée à la fois pour [DEFAULT_TONGUE_IN_RECORDING_DURATION_MS] et
+ * par `MainViewModel` pour dériver la durée réelle (réglable) de cette phase, plutôt que deux
+ * constantes indépendantes qui pourraient diverger.
+ */
+internal const val TONGUE_IN_RECORDING_MULTIPLIER = 2L
+
+/**
+ * Durée par défaut de la phase "langue rentrée" -- volontairement le double de
+ * [DEFAULT_CALIBRATION_RECORDING_DURATION_MS] (revue technique, point 15 -- session de diagnostic
+ * du 13 août 2026, confirmée sur device) : la référence "langue rentrée" enregistrée jusqu'ici
+ * était une pose statique, bouche fermée -- jamais avec mouvement de mâchoire. Or une bouche
+ * ouverte par un mouvement de mâchoire (langue toujours rentrée) s'est révélée visuellement
+ * confondue avec "langue dehors" par le classifieur, avec un chevauchement réel des deux classes
+ * en similarité cosinus (pas un simple problème de seuil de marge, voir
+ * `TongueEmbeddingClassifier.DEFAULT_CLASSIFICATION_MARGIN`). Élargir la référence pour qu'elle
+ * couvre aussi cette variation demande plusieurs cycles d'ouverture/fermeture de mâchoire pendant
+ * l'enregistrement, d'où une durée doublée -- la phase "langue dehors", elle, reste une pose
+ * statique tenue immobile, pas besoin de plus de temps.
+ */
+internal const val DEFAULT_TONGUE_IN_RECORDING_DURATION_MS =
+    DEFAULT_CALIBRATION_RECORDING_DURATION_MS * TONGUE_IN_RECORDING_MULTIPLIER
 
 /** Démarre l'enregistrement -- toujours par la phase "langue dehors" en premier. Nommée
  *  différemment de `MainViewModel.startTongueCalibration()` (qui l'appelle) pour éviter une
@@ -48,15 +74,20 @@ internal fun newTongueCalibrationRecording(): TongueCalibrationRecordingState =
  * d'une frame -- rare mais possible même en calibration guidée) : le sample est alors simplement
  * sauté, la durée continue de s'écouler sans lui. Transition automatique
  * `RECORDING_TONGUE_OUT` -> `PREPARE_TONGUE_IN` -> `RECORDING_TONGUE_IN` -> `DONE` une fois
- * [durationMs]/[prepareDurationMs] atteint ou dépassé pour la phase courante (`>=`, pas `==` :
- * robuste à un pas de temps qui dépasse la frontière sans tomber pile dessus). No-op si déjà `IDLE`
- * ou `DONE`.
+ * [durationMs]/[prepareDurationMs]/[tongueInDurationMs] atteint ou dépassé pour la phase courante
+ * (`>=`, pas `==` : robuste à un pas de temps qui dépasse la frontière sans tomber pile dessus).
+ * No-op si déjà `IDLE` ou `DONE`.
+ *
+ * [tongueInDurationMs] distinct de [durationMs] depuis le 13 août 2026 -- voir le kdoc de
+ * [DEFAULT_TONGUE_IN_RECORDING_DURATION_MS] pour le raisonnement (la phase "langue rentrée" a
+ * besoin de plus de temps pour couvrir plusieurs cycles de mouvement de mâchoire).
  */
 internal fun TongueCalibrationRecordingState.tick(
     elapsedMs: Long,
     embedding: FloatArray?,
     durationMs: Long = DEFAULT_CALIBRATION_RECORDING_DURATION_MS,
     prepareDurationMs: Long = DEFAULT_CALIBRATION_PREPARE_DURATION_MS,
+    tongueInDurationMs: Long = DEFAULT_TONGUE_IN_RECORDING_DURATION_MS,
 ): TongueCalibrationRecordingState = when (phase) {
     TongueCalibrationPhase.IDLE, TongueCalibrationPhase.DONE -> this
     TongueCalibrationPhase.RECORDING_TONGUE_OUT -> {
@@ -79,7 +110,7 @@ internal fun TongueCalibrationRecordingState.tick(
     TongueCalibrationPhase.RECORDING_TONGUE_IN -> {
         val nextAccumulator = if (embedding != null) tongueInAccumulator.accumulate(embedding) else tongueInAccumulator
         val nextElapsed = elapsedMsInPhase + elapsedMs
-        if (nextElapsed >= durationMs) {
+        if (nextElapsed >= tongueInDurationMs) {
             copy(phase = TongueCalibrationPhase.DONE, tongueInAccumulator = nextAccumulator, elapsedMsInPhase = 0L)
         } else {
             copy(tongueInAccumulator = nextAccumulator, elapsedMsInPhase = nextElapsed)

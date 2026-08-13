@@ -225,10 +225,15 @@ class AppSettingsStore(private val context: Context) {
      * Détection expérimentale de la langue tirée (revue technique, point 15) -- **désactivée par
      * défaut**, rangée dans "Fonctionnalités expérimentales". Active la cascade à 3 étages (porte
      * `jawOpen`+`mouthOpennessRatio`, analyse couleur, classification par embedding calibrée) et le
-     * logging de diagnostic (`TONGUE_DIAGNOSTIC_LOGGING`, `MainViewModel`). `tongueOut` reste
-     * affiché localement uniquement (panneau de blendshapes) -- jamais injecté dans les données
-     * réellement envoyées aux protocoles réseau tant que la fiabilité n'est pas confirmée
-     * (`tongueOutInjectionConfirmed`, pas encore implémenté).
+     * logging de diagnostic (`TONGUE_DIAGNOSTIC_LOGGING`, `MainViewModel`).
+     *
+     * `tongueOut` est réellement injecté dans les données envoyées aux protocoles réseau depuis le
+     * 13 août 2026 (même toggle, pas de réglage séparé) -- après deux sessions de test device
+     * confirmant une nette amélioration de la fiabilité (calibration élargie au mouvement de
+     * mâchoire, `TongueCalibrationRecordingState.kt`) et un anti-rebond dédié
+     * (`TongueOutInjectionGate.kt`) filtrant le résidu d'erreurs isolées encore observé. Risque
+     * résiduel faible mais non nul, assumé -- fonctionnalité rangée dans "Expérimental" précisément
+     * pour cette raison, voir revue technique point 15 pour le détail des deux sessions.
      */
     val tongueOutDetectionEnabled: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
         prefs[Keys.TONGUE_OUT_DETECTION] ?: false

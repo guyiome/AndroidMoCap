@@ -2710,3 +2710,75 @@ Studio n'est pas concerné (WebSocket/TCP, coupure détectée nativement, jamais
 plus tard si le sujet revient : abandonner l'approche ICMP pour VMC/UDP et ajuster plutôt le libellé
 UI ("Connecté" sur-promet une garantie que le protocole ne peut pas tenir) plutôt que de continuer à
 chercher un mécanisme de détection fiable côté OS.
+
+### 56. Point 15, étage 3 -- calibration élargie au mouvement de mâchoire, injection réseau activée le 13 août 2026
+
+Reprise du point 15 (voir aussi 15ter/15quinquies) après la découverte, en préparant une revue de
+code générale du 13 août 2026, que le seuil fixé pour lever `tongueOutInjectionConfirmed` ("zéro
+chevauchement `simOut`/`simIn` sur ≥2 sessions indépendantes") n'était toujours pas atteint : une
+tenue "langue rentrée" avec mouvement de mâchoire dérivait encore par moments vers un faux
+`TONGUE_OUT` confiant.
+
+**Diagnostic, avec données réelles (`TONGUE_DIAGNOSTIC_LOGGING` réactivé ponctuellement, capturé via
+le fichier de logs persistant plutôt que logcat en direct -- logcat s'est montré peu fiable cette
+session, voir plus bas)** : sur une tenue "langue rentrée + mâchoire" de 8 échantillons classifiés,
+5 faux `TONGUE_OUT` (`diff` = simOut-simIn de +0,051 à +0,093) -- **dans la même plage que plusieurs
+vraies détections "langue dehors"** (qui descendent aussi bas que +0,033 sur la même session).
+Chevauchement réel des deux classes, pas un simple seuil de marge mal calé : aucune valeur de marge
+n'aurait pu séparer proprement les deux sans aussi couper des détections légitimes.
+
+**Hypothèse retenue** : la calibration "langue rentrée" enregistrait jusqu'ici une pose statique,
+bouche fermée -- jamais avec la mâchoire en mouvement. La référence ne couvrait donc pas ce à quoi
+ressemble une bouche ouverte par la mâchoire sans langue sortie, que le classifieur confondait avec
+"langue dehors" (aussi une bouche ouverte).
+
+**Correctif -- calibration élargie** (`TongueCalibrationRecordingState.kt`) : la phase "langue
+rentrée" est désormais deux fois plus longue (`DEFAULT_TONGUE_IN_RECORDING_DURATION_MS`, multiplié
+par `TONGUE_IN_RECORDING_MULTIPLIER = 2` depuis `DEFAULT_CALIBRATION_RECORDING_DURATION_MS`, source
+unique de vérité partagée entre la valeur par défaut et `MainViewModel` qui dérive la durée réelle,
+réglable) et l'instruction affichée demande explicitement d'ouvrir/fermer la mâchoire plusieurs fois
+pendant l'enregistrement (`tongue_calibration_status_recording_in`, FR/EN mis à jour). Aucun
+changement de mécanisme de classification lui-même (`classifyTongueState` inchangé) -- seule la
+qualité de la référence "langue rentrée" change.
+
+**Deux sessions de confirmation sur device, recalibration incluse** :
+- Session 1 : 98 échantillons classifiés sur le segment "langue rentrée + mâchoire", **0 faux
+  `TONGUE_OUT`**.
+- Session 2 (recalibration non refaite, même référence réutilisée) : 103 échantillons, **3 faux
+  `TONGUE_OUT`** résiduels (2,9%) -- les trois avec un `jawOpen`/`mouthGeo` plus élevés que la
+  moyenne (mâchoire ouverte plus large que ce qu'a peut-être couvert la calibration de 6s). Un
+  isolé, une paire consécutive (129ms d'écart) -- jamais 3 frames d'affilée dans le mauvais sens sur
+  les deux sessions, contre une vraie tenue "langue dehors" qui classe en continu sans coupure une
+  fois lancée.
+
+Comparaison : ancienne calibration statique ~62% de faux positifs sur ce scénario -> nouvelle
+calibration ~0-3%. Amélioration nette, mais le seuil "zéro chevauchement" n'est **techniquement pas
+atteint** (session 2 a un résidu).
+
+**Décision de l'utilisateur (13 août 2026)** : accepter ce risque résiduel plutôt que de courir après
+un zéro absolu, et activer l'injection réseau réelle malgré cela -- "risque relativement faible, sur
+une feature taguée comme pas très fiable" (rangée dans "Fonctionnalités expérimentales", libellé UI
+mis à jour en conséquence).
+
+**Filet de sécurité ajouté en complément** (`TongueOutInjectionGate.kt`, nouveau) : anti-rebond
+exigeant `DEFAULT_TONGUE_OUT_INJECTION_CONSECUTIVE_FRAMES = 3` classements `TONGUE_OUT` consécutifs
+avant de considérer l'état confirmé pour l'injection -- filtre spécifiquement les deux motifs de
+résidu observés (une frame isolée, une paire consécutive), sans retarder significativement une vraie
+détection (jamais de coupure de 3 frames ou plus dans une vraie tenue sur les deux sessions).
+
+**Câblage réseau** (`MainViewModel.kt`) : l'envoi vers `vmcSender`/`iFacialMocapSender`/
+`vtubeStudioSender` (auparavant avant la cascade langue tirée dans le flot de la fonction, donc
+structurellement incapable d'y injecter quoi que ce soit) déplacé après elle. `tongueOutDisplayState`
+(`TongueOutDisplaySmoothing.kt`, lissage de maintien 300ms) reçoit désormais le signal déjà debouncé
+par `TongueOutInjectionGate.kt` plutôt que la classification brute -- le panneau de test LOCAL et la
+valeur réellement envoyée au réseau partagent maintenant exactement le même calcul, plus de
+distinction "ce qu'on voit" / "ce qui part". Pas de nouveau réglage séparé : même toggle
+`tongueOutDetectionEnabled` (Fonctionnalités expérimentales) pilote détection ET injection désormais.
+
+**Note méthodologique, logcat peu fiable cette session** : plusieurs tentatives de capture logcat en
+direct (via adb) n'ont rien montré alors que l'app tournait normalement (confirmé par ailleurs) --
+cause non identifiée (USB/adb instable sur cette session, plusieurs symptômes de reconnexion
+observés en parallèle sur un sujet différent, voir point 55). Contournement fiable utilisé : lire le
+fichier de logs persistant de l'app directement (`adb shell run-as ... cat files/logs/app_logs.txt`,
+niveau "Info" réglé dans Réglages → Journalisation) plutôt que d'insister sur un flux logcat en
+direct -- à retenir pour un futur diagnostic sur ce device si logcat se montre à nouveau capricieux.

@@ -266,8 +266,9 @@ topologie du mesh de landmarks, qui ne modélise que la surface visible du visag
 présente dans le mesh, vraisemblablement un manque de couverture du modèle officiel plutôt qu'une
 impossibilité structurelle) -- distinction qui a conditionné les pistes de correction retenues
 (revue technique points 15/16). `tongueOut` a une mitigation applicative construite en dehors du
-mesh (cascade porte géométrique → couleur → embedding, point 15), fiabilité toujours en cours de
-validation à ce jour ; `cheekPuff` (point 16) n'a pas encore de mitigation implémentée.
+mesh (cascade porte géométrique → couleur → embedding, point 15), envoyée aux protocoles réseau
+depuis le 13 août 2026 malgré un risque résiduel de faux positif isolé assumé (voir point 15/56) ;
+`cheekPuff` (point 16) n'a pas encore de mitigation implémentée.
 
 **ARCore** -- utilisé uniquement pour Augmented Faces au palier `OPTIMAL` (voir §4), pas pour un
 usage de réalité augmentée classique.

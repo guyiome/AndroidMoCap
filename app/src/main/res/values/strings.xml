@@ -140,7 +140,7 @@
     <string name="experimental_features_title">Experimental features</string>
     <string name="experimental_features_placeholder">Cheek-puff detection is not implemented yet (see the technical review).</string>
     <string name="experimental_tongue_detection_title">Tongue-out detection (diagnostic)</string>
-    <string name="experimental_tongue_detection_description">Off by default. Runs a 3-stage cascade (mouth-opening gate, color heuristic, personal-calibration embedding) and shows the result live in the blendshape panel if tongueOut is checked. Reliability is still being validated — never affects what is actually sent over the network.</string>
+    <string name="experimental_tongue_detection_description">Off by default. Runs a 3-stage cascade (mouth-opening gate, color heuristic, personal-calibration embedding) and shows the result live in the blendshape panel if tongueOut is checked. Also sent over the network once calibrated — experimental, occasional false positives are still possible.</string>
     <string name="experimental_tongue_calibration_button">Calibrate detection…</string>
 
     <!-- Tongue calibration screen -->
@@ -150,7 +150,7 @@
     <string name="tongue_calibration_status_calibrated">Calibrated ✓</string>
     <string name="tongue_calibration_status_recording_out">Stick your tongue out and hold…</string>
     <string name="tongue_calibration_status_prepare_in">Get ready to relax your tongue back in…</string>
-    <string name="tongue_calibration_status_recording_in">Tongue in, mouth relaxed…</string>
+    <string name="tongue_calibration_status_recording_in">Tongue in -- open and close your jaw a few times, tongue always in…</string>
     <string name="tongue_calibration_button_start">Start calibration</string>
     <string name="tongue_calibration_button_recalibrate">Recalibrate</string>
     <string name="tongue_calibration_button_cancel">Cancel</string>

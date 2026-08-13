@@ -53,8 +53,11 @@ import com.guyiome.androidmocap.tracking.cosineSimilarity
 import com.guyiome.androidmocap.tracking.DEFAULT_CALIBRATION_PREPARE_DURATION_MS
 import com.guyiome.androidmocap.tracking.DEFAULT_CALIBRATION_RECORDING_DURATION_MS
 import com.guyiome.androidmocap.tracking.DEFAULT_CLASSIFICATION_MARGIN
+import com.guyiome.androidmocap.tracking.TONGUE_IN_RECORDING_MULTIPLIER
 import com.guyiome.androidmocap.tracking.TongueEmbeddingClassification
 import com.guyiome.androidmocap.tracking.TongueOutDisplayState
+import com.guyiome.androidmocap.tracking.TongueOutInjectionState
+import com.guyiome.androidmocap.tracking.confirmed
 import com.guyiome.androidmocap.tracking.jawOpenGateOpen
 import com.guyiome.androidmocap.tracking.mouthGeometricGateOpen
 import com.guyiome.androidmocap.tracking.mirrorFaceTrackingResult
@@ -325,8 +328,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // le 12 août en creusant une sensation de saccade sur le mesh ARCore -- ce log tourne à
         // chaque frame traitée quand le toggle langue tirée est actif, avec extraction de région +
         // formatage de chaîne + écriture logcat, un coût réel maintenant plus perceptible avec le
-        // fond caméra live comme référence visuelle). Repassé à `false`, comme documenté ici depuis
-        // le début -- réactiver ponctuellement pour déboguer un futur souci de ce chemin.
+        // fond caméra live comme référence visuelle).
+        // Réactivé ponctuellement le 13 août 2026 pour capturer simOut/simIn réels pendant deux
+        // sessions de reproduction de la dérive "langue rentrée + mâchoire -> faux TONGUE_OUT" (revue
+        // technique, point 15ter/15quinquies) -- données recueillies, calibration élargie au
+        // mouvement de mâchoire + anti-rebond d'injection ajoutés en conséquence (voir
+        // TongueCalibrationRecordingState.kt/TongueOutInjectionGate.kt), repassé à `false`.
         private const val TONGUE_DIAGNOSTIC_LOGGING = false
         private const val TONGUE_DIAG_TAG = "TongueDiag"
 
@@ -384,8 +391,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     @Volatile private var tongueCalibrationResult: TongueCalibrationResult? = null
     private var tongueCalibrationRecordingState = TongueCalibrationRecordingState()
     private var tongueCalibrationLastTimestampMs: Long? = null
-    // Lissage d'affichage LOCAL uniquement (voir TongueOutDisplaySmoothing.kt) -- ne touche à aucune
-    // décision de la cascade, juste à la valeur "tongueOut" poussée au panneau de test.
+    // Lissage/anti-rebond de tongueOut -- pilote à la fois le panneau de test LOCAL et, depuis le
+    // 13 août 2026, la valeur réellement injectée dans "final" envoyé au réseau (revue technique,
+    // point 15) : les deux utilisent désormais le même signal debouncé/lissé, plus de distinction
+    // entre "ce qu'on voit" et "ce qui part". tongueOutInjectionState (TongueOutInjectionGate.kt)
+    // exige plusieurs classements TONGUE_OUT consécutifs avant de considérer l'état confirmé --
+    // filtre le résidu d'erreurs isolées observé même après l'élargissement de la calibration au
+    // mouvement de mâchoire (TongueCalibrationRecordingState.kt) ; tongueOutDisplayState
+    // (TongueOutDisplaySmoothing.kt) prend ensuite ce signal déjà debouncé et le maintient affiché
+    // un court instant après la dernière confirmation, pour éviter tout clignotement en fin de tenue.
+    private var tongueOutInjectionState = TongueOutInjectionState()
     private var tongueOutDisplayState = TongueOutDisplayState()
     private var tongueOutDisplayLastTimestampMs: Long? = null
 
@@ -938,9 +953,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 imageHeightPx = final.imageHeightPx,
             )
         }
-        vmcSender?.send(final)
-        iFacialMocapSender?.send(final)
-        vtubeStudioSender?.send(final)
+        // Envoi réseau déplacé après la cascade de détection de la langue tirée plus bas (revue
+        // technique, point 15, 13 août 2026) -- permet d'y injecter tongueOut une fois confirmé
+        // fiable, voir tongueOutValueForInjection et son utilisation en fin de fonction.
 
         // Diagnostic temporaire EAR (voir la constante EAR_DIAGNOSTIC_LOGGING ci-dessus) -- brut ET
         // corrigé côte à côte pour vérifier sur device que la correction atténue bien les fuites
@@ -1033,10 +1048,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             val previousPhase = tongueCalibrationRecordingState.phase
             val recordingDurationMs = _uiState.value.tongueCalibrationRecordingDurationMs
+            // Phase "langue rentrée" volontairement plus longue (multiplicateur partagé, voir son
+            // kdoc dans TongueCalibrationRecordingState.kt) -- couvre plusieurs cycles de mouvement
+            // de mâchoire pendant l'enregistrement, pas juste une pose statique bouche fermée.
+            val tongueInDurationMs = recordingDurationMs * TONGUE_IN_RECORDING_MULTIPLIER
             tongueCalibrationRecordingState = tongueCalibrationRecordingState.tick(
                 calibrationElapsedMs,
                 embedding,
                 recordingDurationMs,
+                tongueInDurationMs = tongueInDurationMs,
             )
             if (tongueCalibrationRecordingState.phase == TongueCalibrationPhase.DONE) {
                 val result = tongueCalibrationRecordingState.result()
@@ -1060,10 +1080,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // changement de seconde affichée ou de phase, pas à chaque frame (même discipline
                 // que calibrationAnomalyFlagged) : ceil() pour un décompte 3,2,1 naturel plutôt que
                 // de sauter directement à 2 dès la première frame.
-                val phaseDurationMs = if (tongueCalibrationRecordingState.phase == TongueCalibrationPhase.PREPARE_TONGUE_IN) {
-                    DEFAULT_CALIBRATION_PREPARE_DURATION_MS
-                } else {
-                    recordingDurationMs
+                val phaseDurationMs = when (tongueCalibrationRecordingState.phase) {
+                    TongueCalibrationPhase.PREPARE_TONGUE_IN -> DEFAULT_CALIBRATION_PREPARE_DURATION_MS
+                    TongueCalibrationPhase.RECORDING_TONGUE_IN -> tongueInDurationMs
+                    else -> recordingDurationMs
                 }
                 val secondsRemaining = kotlin.math.ceil(
                     (phaseDurationMs - tongueCalibrationRecordingState.elapsedMsInPhase) / 1000f
@@ -1082,13 +1102,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         // Cascade de détection de la langue tirée, phase 1+3 (revue technique, point 15) -- gatée
-        // par le réglage expérimental. Aucune injection dans "final"/corrected.blendshapes (ce qui
-        // part sur le réseau) tant qu'un test device n'a pas confirmé l'étage 3 -- injecter une
-        // valeur non fiable serait pire que l'honnêteté actuelle du signal à 0. En revanche,
-        // valorisée dans le panneau LOCAL de l'app (tongueOutClassification ci-dessous, ajouté à
-        // TrackingFrame.allBlendshapes en fin de bloc, jamais à "final") -- demande explicite de
-        // l'utilisateur pour avoir un retour direct pendant les phases de test, sans risquer
-        // d'envoyer un signal pas encore validé à un récepteur connecté (VBridger/VMC/VTube Studio).
+        // par le réglage expérimental. Injectée dans "final" envoyé au réseau depuis le 13 août 2026
+        // (voir tongueOutValueForInjection ci-dessous et son utilisation en fin de fonction) --
+        // seulement après deux sessions de test device avec une calibration élargie au mouvement de
+        // mâchoire (TongueCalibrationRecordingState.kt) et un anti-rebond dédié
+        // (TongueOutInjectionGate.kt) pour filtrer le résidu d'erreurs isolées encore observé.
+        // null tant que le toggle est désactivé -- "final" part alors inchangé, comme avant.
+        var tongueOutValueForInjection: Float? = null
         if (_uiState.value.tongueOutDetectionEnabled) {
             val jawOpen = corrected.blendshapes.firstOrNull { it.name == "jawOpen" }?.score ?: 0f
             // Diagnostic croisé (voir kdoc de mouthOpennessRatio, LipLandmarks.kt) : mesure
@@ -1182,22 +1202,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
 
-            // Valorisation LOCALE uniquement (panneau de blendshapes de l'app) -- demande explicite
-            // de l'utilisateur (11 août 2026) pour un retour direct pendant les phases de test, sans
-            // envoyer un signal pas encore validé à un récepteur connecté. N'écrit jamais dans
-            // "final"/corrected -- "final" reste ce qui part vers vmcSender/iFacialMocapSender/
-            // vtubeStudioSender, inchangé.
+            // Anti-rebond avant injection (TongueOutInjectionGate.kt, 13 août 2026) : exige plusieurs
+            // classements TONGUE_OUT consécutifs avant de considérer l'état confirmé -- filtre le
+            // résidu d'erreurs isolées observé même après l'élargissement de la calibration au
+            // mouvement de mâchoire (voir son kdoc pour le détail des deux sessions de test). Le
+            // panneau LOCAL de test et la valeur réellement envoyée au réseau partagent désormais ce
+            // même signal debouncé -- plus de distinction "ce qu'on voit" / "ce qui part".
+            tongueOutInjectionState = tongueOutInjectionState.next(tongueOutClassification)
+            val debouncedClassification =
+                if (tongueOutInjectionState.confirmed()) TongueEmbeddingClassification.TONGUE_OUT else null
+
             // Lissé (TongueOutDisplaySmoothing.kt) plutôt qu'un booléen brut par frame -- retour
             // utilisateur (11 août 2026) : pendant une tenue réelle, l'étage 3 alterne souvent
             // TONGUE_OUT/UNDECIDED d'une frame à l'autre, ce qui clignotait 1/0 à l'écran. Le
             // lissage ne change aucune décision de la cascade elle-même (etage3/simOut/simIn dans
-            // les logs restent bruts, non lissés).
+            // les logs restent bruts, non lissés/non debouncés).
             val displayElapsedMs = tongueOutDisplayLastTimestampMs?.let { corrected.timestampMs - it } ?: 0L
             tongueOutDisplayLastTimestampMs = corrected.timestampMs
-            tongueOutDisplayState = tongueOutDisplayState.next(tongueOutClassification, displayElapsedMs)
+            tongueOutDisplayState = tongueOutDisplayState.next(debouncedClassification, displayElapsedMs)
             val tongueOutDisplayValue = if (tongueOutDisplayState.displayedAsOut) 1f else 0f
             _trackingFrame.update { it.copy(allBlendshapes = it.allBlendshapes + BlendshapeScore("tongueOut", tongueOutDisplayValue)) }
+            tongueOutValueForInjection = tongueOutDisplayValue
         }
+
+        // Envoi réseau (revue technique, point 15) : injecte tongueOut si le toggle expérimental est
+        // actif (tongueOutValueForInjection non-null), sinon "final" part inchangé -- déplacé après
+        // la cascade ci-dessus (auparavant plus haut dans cette fonction, avant que la cascade ait pu
+        // calculer quoi que ce soit) pour rendre cette injection possible.
+        val finalToSend = tongueOutValueForInjection?.let { value ->
+            final.copy(blendshapes = final.blendshapes + BlendshapeScore("tongueOut", value))
+        } ?: final
+        vmcSender?.send(finalToSend)
+        iFacialMocapSender?.send(finalToSend)
+        vtubeStudioSender?.send(finalToSend)
     }
 
     /**
