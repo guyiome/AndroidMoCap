@@ -87,6 +87,11 @@ class IFacialMocapSender(
      * connexion visiblement -- [startListening] appelle [onStatusChanged] avec l'IP quoi qu'il
      * arrive -- juste plus aucune donnée envoyée, sans erreur visible : plus sournois, pas moins
      * grave).
+     *
+     * ⚠️ **`send()` seul insuffisant, confirmé sur device et corrigé (13 août 2026)** : voir le kdoc
+     * de [startUdpLivenessProbe] (même mécanisme que `VmcOscSender`, découvert dessus en premier) --
+     * `connect()` réussi n'empêchait pas [PortUnreachableException] de ne jamais remonter dans
+     * `send()` une fois le récepteur fermé, sur ce device. Sonde dédiée démarrée ici en complément.
      */
     private fun openSendSocket(address: InetAddress): DatagramSocket? {
         val newSocket = try {
@@ -97,6 +102,7 @@ class IFacialMocapSender(
         }
         try {
             newSocket.connect(address, PORT)
+            startUdpLivenessProbe(newSocket, "IFacialMocapLivenessProbe", TAG) { onSendSocketUnreachable(newSocket) }
         } catch (e: Exception) {
             AppLog.w(
                 TAG,
@@ -106,6 +112,24 @@ class IFacialMocapSender(
             )
         }
         return newSocket
+    }
+
+    /**
+     * Point d'entrée unique pour signaler une cible devenue injoignable, que ce soit détecté par
+     * [send] (le chemin d'origine, insuffisant seul -- voir le kdoc de [openSendSocket]) ou par la
+     * sonde dédiée ([startUdpLivenessProbe]). Vérifie l'identité de [source] : si un nouveau
+     * handshake est arrivé entretemps ([sendSocket] a changé), cet appel appartient à une connexion
+     * déjà abandonnée -- l'état n'est alors pas touché, mais [source] est quand même fermé (évite de
+     * laisser fuir ce socket devenu orphelin).
+     */
+    private fun onSendSocketUnreachable(source: DatagramSocket) {
+        if (sendSocket === source) {
+            targetAddress = null
+            sendSocket = null
+            AppLog.i(TAG, "Cible UDP/VBridger injoignable (ICMP port injoignable) -- déconnexion détectée")
+            onStatusChanged(null)
+        }
+        source.close()
     }
 
     /** Démarre l'écoute du handshake sur le port 49983. Idempotent. */
@@ -162,16 +186,7 @@ class IFacialMocapSender(
                 val packet = if (out.isConnected) DatagramPacket(bytes, bytes.size) else DatagramPacket(bytes, bytes.size, address, PORT)
                 out.send(packet)
             } catch (e: PortUnreachableException) {
-                // Identité vérifiée : si un nouveau handshake est arrivé entretemps (autre thread,
-                // voir startListening()), sendSocket pointe déjà vers une connexion différente --
-                // ce callback appartient alors à une connexion déjà abandonnée, à ignorer.
-                if (sendSocket === out) {
-                    targetAddress = null
-                    sendSocket = null
-                    AppLog.i(TAG, "Cible UDP/VBridger injoignable (ICMP port injoignable) -- déconnexion détectée")
-                    onStatusChanged(null)
-                }
-                out.close()
+                onSendSocketUnreachable(out)
             } catch (e: Exception) {
                 // Cible momentanément injoignable : on laisse tomber cette frame plutôt que de bloquer.
             }

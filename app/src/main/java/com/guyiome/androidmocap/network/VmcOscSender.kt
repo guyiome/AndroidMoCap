@@ -166,6 +166,11 @@ class VmcOscSender(
      * déconnexion pour cette session-là) plutôt que de faire échouer la connexion entière. Voir
      * [DatagramSocket.isConnected] utilisé dans [send] pour adapter la construction du paquet aux
      * deux cas.
+     *
+     * ⚠️ **`send()` seul insuffisant, confirmé sur device et corrigé (13 août 2026)** : voir le kdoc
+     * de [startUdpLivenessProbe] pour l'histoire complète -- `connect()` réussi et données bien
+     * reçues côté PC n'empêchaient pas [PortUnreachableException] de ne **jamais** remonter dans
+     * `send()` une fois le récepteur fermé, sur ce device. Sonde dédiée démarrée ici en complément.
      */
     private fun connect() {
         val newSocket = try {
@@ -177,6 +182,7 @@ class VmcOscSender(
         }
         try {
             newSocket.connect(host, port)
+            startUdpLivenessProbe(newSocket, "VmcLivenessProbe", TAG) { onSocketUnreachable(newSocket) }
         } catch (e: Exception) {
             AppLog.w(
                 TAG,
@@ -186,6 +192,21 @@ class VmcOscSender(
             )
         }
         socket = newSocket
+    }
+
+    /**
+     * Point d'entrée unique pour signaler une cible devenue injoignable, que ce soit détecté par
+     * [send] (le chemin d'origine, insuffisant seul -- voir le kdoc de [connect]) ou par la sonde
+     * dédiée ([startUdpLivenessProbe]). Vérifie l'identité de [source] : si l'utilisateur s'est
+     * reconnecté entretemps ([socket] a changé), cet appel appartient à une connexion déjà
+     * abandonnée, à ignorer.
+     */
+    private fun onSocketUnreachable(source: DatagramSocket) {
+        if (socket !== source) return
+        if (connectionLost.compareAndSet(false, true)) {
+            AppLog.i(TAG, "Cible VMC $host:$port injoignable (ICMP port injoignable) -- déconnexion détectée")
+            onConnectionLost()
+        }
     }
 
     fun send(result: FaceTrackingResult) {
@@ -200,10 +221,7 @@ class VmcOscSender(
                 val packet = if (out.isConnected) DatagramPacket(bytes, bytes.size) else DatagramPacket(bytes, bytes.size, host, port)
                 out.send(packet)
             } catch (e: PortUnreachableException) {
-                if (connectionLost.compareAndSet(false, true)) {
-                    AppLog.i(TAG, "Cible VMC $host:$port injoignable (ICMP port injoignable) -- déconnexion détectée")
-                    onConnectionLost()
-                }
+                onSocketUnreachable(out)
             } catch (e: Exception) {
                 // Réseau momentanément indisponible : on laisse tomber cette frame plutôt que de bloquer.
             }
