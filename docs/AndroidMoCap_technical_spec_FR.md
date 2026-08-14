@@ -1,11 +1,11 @@
 # AndroidMoCap — Spécification technique
 
-*🇬🇧 English version: [AndroidMoCap_spec_technique.md](AndroidMoCap_spec_technique.md)*
+*🇬🇧 English version: [AndroidMoCap_technical_spec.md](AndroidMoCap_technical_spec.md)*
 
 *Document de référence sur l'architecture et l'implémentation courantes. Décrit comment l'app est
 construite, avec le niveau de détail technique -- pas un journal, pas d'historique de décisions, pas
 de feuille de route. Pour le périmètre fonctionnel côté utilisateur, voir
-`AndroidMoCap_spec_fonctionnelle_FR.md`.*
+`AndroidMoCap_functional_spec_FR.md`.*
 
 ## 1. Vue d'ensemble
 
@@ -266,7 +266,7 @@ Suite de tests unitaires JVM pur (`app/src/test/`, aucune dépendance Android/Ro
 qui ne dépend pas directement du framework Android/MediaPipe/CameraX -- exemples : `RotationMath`
 (conversions matrice/quaternion/Euler), `computeEyeGazeDegrees`, `CameraController.rotatedDimensions`,
 `ArCoreFaceSelector.pickPrimary`. Détail fonction par fonction, avec les raisons explicites de ce
-qui n'est volontairement pas couvert, dans `AndroidMoCap_tests_unitaires_FR.md`.
+qui n'est volontairement pas couvert, dans `AndroidMoCap_unit_tests_FR.md`.
 
 ## 10. Build et distribution
 

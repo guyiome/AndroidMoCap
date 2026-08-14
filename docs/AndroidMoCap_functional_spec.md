@@ -1,10 +1,10 @@
 # AndroidMoCap — Functional specification
 
-*🇫🇷 Version française : [AndroidMoCap_spec_fonctionnelle_FR.md](AndroidMoCap_spec_fonctionnelle_FR.md)*
+*🇫🇷 Version française : [AndroidMoCap_functional_spec_FR.md](AndroidMoCap_functional_spec_FR.md)*
 
 *Reference document describing the current state of the functional scope. Describes what the app
 does today, for a non-technical reader -- not a changelog, not a history of decisions, not a
-roadmap. For architecture and implementation choices, see `AndroidMoCap_spec_technique.md`.*
+roadmap. For architecture and implementation choices, see `AndroidMoCap_technical_spec.md`.*
 
 ## 1. Overview
 

@@ -107,7 +107,7 @@ app/src/main/java/com/guyiome/androidmocap/
 
 Pure JVM unit test suite (no Android/Robolectric dependency) under `app/src/test/`.
 Function-by-function detail, with explicit reasons for what's deliberately not covered, in
-`docs/AndroidMoCap_tests_unitaires.md`. Run with:
+`docs/AndroidMoCap_unit_tests.md`. Run with:
 
 ```
 ./gradlew testDebugUnitTest
@@ -115,10 +115,10 @@ Function-by-function detail, with explicit reasons for what's deliberately not c
 
 ## Documentation
 
-- `docs/AndroidMoCap_spec_fonctionnelle.md` -- what the app does today, from the user's side.
-- `docs/AndroidMoCap_spec_technique.md` -- architecture, capture pipeline, network protocols,
+- `docs/AndroidMoCap_functional_spec.md` -- what the app does today, from the user's side.
+- `docs/AndroidMoCap_technical_spec.md` -- architecture, capture pipeline, network protocols,
   non-functional constraints.
-- `docs/AndroidMoCap_tests_unitaires.md` -- test coverage detail.
+- `docs/AndroidMoCap_unit_tests.md` -- test coverage detail.
 
 ## Roadmap
 

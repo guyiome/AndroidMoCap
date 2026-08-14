@@ -1,6 +1,6 @@
 # AndroidMoCap — Suivi des tests unitaires
 
-*🇬🇧 English version: [AndroidMoCap_tests_unitaires.md](AndroidMoCap_tests_unitaires.md)*
+*🇬🇧 English version: [AndroidMoCap_unit_tests.md](AndroidMoCap_unit_tests.md)*
 
 Document de référence sur l'état courant de la couverture de tests -- pas un journal, pas d'historique de correctifs. Il liste, module par module, ce qui est couvert par des tests unitaires JVM purs (`app/src/test/`, exécutés via `./gradlew testDebugUnitTest`, aucun appareil/émulateur requis), et pourquoi le reste ne l'est pas.
 
@@ -148,7 +148,7 @@ du SDK ARCore (`Session`, `GLSurfaceView.Renderer`, `Frame.acquireCameraImage()`
 caméra/cycle de vie dans `MainViewModel` -- nécessiterait Robolectric ou un test instrumenté pour un
 gain limité vu la nature du code (orchestration, pas de décision non triviale isolable). Cette
 absence de couverture JUnit ne reflète pas l'état de fonctionnement réel de la fonctionnalité :
-la fusion ARCore est confirmée fonctionnelle sur device (voir `AndroidMoCap_spec_technique_FR.md`, §4)
+la fusion ARCore est confirmée fonctionnelle sur device (voir `AndroidMoCap_technical_spec_FR.md`, §4)
 -- c'est uniquement ce fichier de suivi de tests qui ne peut pas l'exercer automatiquement.
 
 ## Règle pour la suite (TDD)

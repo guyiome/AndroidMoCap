@@ -115,7 +115,7 @@ app/src/main/java/com/guyiome/androidmocap/
 
 Suite de tests unitaires JVM pur (aucune dépendance Android/Robolectric) sous `app/src/test/`.
 Détail fonction par fonction, avec les raisons explicites de ce qui n'est volontairement pas
-couvert, dans `docs/AndroidMoCap_tests_unitaires_FR.md`. Lancer avec :
+couvert, dans `docs/AndroidMoCap_unit_tests_FR.md`. Lancer avec :
 
 ```
 ./gradlew testDebugUnitTest
@@ -123,10 +123,10 @@ couvert, dans `docs/AndroidMoCap_tests_unitaires_FR.md`. Lancer avec :
 
 ## Documentation
 
-- `docs/AndroidMoCap_spec_fonctionnelle_FR.md` -- ce que l'app fait aujourd'hui, côté utilisateur.
-- `docs/AndroidMoCap_spec_technique_FR.md` -- architecture, pipeline de capture, protocoles réseau,
+- `docs/AndroidMoCap_functional_spec_FR.md` -- ce que l'app fait aujourd'hui, côté utilisateur.
+- `docs/AndroidMoCap_technical_spec_FR.md` -- architecture, pipeline de capture, protocoles réseau,
   contraintes non-fonctionnelles.
-- `docs/AndroidMoCap_tests_unitaires_FR.md` -- détail de la couverture de tests.
+- `docs/AndroidMoCap_unit_tests_FR.md` -- détail de la couverture de tests.
 
 ## Feuille de route
 

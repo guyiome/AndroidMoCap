@@ -1,11 +1,11 @@
 # AndroidMoCap — Spécification fonctionnelle
 
-*🇬🇧 English version: [AndroidMoCap_spec_fonctionnelle.md](AndroidMoCap_spec_fonctionnelle.md)*
+*🇬🇧 English version: [AndroidMoCap_functional_spec.md](AndroidMoCap_functional_spec.md)*
 
 *Document de référence sur l'état courant du périmètre fonctionnel. Décrit ce que l'app fait
 aujourd'hui, pour un lecteur non technique -- pas un journal, pas d'historique de décisions, pas de
 feuille de route. Pour l'architecture et les choix d'implémentation, voir
-`AndroidMoCap_spec_technique_FR.md`.*
+`AndroidMoCap_technical_spec_FR.md`.*
 
 ## 1. Présentation générale
 

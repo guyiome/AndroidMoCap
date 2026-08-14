@@ -1,6 +1,6 @@
 # AndroidMoCap — Unit test tracking
 
-*🇫🇷 Version française : [AndroidMoCap_tests_unitaires_FR.md](AndroidMoCap_tests_unitaires_FR.md)*
+*🇫🇷 Version française : [AndroidMoCap_unit_tests_FR.md](AndroidMoCap_unit_tests_FR.md)*
 
 Reference document on the current state of test coverage -- not a changelog, not a history of
 fixes. Lists, module by module, what's covered by pure JVM unit tests (`app/src/test/`, run via
@@ -181,7 +181,7 @@ the ARCore SDK (`Session`, `GLSurfaceView.Renderer`, `Frame.acquireCameraImage()
 camera/lifecycle wiring in `MainViewModel` -- would need Robolectric or an instrumented test for
 limited gain given the nature of the code (orchestration, no non-trivial isolable decision). This
 lack of JUnit coverage doesn't reflect the feature's actual working state: ARCore fusion is confirmed
-functional on device (see `AndroidMoCap_spec_technique.md`, §4) -- it's only this test-tracking file
+functional on device (see `AndroidMoCap_technical_spec.md`, §4) -- it's only this test-tracking file
 that can't exercise it automatically.
 
 ## Rule going forward (TDD)

@@ -1,10 +1,10 @@
 # AndroidMoCap — Technical specification
 
-*🇫🇷 Version française : [AndroidMoCap_spec_technique_FR.md](AndroidMoCap_spec_technique_FR.md)*
+*🇫🇷 Version française : [AndroidMoCap_technical_spec_FR.md](AndroidMoCap_technical_spec_FR.md)*
 
 *Reference document on the current architecture and implementation. Describes how the app is
 built, at technical detail level -- not a changelog, not a decision history, not a roadmap. For
-user-facing functional scope, see `AndroidMoCap_spec_fonctionnelle.md`.*
+user-facing functional scope, see `AndroidMoCap_functional_spec.md`.*
 
 ## 1. Overview
 
@@ -255,7 +255,7 @@ Pure JVM unit test suite (`app/src/test/`, no Android/Robolectric dependency),
 that doesn't directly depend on the Android/MediaPipe/CameraX framework -- examples: `RotationMath`
 (matrix/quaternion/Euler conversions), `computeEyeGazeDegrees`, `CameraController.rotatedDimensions`,
 `ArCoreFaceSelector.pickPrimary`. Function-by-function detail, with explicit reasons for what's
-deliberately not covered, in `AndroidMoCap_tests_unitaires.md`.
+deliberately not covered, in `AndroidMoCap_unit_tests.md`.
 
 ## 10. Build and distribution
 

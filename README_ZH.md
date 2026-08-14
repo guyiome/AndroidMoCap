@@ -95,7 +95,7 @@ app/src/main/java/com/guyiome/androidmocap/
 ## 测试
 
 纯 JVM 单元测试套件（不依赖 Android/Robolectric），位于 `app/src/test/`。逐函数的详细说明，包括
-哪些内容有意未覆盖及其原因，见 `docs/AndroidMoCap_tests_unitaires.md`（英文）。运行方式：
+哪些内容有意未覆盖及其原因，见 `docs/AndroidMoCap_unit_tests.md`（英文）。运行方式：
 
 ```
 ./gradlew testDebugUnitTest
@@ -105,9 +105,9 @@ app/src/main/java/com/guyiome/androidmocap/
 
 以下文档目前仅提供英文/法文版本：
 
-- `docs/AndroidMoCap_spec_fonctionnelle.md` -- 应用当前的功能说明，面向用户。
-- `docs/AndroidMoCap_spec_technique.md` -- 架构、采集管线、网络协议、非功能性约束。
-- `docs/AndroidMoCap_tests_unitaires.md` -- 测试覆盖详情。
+- `docs/AndroidMoCap_functional_spec.md` -- 应用当前的功能说明，面向用户。
+- `docs/AndroidMoCap_technical_spec.md` -- 架构、采集管线、网络协议、非功能性约束。
+- `docs/AndroidMoCap_unit_tests.md` -- 测试覆盖详情。
 
 ## 路线图
 

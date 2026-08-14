@@ -110,7 +110,7 @@ app/src/main/java/com/guyiome/androidmocap/
 ## テスト
 
 純粋な JVM 単体テストスイート（Android/Robolectric 非依存）が `app/src/test/` にあります。関数単位の
-詳細と、意図的にカバーされていない箇所の理由は `docs/AndroidMoCap_tests_unitaires.md`（英語）を
+詳細と、意図的にカバーされていない箇所の理由は `docs/AndroidMoCap_unit_tests.md`（英語）を
 参照してください。実行方法：
 
 ```
@@ -121,10 +121,10 @@ app/src/main/java/com/guyiome/androidmocap/
 
 以下のドキュメントは現在、英語版/フランス語版のみ提供されています：
 
-- `docs/AndroidMoCap_spec_fonctionnelle.md` -- アプリが現在提供している機能（ユーザー向け）。
-- `docs/AndroidMoCap_spec_technique.md` -- アーキテクチャ、キャプチャパイプライン、ネットワーク
+- `docs/AndroidMoCap_functional_spec.md` -- アプリが現在提供している機能（ユーザー向け）。
+- `docs/AndroidMoCap_technical_spec.md` -- アーキテクチャ、キャプチャパイプライン、ネットワーク
   プロトコル、非機能要件。
-- `docs/AndroidMoCap_tests_unitaires.md` -- テストカバレッジの詳細。
+- `docs/AndroidMoCap_unit_tests.md` -- テストカバレッジの詳細。
 
 ## ロードマップ
 
