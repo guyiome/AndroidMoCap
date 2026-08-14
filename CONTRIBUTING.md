@@ -1,24 +1,26 @@
-# Contribuer à AndroidMoCap
+# Contributing to AndroidMoCap
 
-Merci de l'intérêt porté à ce projet. Quelques points avant d'ouvrir une pull request.
+*🇫🇷 Version française : [CONTRIBUTING_FR.md](CONTRIBUTING_FR.md)*
 
-## Licence du projet
+Thanks for your interest in this project. A few points before opening a pull request.
 
-Le code est distribué sous licence [PolyForm Shield 1.0.0](https://polyformproject.org/licenses/shield/1.0.0)
-(voir `LICENSE`) : usage libre, y compris commercial, à l'exception de la construction d'un produit
-qui concurrencerait le logiciel lui-même. Ce n'est pas une licence "open source" au sens strict
-(OSI) -- choix délibéré, voir le point 22 de `AndroidMoCap_revue_technique.md` pour le
-raisonnement.
+## Project license
 
-## Accord de licence contributeur (CLA)
+The code is distributed under the [PolyForm Shield 1.0.0](https://polyformproject.org/licenses/shield/1.0.0)
+license (see `LICENSE`): free use, including commercial, except building a product that would
+compete with the software itself. This is not an "open source" license in the strict (OSI) sense --
+a deliberate choice, to keep the maintainer able to keep distributing and evolving the software,
+including commercially, without a third party being able to turn it into a competing product.
 
-Toute contribution (pull request, patch) suppose l'acceptation des termes de `CLA.md`. En résumé :
-vous gardez vos droits sur votre contribution, mais vous accordez au mainteneur une licence assez
-large pour continuer à faire évoluer -- et, le cas échéant, relicencier -- le projet à l'avenir (par
-exemple vers Apache 2.0/MIT). Indiquez votre accord directement dans le message de la pull request.
+## Contributor License Agreement (CLA)
 
-## Avant de proposer un changement
+Any contribution (pull request, patch) implies acceptance of the terms of `CLA.md`/`CLA_FR.md`. In
+short: you keep your rights over your contribution, but you grant the maintainer a broad enough
+license to keep evolving -- and, if needed, relicense -- the project in the future (for example
+toward Apache 2.0/MIT). State your agreement directly in the pull request's message.
 
-Pour tout changement non trivial, ouvrir une issue au préalable est préférable à une pull request
-surprise -- ce projet est actuellement mené par une seule personne, une discussion en amont évite du
-travail refait de part et d'autre.
+## Before proposing a change
+
+For any non-trivial change, opening an issue beforehand is preferable to a surprise pull request --
+this project is currently maintained by a single person, and an upfront discussion avoids duplicated
+work on either side.

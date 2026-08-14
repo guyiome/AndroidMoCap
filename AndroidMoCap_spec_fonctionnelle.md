@@ -1,199 +1,156 @@
-# AndroidMoCap — Spécification fonctionnelle
+# AndroidMoCap — Functional specification
 
-*Document de référence sur l'état courant du périmètre fonctionnel, à l'instant présent -- pas un
-journal, pas d'historique de décisions. Pour l'architecture et les choix d'implémentation, voir
-`AndroidMoCap_spec_technique.md`. Dernière mise à jour : 14 août 2026.*
+*🇫🇷 Version française : [AndroidMoCap_spec_fonctionnelle_FR.md](AndroidMoCap_spec_fonctionnelle_FR.md)*
 
-## 1. Présentation générale
+*Reference document describing the current state of the functional scope. Describes what the app
+does today, for a non-technical reader -- not a changelog, not a history of decisions, not a
+roadmap. For architecture and implementation choices, see `AndroidMoCap_spec_technique.md`.*
 
-AndroidMoCap transforme un téléphone Android en tracker de capture de mouvement facial pour
-VTubing : la caméra frontale capture le visage, l'app calcule un jeu de blendshapes (coefficients
-d'expression faciale) et les transmet en direct, sur le réseau local, à un logiciel receveur sur PC
-qui anime un avatar.
+## 1. Overview
 
-**Public visé** : streamers/VTubers utilisant un téléphone Android comme solution de tracking
-facial, en alternative aux solutions iOS (iFacialMocap, FaceMotion3D) qui bénéficient d'un capteur
-de profondeur dédié (TrueDepth) absent des téléphones Android. Le projet comble un vide identifié
-sur cette plateforme : MeowFace, la référence historique, n'est plus maintenue et n'a pas de
-successeur ; VTube Studio propose son propre tracking Android mais de qualité reconnue inférieure
-et pensé pour afficher directement un modèle Live2D sur le téléphone plutôt que comme émetteur
-universel.
+AndroidMoCap turns an Android phone into a facial motion-capture tracker for VTubing: the front
+camera captures the face, the app computes a set of blendshapes (facial expression coefficients)
+and streams them live, over the local network, to receiving software on a PC that animates an
+avatar.
 
-**Ce que l'app n'est pas** : ni un afficheur d'avatar (contrairement à VTube Studio Android), ni un
-service cloud (tout le traitement et l'échange de données reste local à l'appareil et au réseau
-Wi-Fi local), ni une app store-first (distribution actuelle uniquement via GitHub Releases).
+**Target audience**: streamers/VTubers using an Android phone as a facial tracking solution, as an
+alternative to iOS solutions (iFacialMocap, FaceMotion3D) which benefit from a dedicated depth
+sensor (TrueDepth) absent from Android phones.
 
-## 2. Cas d'usage principal
+**What the app is not**: not an avatar display app (unlike VTube Studio Android), not a cloud
+service (all processing and data exchange stays local to the device and the local Wi-Fi network),
+not store-first distributed (currently distributed only via GitHub Releases).
 
-Un streamer installe l'app sur un téléphone Android, le positionne face à lui (main, support, pied
-de table...), lance l'app, calibre une pose neutre, choisit le protocole et la cible réseau
-correspondant à son logiciel VTuber, puis démarre son stream. Le téléphone tourne en continu
-pendant toute la session, généralement sans qu'on y touche ni qu'on le regarde directement -- c'est
-l'avatar affiché côté PC qui sert de retour visuel.
+## 2. Primary use case
 
-## 3. Périmètre fonctionnel actuel
+A streamer installs the app on an Android phone, positions it facing them (hand, stand, tripod...),
+launches the app, calibrates a neutral pose, chooses the protocol and network target matching their
+VTuber software, then starts streaming. The phone runs continuously for the whole session, generally
+without being touched or looked at directly -- the avatar displayed on the PC side serves as the
+visual feedback.
 
-### 3.1 Capture et tracking
+## 3. Functional scope
 
-- Sélection automatique du meilleur pipeline disponible selon l'appareil (palier `COMPATIBLE`,
-  `STANDARD` ou `OPTIMAL`), basée sur le support ARCore, la classe de performance officielle
-  Android, le nombre de cœurs CPU et la RAM totale -- aucune configuration manuelle requise.
-  Repli automatique du délégué GPU vers CPU si l'initialisation GPU échoue. Au palier `OPTIMAL`,
-  la pose de tête vient d'ARCore Augmented Faces plutôt que de MediaPipe (les blendshapes restent
-  toujours calculés par MediaPipe) -- repli automatique et silencieux sur le palier `STANDARD` si
-  ARCore s'avère indisponible à l'usage malgré un appareil qui le supporte a priori. Confirmé
-  fonctionnel sur device.
-- Calcul de 52 blendshapes au format ARKit à partir de la caméra frontale (MediaPipe Face
-  Landmarker). Deux blendshapes (`tongueOut`, `cheekPuff`) ne sont pas restitués de façon fiable
-  par ce modèle -- limitation du modèle lui-même, documentée, pas un bug de l'app. `tongueOut`
-  bénéficie d'une détection expérimentale alternative (voir ci-dessous) ; `cheekPuff` reste sans
-  mitigation pour l'instant (voir §4).
-- **Détection expérimentale de la langue tirée** (`tongueOut`) -- cascade dédiée (porte géométrique
-  bouche ouverte → recadrage/couleur → comparaison à une calibration personnelle par embedding),
-  activable dans "Fonctionnalités expérimentales" (§3.4). Depuis le 13 août 2026, également envoyée
-  aux protocoles réseau (§3.3), pas seulement affichée localement -- fiabilité nettement améliorée
-  (calibration élargie au mouvement de mâchoire + anti-rebond avant injection) mais un risque
-  résiduel faible reste assumé, d'où le rangement en "Expérimental".
-- Estimation de la direction du regard (par œil, pitch/yaw) reconstruite à partir des blendshapes
-  directionnels (`eyeLookUp/Down/In/OutLeft/Right`), MediaPipe ne fournissant pas cette donnée
-  nativement.
-- Estimation de la rotation de la tête à partir de la matrice de transformation faciale fournie par
-  MediaPipe.
-- Overlay optionnel (désactivé par défaut) du mesh de tracking complet (478 points) superposé à
-  l'aperçu caméra, à but de diagnostic visuel.
+### 3.1 Capture and tracking
 
-### 3.2 Calibrage
+- Automatic selection of the best available pipeline based on the device (`COMPATIBLE`, `STANDARD`
+  or `OPTIMAL` tier), based on ARCore support, the official Android performance class, CPU core
+  count and total RAM -- no manual configuration required. Automatic fallback from GPU delegate to
+  CPU if GPU initialization fails. On the `OPTIMAL` tier, head pose comes from ARCore Augmented
+  Faces rather than MediaPipe (blendshapes are always computed by MediaPipe) -- automatic, silent
+  fallback to the `STANDARD` tier if ARCore turns out to be unavailable at runtime despite a device
+  that supports it in principle.
+- Computation of 52 ARKit-format blendshapes from the front camera (MediaPipe Face Landmarker). Two
+  blendshapes (`tongueOut`, `cheekPuff`) aren't reliably restituted by this model -- a limitation of
+  the model itself, not an app bug. `tongueOut` benefits from an experimental alternative detection
+  path (see below); `cheekPuff` remains without mitigation.
+- **Experimental tongue-out detection** (`tongueOut`) -- a dedicated cascade (open-mouth geometric
+  gate → crop/color → comparison against a personal embedding calibration), toggleable under
+  "Experimental features" (§3.4). Once the personal calibration is done, the value is sent to the
+  network protocols (§3.3), not just displayed locally -- classified as "Experimental" due to a
+  residual risk of an isolated false positive.
+- Gaze direction estimation (per eye, pitch/yaw) reconstructed from directional blendshapes
+  (`eyeLookUp/Down/In/OutLeft/Right`), since MediaPipe doesn't provide this natively.
+- Head rotation estimation from the facial transformation matrix provided by MediaPipe.
+- Optional overlay (off by default) of the full tracking mesh (478 points) superimposed on the
+  camera preview, for visual diagnostics.
 
-Calibrage manuel de la pose neutre, déclenché à la demande depuis le bandeau principal, avec un
-compte à rebours de 5 secondes avant capture -- laisse le temps à l'utilisateur de reprendre une
-expression neutre face à la caméra.
+### 3.2 Calibration
 
-**Détection d'anomalie de calibrage** : le bouton de calibrage se teinte en rouge si la pose de
-tête semble avoir dérivé depuis le dernier calibrage (visage au repos mais pose qui ne revient pas
-près de zéro, ou perte de détection du visage suivie d'une redétection) -- purement informatif,
-aucune action automatique, se résout uniquement par un nouveau calibrage explicite. Confirmé
-fonctionnel sur device, tous paliers testés.
+Manual calibration of the neutral pose, triggered on demand from the main bar, with a 5-second
+countdown before capture -- gives the user time to return to a neutral expression facing the camera.
 
-### 3.3 Connectivité réseau
+**Calibration anomaly detection**: the calibration button turns red if the head pose appears to have
+drifted since the last calibration (face at rest but pose not returning close to zero, or a loss of
+face detection followed by redetection) -- purely informational, no automatic action, only resolved
+by an explicit new calibration.
 
-Trois protocoles de sortie, mutuellement exclusifs (un seul actif à la fois, choix dans les
-réglages) :
+### 3.3 Network connectivity
 
-- **VMC/OSC** -- destiné à Blender, Unity (pas VTube Studio, qui ne reçoit vraisemblablement pas ce
-  protocole en entrée). L'app envoie les données vers une IP/port PC saisis manuellement dans les
-  réglages. Confirmé fonctionnel sur device, contenu des paquets vérifié.
-- **Protocole compatible iFacialMocap/UDP** -- destiné à VBridger. Affiché "UDP / VBridger" dans
-  l'interface (le nom "iFacialMocap" reste en mention secondaire pour rester trouvable par qui
-  cherche ce terme précis, mais l'app ne se connecte pas à cette application tierce, elle implémente
-  seulement un protocole compatible). L'app écoute passivement ; c'est le logiciel PC qui vient se
-  connecter, à partir de l'IP du téléphone affichée dans les réglages -- aucune saisie manuelle côté
-  téléphone pour ce chemin.
-- **API Plugin VTube Studio** -- intégration directe, en contournant VMC/OSC que VTube Studio ne
-  reçoit pas. IP/port (8001 par défaut) saisis manuellement, comme pour VMC. Popup d'autorisation à
-  accepter dans VTube Studio à la première connexion (jeton ensuite mémorisé, avec nouvelle demande
-  automatique s'il est révoqué entre-temps, plus un bouton "Oublier le jeton" en secours). Une fois
-  connecté, les paramètres créés doivent être mappés une fois par l'utilisateur dans l'éditeur de
-  paramètres de VTube Studio pour animer un modèle Live2D -- l'app ne peut pas le faire à sa place.
-  Confirmé fonctionnel sur device.
+Three output protocols, mutually exclusive (only one active at a time, chosen in settings):
 
-Le téléphone et le PC receveur doivent être sur le même réseau Wi-Fi local dans les trois cas.
+- **VMC/OSC** -- for Blender, Unity (not VTube Studio, which doesn't accept this protocol as
+  input). The app sends data to a PC IP/port entered manually in settings.
+- **iFacialMocap/UDP-compatible protocol** -- for VBridger. Shown as "UDP / VBridger" in the
+  interface (the "iFacialMocap" name stays as a secondary mention to remain findable by anyone
+  searching for that exact term, but the app doesn't connect to that third-party app, it only
+  implements a compatible protocol). The app listens passively; it's the PC software that connects
+  in, using the phone's IP shown in settings -- no manual entry needed on the phone side for this
+  path.
+- **VTube Studio Plugin API** -- direct integration, bypassing VMC/OSC which VTube Studio doesn't
+  accept. IP/port (8001 by default) entered manually, same as VMC. An authorization popup must be
+  accepted in VTube Studio on first connection (the token is then remembered, with an automatic new
+  request if it's revoked in the meantime, plus a "Forget token" button as a fallback). Once
+  connected, the created parameters must be mapped once by the user in VTube Studio's parameter
+  editor to animate a Live2D model -- the app cannot do this on the user's behalf.
 
-### 3.4 Interface utilisateur
+The phone and the receiving PC must be on the same local Wi-Fi network in all three cases.
 
-- **Bandeau HUD minimal**, affiché en permanence sur l'aperçu caméra plein écran : indicateur de
-  détection du visage, bouton connexion/déconnexion, bouton de calibrage (avec anneau de compte à
-  rebours), accès aux réglages. Chaque icône pivote sur elle-même pour rester lisible quel que soit
-  l'angle auquel le téléphone est tenu ou posé.
-- **Écran de réglages**, réorganisé en menu à 5 catégories (chacune son propre écran, retour vers
-  le menu par flèche standard ou bouton/geste retour système) : Diagnostics (lecture seule -- palier
-  actif, délégué GPU/CPU, visage détecté, latence d'inférence, état de calibration), Connexion
-  (type + cible réseau, seul le sous-bloc du type choisi affiché), Affichage & confort (accès à
-  l'écran de sélection des blendshapes affichés + sa persistance, overlay du mesh de tracking, mode
-  économie d'énergie, seuil d'alerte batterie), Fonctionnalités expérimentales (interrupteur de
-  détection de la langue tirée + accès à son écran de calibration dédié, voir ci-dessus ; réservée
-  pour la détection des joues gonflées, pas encore implémentée -- voir §4), Journalisation (niveau
-  de log, partage du fichier de logs).
-- **Écran de sélection des blendshapes affichés** : catalogue complet des 52 blendshapes ARKit,
-  groupés par catégorie (sourcils, yeux, joues, nez, mâchoire, bouche, langue), avec recherche.
-  Affiche la valeur en direct de chaque blendshape coché sur l'écran principal. Icône d'avertissement
-  discrète à côté des blendshapes connus pour être mal restitués par MediaPipe (`jawForward`,
-  `jawLeft`, `jawRight`, `mouthDimpleLeft/Right`, `cheekPuff`, `tongueOut`) -- informatif, n'empêche
-  pas la sélection. Non conservée d'une session à l'autre par défaut, mais persistance activable
-  dans les réglages (Affichage & confort).
-- **Navigation** : chaque écran superposé (réglages et ses 5 catégories, sélection des blendshapes)
-  se ferme via une flèche retour standard, le bouton retour matériel, ou le geste de balayage
-  système (predictive back, Android 13+) -- les trois déclenchent la même action.
-- **Langue** : interface disponible en français (défaut) et anglais. Deux façons de la choisir,
-  toutes deux confirmées fonctionnelles sur device : le sélecteur système par app (réglages Android,
-  Android 13+ seulement), ou un sélecteur **dans l'app** (Affichage & confort > "Langue de l'app" --
-  "Suivre le système" / "Français" / "English"), qui fonctionne sur toutes les versions d'Android et
-  mémorise le choix automatiquement d'un lancement à l'autre. Changer la langue depuis ce sélecteur
-  ferme l'écran de réglages en cours (retour à l'écran principal) le temps d'appliquer le changement.
-  Les noms de blendshapes ARKit (`jawOpen`, `mouthSmileLeft`...) restent en anglais technique quelle
-  que soit la langue choisie -- ce sont des identifiants de protocole, pas du texte d'affichage.
+### 3.4 User interface
 
-### 3.5 Gestion de l'énergie
+- **Minimal HUD bar**, always shown over the full-screen camera preview: face-detection indicator,
+  connect/disconnect button, calibration button (with countdown ring), settings access. Each icon
+  rotates in place to stay readable regardless of the angle the phone is held or set down at.
+- **Settings screen**, organized into a 5-category menu (each its own screen, back to the menu via
+  a standard arrow or the system back button/gesture): Diagnostics (read-only -- active tier,
+  GPU/CPU delegate, face detected, inference latency, calibration state), Connection (type + network
+  target, only the sub-block for the chosen type is shown), Display & comfort (access to the
+  displayed-blendshapes selection screen + its persistence, tracking mesh overlay, power-save mode,
+  low-battery alert threshold), Experimental features (tongue-out detection toggle + access to its
+  dedicated calibration screen, see above), Logging (log level, log file sharing).
+- **Displayed-blendshapes selection screen**: full catalog of the 52 ARKit blendshapes, grouped by
+  category (eyebrows, eyes, cheeks, nose, jaw, mouth, tongue), with search. Shows the live value of
+  each checked blendshape on the main screen. A discreet warning icon next to blendshapes known to
+  be poorly restituted by MediaPipe (`jawForward`, `jawLeft`, `jawRight`, `mouthDimpleLeft/Right`,
+  `cheekPuff`, `tongueOut`) -- informational, doesn't prevent selection. Not kept across sessions by
+  default, but persistence can be enabled in settings (Display & comfort).
+- **Navigation**: every overlay screen (settings and its 5 categories, blendshape selection) closes
+  via a standard back arrow, the hardware back button, or the system swipe gesture (predictive back,
+  Android 13+) -- all three trigger the same action.
+- **Language**: interface available in French (default) and English. Two ways to choose it: the
+  system per-app selector (Android settings, Android 13+ only), or an **in-app** selector (Display &
+  comfort > "App language" -- "Follow system" / "Français" / "English"), which works on every
+  Android version and remembers the choice automatically across launches. Changing the language from
+  this selector closes the currently open settings screen (back to the main screen) while the change
+  is applied. ARKit blendshape names (`jawOpen`, `mouthSmileLeft`...) stay in technical English
+  regardless of the chosen language -- they are protocol identifiers, not display text.
 
-- **Mode économie d'énergie** : après un délai d'inactivité configurable (aucun toucher de
-  l'écran), assombrit l'écran au minimum et masque l'aperçu caméra affiché -- le tracking et
-  l'envoi réseau continuent normalement en arrière-plan. Sortie immédiate au moindre toucher.
-  Pensé pour les sessions longues où le téléphone est posé loin de l'utilisateur.
-- **Alerte batterie faible** : overlay visuel (icône pulsante) quand la batterie descend sous un
-  seuil configurable et que le téléphone n'est pas en charge.
-- **Throttling thermique dynamique** : le débit d'analyse cible est réduit de moitié si l'appareil
-  chauffe en cours de session (icône discrète dans le bandeau HUD), et remonte automatiquement dès
-  que la chauffe retombe -- aucune action requise de l'utilisateur. Confirmé fonctionnel sur device
-  via le mock de debug (le capteur thermique réel n'a pas encore été sollicité en usage normal).
+### 3.5 Power management
+
+- **Power-save mode**: after a configurable idle delay (no screen touch), dims the screen to
+  minimum and hides the displayed camera preview -- tracking and network sending continue normally
+  in the background. Immediate exit on the slightest touch. Designed for long sessions where the
+  phone sits away from the user.
+- **Low-battery alert**: a visual overlay (pulsing icon) when the battery drops below a
+  configurable threshold and the phone isn't charging.
+- **Dynamic thermal throttling**: the target analysis rate is halved if the device heats up during
+  a session (a discreet icon in the HUD bar), and ramps back up automatically once it cools down --
+  no user action required.
 
 ### 3.6 Distribution
 
-Distribution en dehors du Play Store, via GitHub Releases (APK signé, publié automatiquement à
-chaque tag de version). Pas de vérification de mise à jour intégrée à l'app pour l'instant (en
-réflexion, voir §4).
+Distributed outside the Play Store, via GitHub Releases (signed APK, published automatically on
+every version tag). No in-app update check.
 
-## 4. Hors périmètre actuel -- en réflexion, non implémenté
+## 4. Cross-cutting functional constraints
 
-Fonctionnalités actées en conception mais sans code écrit à ce jour, résumées ici en une ligne
-chacune :
+- **Privacy / network**: no communication other than the voluntary stream to the target chosen by
+  the user, on the local network -- no telemetry, no third-party service.
+- **Required hardware**: a physical device with a front camera; the Android emulator doesn't
+  provide a usable camera feed for tracking.
+- **Minimum Android version**: Android 11 (API 30).
+- **License**: free use of the software, including commercial use, except building a competing
+  product -- see `LICENSE`.
 
-- **Détection expérimentale des joues gonflées** (`cheekPuff`) -- cascade géométrique allégée,
-  même famille que la détection de langue tirée déjà implémentée (§3.1). Rangée derrière le même
-  interrupteur "Fonctionnalités expérimentales" une fois codée, avec avertissement si l'appareil
-  throttle (même mécanisme déjà en place pour la langue tirée).
-- **Affichage de la valeur brute à côté de la valeur ajustée** dans l'écran de sélection des
-  blendshapes, si une pondération par blendshape est un jour ajoutée -- n'a de sens que ce jour-là.
-  La persistance optionnelle de la sélection, elle, est déjà implémentée (voir §3.4).
-- **Adaptation des écrans de réglages à l'orientation système** sur grand écran (tablette) --
-  actuellement non adaptatif ; un constat plateforme (Android 16/17 ignore déjà le verrouillage
-  d'orientation sur grand écran, indépendamment de ce choix) est documenté sans décision de mise en
-  œuvre.
-- **Ajustement de poids/gain par blendshape** (+ lissage réglable) -- fonctionnalité équivalente à
-  ce que proposait MeowFace et propose iFacialMocap aujourd'hui. Idée retenue comme prioritaire
-  lors du comparatif concurrentiel, pas encore formalisée en point de conception détaillé.
-- **Vérification de mise à jour semi-automatique** (bannière non intrusive comparant au dernier tag
-  GitHub Releases) -- en attente du passage du dépôt en public (l'API GitHub Releases exige une
-  authentification pour un dépôt privé).
+## 5. Quick glossary
 
-## 5. Contraintes fonctionnelles transverses
-
-- **Vie privée / réseau** : aucune communication autre que le flux volontaire vers la cible choisie
-  par l'utilisateur, sur le réseau local -- pas de télémétrie, pas de service tiers.
-- **Matériel requis** : un appareil physique avec caméra frontale ; l'émulateur Android ne fournit
-  pas de flux caméra exploitable pour le tracking.
-- **Version Android minimale** : Android 11 (API 30).
-- **Licence** : usage libre du logiciel, y compris commercial, à l'exception de la construction
-  d'un produit concurrent -- voir `LICENSE`.
-
-## 6. Glossaire rapide
-
-- **Blendshape** : coefficient (0 à 1) représentant l'intensité d'une expression faciale
-  élémentaire (sourire, clignement, ouverture de mâchoire...), au format standardisé ARKit (52
-  coefficients).
-- **VMC (Virtual Motion Capture)** : protocole réseau basé sur OSC, standard de facto pour
-  transmettre des données de mocap à des logiciels VTuber (Blender, Unity, VSeeFace... -- pas VTube
-  Studio, qui utilise sa propre API Plugin, voir §3.3).
-- **Palier de tracking** : niveau de pipeline choisi automatiquement selon les capacités de
-  l'appareil (`COMPATIBLE` < `STANDARD` < `OPTIMAL`), déterminant le délégué (CPU/GPU), le débit
-  cible et la source de pose de tête utilisée.
-- **Perfect Sync** : convention (issue de VSeeFace/VBridger) désignant un rig d'avatar capable
-  d'exploiter l'intégralité des 52 blendshapes ARKit, au-delà des expressions basiques.
+- **Blendshape**: a coefficient (0 to 1) representing the intensity of an elementary facial
+  expression (smile, blink, jaw opening...), in the standardized ARKit format (52 coefficients).
+- **VMC (Virtual Motion Capture)**: an OSC-based network protocol, the de facto standard for
+  streaming mocap data to VTuber software (Blender, Unity, VSeeFace... -- not VTube Studio, which
+  uses its own Plugin API, see §3.3).
+- **Tracking tier**: the pipeline level automatically chosen based on device capabilities
+  (`COMPATIBLE` < `STANDARD` < `OPTIMAL`), determining the delegate (CPU/GPU), the target rate and
+  the head-pose source used.
+- **Perfect Sync**: a convention (from VSeeFace/VBridger) describing an avatar rig able to use the
+  full set of 52 ARKit blendshapes, beyond basic expressions.

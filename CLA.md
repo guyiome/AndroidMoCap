@@ -1,53 +1,53 @@
-# AndroidMoCap — Accord de licence contributeur (CLA)
+# AndroidMoCap — Contributor License Agreement (CLA)
 
-*Applicable à toute contribution (pull request, patch, ou tout autre apport de code, de
-documentation ou d'autre matériel) soumise au projet AndroidMoCap. Document propre à ce projet, pas
-un texte juridique standardisé -- inspiré des principes habituels des CLA individuels (type Apache
-ICLA), simplifié pour un projet de cette taille.*
+*🇫🇷 Version française : [CLA_FR.md](CLA_FR.md)*
 
-## Pourquoi ce document
+*Applies to any contribution (pull request, patch, or any other code, documentation, or other
+material submitted) to the AndroidMoCap project. A document specific to this project, not a
+standardized legal text -- inspired by the usual principles of individual CLAs (Apache ICLA-style),
+simplified for a project of this size.*
 
-AndroidMoCap est distribué sous licence PolyForm Shield 1.0.0 (voir `LICENSE`), qui réserve au
-titulaire des droits (le mainteneur du projet) la possibilité de continuer à distribuer et faire
-évoluer le logiciel, y compris commercialement. Pour que ça reste cohérent une fois que des
-contributions externes s'ajoutent au code, chaque contributeur doit accorder au mainteneur des
-droits suffisants sur sa propre contribution -- notamment la possibilité de changer de licence à
-l'avenir (par exemple vers une licence permissive standard comme Apache 2.0 ou MIT, si ce choix est
-fait un jour), sans avoir à retrouver et recontacter individuellement chaque personne ayant
-contribué entre-temps. Voir le raisonnement complet dans `AndroidMoCap_revue_technique.md` (point
-22, "réflexion sur les licences").
+## Why this document
 
-## Ce que vous accordez en contribuant
+AndroidMoCap is distributed under the PolyForm Shield 1.0.0 license (see `LICENSE`), which reserves
+to the rights holder (the project maintainer) the ability to keep distributing and evolving the
+software, including commercially. For that to stay coherent once external contributions are added
+to the code, each contributor must grant the maintainer sufficient rights over their own
+contribution -- notably the ability to change license in the future (for example toward a standard
+permissive license like Apache 2.0 or MIT, should that choice be made one day), without having to
+track down and individually re-contact every person who contributed in the meantime.
 
-En soumettant une contribution à ce projet, vous acceptez les termes suivants :
+## What you grant by contributing
 
-1. **Vous conservez vos droits d'auteur** sur votre contribution -- ce document n'est pas une
-   cession de copyright, seulement une licence.
-2. Vous accordez au mainteneur du projet une licence de droits d'auteur perpétuelle, mondiale,
-   non exclusive, gratuite et libre de redevances, pour utiliser, reproduire, modifier, distribuer,
-   sous-licencier et exploiter votre contribution -- **y compris sous une licence différente de
-   celle du projet au moment de la contribution**, notamment (sans s'y limiter) une bascule future
-   vers une licence permissive standard comme Apache 2.0 ou MIT, ou toute autre licence que le
-   mainteneur jugerait pertinente pour le projet par la suite.
-3. Vous accordez au mainteneur une licence de brevet, dans les mêmes conditions que ci-dessus,
-   pour toute revendication de brevet que vous détenez et qui serait nécessairement mise en cause
-   par l'utilisation de votre contribution telle qu'intégrée au projet.
-4. Vous garantissez que votre contribution est votre travail original (ou que vous disposez des
-   droits nécessaires pour la soumettre sous ces termes), et qu'elle ne viole, à votre
-   connaissance, aucun droit de tiers.
-5. Votre contribution est fournie "en l'état", sans garantie d'aucune sorte.
+By submitting a contribution to this project, you agree to the following terms:
 
-## Ce que vous gardez
+1. **You retain your copyright** on your contribution -- this document is not a copyright
+   assignment, only a license.
+2. You grant the project maintainer a perpetual, worldwide, non-exclusive, royalty-free copyright
+   license to use, reproduce, modify, distribute, sublicense, and otherwise exploit your
+   contribution -- **including under a license different from the project's license at the time of
+   contribution**, notably (without limitation) a future switch to a standard permissive license
+   like Apache 2.0 or MIT, or any other license the maintainer deems relevant for the project going
+   forward.
+3. You grant the maintainer a patent license, under the same conditions as above, for any patent
+   claim you hold that would necessarily be implicated by the use of your contribution as
+   integrated into the project.
+4. You warrant that your contribution is your original work (or that you hold the necessary rights
+   to submit it under these terms), and that it does not, to your knowledge, infringe any
+   third-party right.
+5. Your contribution is provided "as is", without warranty of any kind.
 
-Rien n'empêche de réutiliser votre propre contribution ailleurs, sous les termes de votre choix --
-ce document accorde des droits supplémentaires au mainteneur, il ne retire aucun droit sur ce que
-vous avez écrit.
+## What you keep
 
-## Comment ça s'applique concrètement
+Nothing prevents you from reusing your own contribution elsewhere, under terms of your choosing --
+this document grants additional rights to the maintainer, it does not take away any right over what
+you wrote.
 
-Faute d'outillage automatisé (pas de bot de signature CLA à ce stade), l'acceptation se fait par
-une mention explicite dans la pull request elle-même, par exemple :
+## How this is applied in practice
 
-> J'ai lu et j'accepte les termes de CLA.md pour cette contribution.
+For lack of automated tooling (no CLA-signing bot at this stage), acceptance is done via an explicit
+mention in the pull request itself, for example:
 
-Un mainteneur peut refuser d'intégrer une contribution tant que cette mention n'a pas été faite.
+> I have read and accept the terms of CLA.md for this contribution.
+
+A maintainer may decline to merge a contribution until this mention has been made.

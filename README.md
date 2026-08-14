@@ -1,119 +1,113 @@
 # AndroidMoCap
 
-Capture de mouvement facial sur Android, transmise en direct à Blender, Unity, VBridger ou
-directement à VTube Studio sur le réseau local. Le téléphone devient un tracker facial autonome :
-aucune app tierce, aucun service cloud, juste la caméra frontale et un flux de blendshapes envoyé
-au PC.
+*🇫🇷 Version française : [README_FR.md](README_FR.md)*
 
-Né du constat qu'il n'existe aujourd'hui aucune alternative Android maintenue à MeowFace (abandonné
-depuis, sa librairie de tracking sous-jacente ayant été dépréciée) : ce projet vise à combler ce
-vide, avec une contrainte propre à Android qu'aucune app du secteur ne peut totalement effacer --
-l'absence de capteur de profondeur dédié (contrairement à l'iPhone/TrueDepth) plafonne la précision
-atteignable, quelle que soit la qualité du logiciel.
+Facial motion capture on Android, streamed live to Blender, Unity, VBridger, or directly to VTube
+Studio over the local network. The phone becomes a standalone facial tracker: no third-party app, no
+cloud service, just the front camera and a blendshape stream sent to the PC.
 
-Projet personnel, développé et maintenu par une seule personne, en évolution active.
+Born from the observation that there is currently no maintained Android alternative to MeowFace
+(abandoned, its underlying tracking library having been deprecated): this project aims to fill that
+gap, with an Android-specific constraint that no app in this space can fully erase -- the lack of a
+dedicated depth sensor (unlike iPhone/TrueDepth) caps the achievable accuracy, regardless of
+software quality.
 
-## Fonctionnalités
+Personal project, developed and maintained by a single person, in active development.
 
-- **Sélection automatique du meilleur pipeline** selon les capacités de l'appareil (GPU/CPU, RAM,
-  cœurs, support ARCore) -- rien à configurer, l'app s'adapte du haut de gamme à l'entrée de gamme,
-  avec repli automatique GPU → CPU si le délégué GPU échoue.
-- **52 blendshapes ARKit** via MediaPipe Face Landmarker, plus une estimation de la direction du
-  regard (non fournie nativement par MediaPipe, reconstruite à partir des blendshapes oculaires).
-- **Triple sortie réseau, toutes confirmées fonctionnelles sur device** : protocole VMC/OSC
-  (Blender, Unity), protocole iFacialMocap/UDP (VBridger), et intégration directe VTube Studio via
-  son API Plugin propriétaire (VTube Studio ne reçoit pas VMC/OSC en entrée).
-- **Calibrage de pose neutre** à la demande, avec compte à rebours.
-- HUD minimal et lisible quelle que soit l'orientation du téléphone, réglages détaillés (sélection
-  des blendshapes affichés, seuil de batterie faible, mode économie d'énergie, overlay de debug du
-  mesh de tracking à 478 points).
-- **Mode économie d'énergie** : assombrit l'écran et coupe l'aperçu caméra après inactivité sans
-  interrompre le tracking ni l'envoi -- pensé pour les sessions de stream longues, téléphone posé
-  loin de l'utilisateur.
+## Features
 
-À l'étude, pas encore implémenté : détection expérimentale de la langue tirée et des joues gonflées
-(blendshapes que MediaPipe ne restitue pas de façon fiable), voir la feuille de route plus bas.
+- **Automatic best-pipeline selection** based on device capabilities (GPU/CPU, RAM, cores, ARCore
+  support) -- nothing to configure, the app adapts from high-end to entry-level, with automatic
+  GPU → CPU fallback if the GPU delegate fails.
+- **52 ARKit blendshapes** via MediaPipe Face Landmarker, plus gaze-direction estimation (not
+  natively provided by MediaPipe, reconstructed from eye blendshapes).
+- **Triple network output**: VMC/OSC protocol (Blender, Unity), iFacialMocap/UDP protocol
+  (VBridger), and direct VTube Studio integration via its own proprietary Plugin API (VTube Studio
+  doesn't accept VMC/OSC as input).
+- **On-demand neutral-pose calibration**, with a countdown.
+- Minimal HUD readable regardless of phone orientation, detailed settings (displayed-blendshape
+  selection, low-battery threshold, power-save mode, 478-point tracking-mesh debug overlay).
+- **Power-save mode**: dims the screen and cuts the camera preview after inactivity without
+  interrupting tracking or sending -- designed for long streaming sessions with the phone sitting
+  away from the user.
 
-## Prérequis
+## Requirements
 
-- Android 11 (API 30) ou plus.
-- Un **appareil physique** avec caméra frontale -- l'émulateur Android ne fournit pas de flux
-  caméra exploitable pour le tracking.
-- Téléphone et PC receveur sur le **même réseau Wi-Fi local**.
+- Android 11 (API 30) or later.
+- A **physical device** with a front camera -- the Android emulator doesn't provide a usable camera
+  feed for tracking.
+- Phone and receiving PC on the **same local Wi-Fi network**.
 
 ## Installation
 
-L'app n'est pas distribuée sur le Play Store. Télécharger le dernier APK depuis les
-[Releases GitHub](../../releases) et l'installer directement. Android affichera un avertissement
-"source inconnue" à l'installation -- normal pour un APK distribué hors store, à autoriser
-ponctuellement dans les réglages au moment de l'installation.
+The app isn't distributed on the Play Store. Download the latest APK from
+[GitHub Releases](../../releases) and install it directly. Android will show an "unknown source"
+warning at install time -- normal for an APK distributed outside a store, to be allowed once in
+settings during installation.
 
-## Connexion côté PC
+## PC-side connection
 
-**Blender / Unity** : utiliser un addon/package compatible VMC, configuré pour écouter sur le même
-port (`39539` par défaut, modifiable côté app).
+**Blender / Unity**: use a VMC-compatible addon/package, configured to listen on the same port
+(`39539` by default, configurable on the app side).
 
-**VTube Studio** : ne reçoit pas VMC/OSC nativement -- pas d'option de ce genre dans ses réglages.
-L'app propose une intégration directe via l'API Plugin propriétaire de VTube Studio (choisir
-"VTube Studio" dans les réglages de connexion, IP du PC + port 8001 par défaut) : un popup
-d'autorisation apparaît dans VTube Studio à la première connexion, puis les paramètres créés
-doivent être mappés une fois dans l'éditeur de paramètres de VTube Studio pour animer le modèle.
-Confirmé fonctionnel sur device.
+**VTube Studio**: doesn't accept VMC/OSC natively -- no setting of that kind in its options. The app
+offers direct integration via VTube Studio's proprietary Plugin API (choose "VTube Studio" in the
+connection settings, PC IP + port 8001 by default): an authorization popup appears in VTube Studio
+on first connection, then the created parameters must be mapped once in VTube Studio's parameter
+editor to animate the model.
 
-**VBridger** : sélectionner le protocole iFacialMocap dans les réglages de l'app, puis suivre les
-instructions VBridger en pointant vers l'IP affichée sur le téléphone -- c'est VBridger qui vient se
-connecter à l'app, aucune IP à saisir côté téléphone pour ce chemin.
+**VBridger**: select the iFacialMocap protocol in the app's settings, then follow VBridger's
+instructions pointing to the IP shown on the phone -- it's VBridger that connects in to the app, no
+IP to enter on the phone side for this path.
 
-## Vie privée et réseau
+## Privacy and network
 
-L'app ne communique qu'avec la cible choisie dans les réglages, sur le réseau local -- aucun
-service tiers, aucune télémétrie, aucune donnée envoyée en dehors de ce flux volontaire vers le
-PC receveur.
+The app only communicates with the target chosen in settings, on the local network -- no
+third-party service, no telemetry, no data sent outside this voluntary stream to the receiving PC.
 
-**Logs** : conservés localement (fichier privé à l'app, jamais transmis automatiquement), niveau
-"Erreur" par défaut, réglable dans Réglages > Journalisation. Peuvent contenir des informations
-techniques (erreurs, statut de connexion) et l'adresse IP locale configurée -- jamais de données de
-suivi du visage. Les adresses IP sont masquées automatiquement en dehors des builds de
-développement. Un bouton "Partager les logs" permet d'envoyer ce fichier (ex. pour signaler un
-problème) -- entièrement à l'initiative de l'utilisateur, qui choisit la destination.
+**Logs**: kept locally (a file private to the app, never transmitted automatically), "Error" level
+by default, adjustable in Settings > Logging. May contain technical information (errors, connection
+status) and the configured local IP address -- never face-tracking data. IP addresses are
+automatically masked outside development builds. A "Share logs" button lets you send this file
+(e.g. to report an issue) -- entirely at the user's initiative, who chooses the destination.
 
-## Compiler depuis les sources
+## Building from source
 
-1. **Télécharger le modèle MediaPipe** (obligatoire, trop volumineux pour être versionné) et le
-   placer dans `app/src/main/assets/face_landmarker.task` :
+1. **Download the MediaPipe model** (required, too large to be versioned) and place it at
+   `app/src/main/assets/face_landmarker.task`:
    `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task`
-   Si le lien a changé, repartir de la page officielle
+   If the link has changed, start from the official
    [Face landmark detection guide for Android](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker/android)
-   (section "Model").
-   - **Optionnel** : pour la détection expérimentale de la langue tirée (étage 3, désactivée par
-     défaut), un second modèle, `app/src/main/assets/image_embedder.tflite` :
+   page (the "Model" section).
+   - **Optional**: for experimental tongue-out detection (stage 3, off by default), a second model,
+     `app/src/main/assets/image_embedder.tflite`:
      `https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_small/float32/latest/mobilenet_v3_small.tflite`.
-     L'app compile et fonctionne normalement sans -- seule cette fonctionnalité expérimentale en a besoin.
-2. Ouvrir le dossier dans Android Studio (`File > Open`). Le premier sync Gradle télécharge AGP,
-   Kotlin et les dépendances ARCore/CameraX/MediaPipe/JavaOSC/nv-websocket-client/kotlinx.serialization
-   listées dans `gradle/libs.versions.toml`.
-3. Builder et lancer sur un **appareil physique** (voir Prérequis) -- pas d'émulateur possible pour
-   tester le tracking.
+     The app builds and runs normally without it -- only this experimental feature needs it.
+2. Open the folder in Android Studio (`File > Open`). The first Gradle sync downloads AGP, Kotlin
+   and the ARCore/CameraX/MediaPipe/JavaOSC/nv-websocket-client/kotlinx.serialization dependencies
+   listed in `gradle/libs.versions.toml`.
+3. Build and run on a **physical device** (see Requirements) -- no emulator possible for testing
+   tracking.
 
-## Structure du projet
+## Project structure
 
 ```
 app/src/main/java/com/guyiome/androidmocap/
-  MainActivity.kt              Permission caméra + point d'entrée Compose
-  capabilities/                Détection des capacités de l'appareil (ARCore, GPU, RAM, thermal)
-  tracking/                    Sélection de palier + wrapper MediaPipe Face Landmarker + maths de rotation
-  camera/                      Pilotage CameraX (caméra frontale -> MPImage, pool de bitmaps)
-  sensors/                     Orientation du téléphone, icônes HUD, batterie
-  network/                     Envoi OSC/UDP (VMC), UDP (iFacialMocap), WebSocket (API Plugin VTube Studio)
-  settings/                    Persistance des réglages (DataStore)
-  ui/                          ViewModel + écrans Compose (HUD, réglages, overlay mesh)
+  MainActivity.kt              Camera permission + Compose entry point
+  capabilities/                Device capability detection (ARCore, GPU, RAM, thermal)
+  tracking/                    Tier selection + MediaPipe Face Landmarker wrapper + rotation math
+  camera/                      CameraX driving (front camera -> MPImage, bitmap pool)
+  sensors/                     Phone orientation, HUD icons, battery
+  network/                     OSC/UDP sending (VMC), UDP sending (iFacialMocap), WebSocket (VTube Studio Plugin API)
+  settings/                    Settings persistence (DataStore)
+  ui/                          ViewModel + Compose screens (HUD, settings, mesh overlay)
 ```
 
 ## Tests
 
-Suite de tests unitaires JVM pur (aucune dépendance Android/Robolectric) sous `app/src/test/`.
-Détail fonction par fonction, avec les raisons explicites de ce qui n'est volontairement pas
-couvert, dans `AndroidMoCap_tests_unitaires.md`. Lancer avec :
+Pure JVM unit test suite (no Android/Robolectric dependency) under `app/src/test/`.
+Function-by-function detail, with explicit reasons for what's deliberately not covered, in
+`AndroidMoCap_tests_unitaires.md`. Run with:
 
 ```
 ./gradlew testDebugUnitTest
@@ -121,54 +115,53 @@ couvert, dans `AndroidMoCap_tests_unitaires.md`. Lancer avec :
 
 ## Documentation
 
-- `AndroidMoCap_spec_fonctionnelle.md` -- ce que l'app fait aujourd'hui, côté utilisateur.
-- `AndroidMoCap_spec_technique.md` -- architecture, pipeline de capture, protocoles réseau,
-  contraintes non-fonctionnelles.
-- `AndroidMoCap_tests_unitaires.md` -- détail de la couverture de tests.
+- `AndroidMoCap_spec_fonctionnelle.md` -- what the app does today, from the user's side.
+- `AndroidMoCap_spec_technique.md` -- architecture, capture pipeline, network protocols,
+  non-functional constraints.
+- `AndroidMoCap_tests_unitaires.md` -- test coverage detail.
 
-## Feuille de route
+## Roadmap
 
-État courant détaillé dans `AndroidMoCap_spec_fonctionnelle.md` (§4, "Hors périmètre actuel") et
-`AndroidMoCap_spec_technique.md`. Points principaux encore ouverts :
+Main items still open:
 
-- Détection expérimentale des joues gonflées (`cheekPuff`) -- même famille que la détection de
-  langue tirée déjà implémentée, encore au stade de conception.
-- Vérification de mise à jour semi-automatique (comparaison au dernier tag GitHub Releases, lien
-  direct plutôt qu'installation silencieuse -- impossible hors store).
-- Adaptation des écrans de réglages à l'orientation système sur grand écran (tablette).
-- Ajustement de poids/gain par blendshape (+ lissage réglable).
+- Experimental puffed-cheek detection (`cheekPuff`) -- same family as the already-implemented
+  tongue-out detection, still at the design stage.
+- Semi-automatic update check (comparison against the latest GitHub Releases tag, a direct link
+  rather than a silent install -- impossible outside a store).
+- Settings screens' adaptation to system orientation on large screens (tablet).
+- Per-blendshape weight/gain adjustment (+ adjustable smoothing).
 
-## Licence
+## License
 
-Distribué sous licence [PolyForm Shield 1.0.0](https://polyformproject.org/licenses/shield/1.0.0)
-(voir `LICENSE`) : usage libre, y compris commercial, à l'exception de la construction d'un produit
-qui concurrencerait le logiciel lui-même. Ce n'est pas une licence "open source" au sens strict
-(OSI) -- code source visible et modifiable pour un usage personnel, mais pas librement
-redistribuable comme produit concurrent.
+Distributed under the [PolyForm Shield 1.0.0](https://polyformproject.org/licenses/shield/1.0.0)
+license (see `LICENSE`): free use, including commercial, except building a product that would
+compete with the software itself. This is not an "open source" license in the strict (OSI) sense --
+source code visible and modifiable for personal use, but not freely redistributable as a competing
+product.
 
-## Contribuer
+## Contributing
 
-Voir `CONTRIBUTING.md` avant d'ouvrir une pull request -- toute contribution suppose l'acceptation
-de l'accord de licence contributeur (`CLA.md`).
+See `CONTRIBUTING.md` before opening a pull request -- any contribution implies acceptance of the
+contributor license agreement (`CLA.md`).
 
-## Publier une version (mainteneur)
+## Publishing a release (maintainer)
 
-Signature configurée via des variables d'environnement (`RELEASE_KEYSTORE_BASE64`,
-`RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`), lues en local ou depuis
-les secrets GitHub Actions -- jamais commitées. Pousser un tag déclenche la publication :
+Signing configured via environment variables (`RELEASE_KEYSTORE_BASE64`,
+`RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`), read locally or from
+GitHub Actions secrets -- never committed. Pushing a tag triggers publishing:
 
 ```
 git tag v0.2.0
 git push origin v0.2.0
 ```
 
-Le workflow (`.github/workflows/release.yml`) construit l'APK (téléchargement du modèle MediaPipe
-inclus), le signe, et crée une Release GitHub avec l'APK en pièce jointe.
+The workflow (`.github/workflows/release.yml`) builds the APK (including the MediaPipe model
+download), signs it, and creates a GitHub Release with the APK attached.
 
-**Canal beta** : un tag contenant `-beta` (ex. `v0.3.0-beta.1`) suit exactement le même chemin, mais
-la Release est publiée comme *prerelease* GitHub -- ignorée par défaut par les outils de suivi de
-mise à jour (Obtainium et similaires) sauf activation explicite du côté de qui l'installe. Pratique
-pour partager un build à tester sans que ça remonte comme "mise à jour recommandée".
+**Beta channel**: a tag containing `-beta` (e.g. `v0.3.0-beta.1`) follows exactly the same path, but
+the Release is published as a GitHub *prerelease* -- skipped by default by update-tracking tools
+(Obtainium and similar) unless explicitly enabled on the installer's side. Handy for sharing a test
+build without it showing up as a "recommended update".
 
 ```
 git tag v0.3.0-beta.1
