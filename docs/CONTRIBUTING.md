@@ -1,6 +1,6 @@
 # Contributing to AndroidMoCap
 
-*🇫🇷 Version française : [CONTRIBUTING_FR.md](CONTRIBUTING_FR.md)*
+*🇫🇷 Français : [CONTRIBUTING_FR.md](CONTRIBUTING_FR.md) · 🇨🇳 简体中文: [CONTRIBUTING_ZH.md](CONTRIBUTING_ZH.md) · 🇯🇵 日本語: [CONTRIBUTING_JA.md](CONTRIBUTING_JA.md)*
 
 Thanks for your interest in this project. A few points before opening a pull request.
 

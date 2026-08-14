@@ -1,6 +1,6 @@
 # AndroidMoCap
 
-*🇫🇷 Version française : [README_FR.md](README_FR.md)*
+*🇫🇷 Français : [README_FR.md](README_FR.md) · 🇨🇳 简体中文: [README_ZH.md](README_ZH.md) · 🇯🇵 日本語: [README_JA.md](README_JA.md)*
 
 Facial motion capture on Android, streamed live to Blender, Unity, VBridger, or directly to VTube
 Studio over the local network. The phone becomes a standalone facial tracker: no third-party app, no
@@ -134,10 +134,12 @@ Main items still open:
 ## License
 
 Distributed under the [PolyForm Shield 1.0.0](https://polyformproject.org/licenses/shield/1.0.0)
-license (see `LICENSE`): free use, including commercial, except building a product that would
-compete with the software itself. This is not an "open source" license in the strict (OSI) sense --
-source code visible and modifiable for personal use, but not freely redistributable as a competing
-product.
+license (see `LICENSE` -- the only legally authoritative version; unofficial, unreviewed machine
+translations exist for reference in [LICENSE_ZH.md](LICENSE_ZH.md) and
+[LICENSE_JA.md](LICENSE_JA.md)): free use, including commercial, except building a product that
+would compete with the software itself. This is not an "open source" license in the strict (OSI)
+sense -- source code visible and modifiable for personal use, but not freely redistributable as a
+competing product.
 
 ## Contributing
 

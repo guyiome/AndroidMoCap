@@ -1,6 +1,6 @@
 # AndroidMoCap — Accord de licence contributeur (CLA)
 
-*🇬🇧 English version: [CLA.md](CLA.md)*
+*🇬🇧 English: [CLA.md](CLA.md) · 🇨🇳 简体中文: [CLA_ZH.md](CLA_ZH.md) · 🇯🇵 日本語: [CLA_JA.md](CLA_JA.md)*
 
 *Applicable à toute contribution (pull request, patch, ou tout autre apport de code, de
 documentation ou d'autre matériel) soumise au projet AndroidMoCap. Document propre à ce projet, pas
