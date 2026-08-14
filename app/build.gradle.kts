@@ -145,7 +145,7 @@ dependencies {
     // propose systématiquement l'extension permessage-deflate sans réglage public pour la
     // désactiver, incompatible avec le serveur VTube Studio -- voir le commentaire dans
     // gradle/libs.versions.toml), kotlinx.serialization pour l'encodage JSON des requêtes/réponses
-    // de l'API (préféré à org.json : reste testable en JVM pur, voir Documentation/AndroidMoCap_tests_unitaires.md).
+    // de l'API (préféré à org.json : reste testable en JVM pur, voir docs/AndroidMoCap_tests_unitaires.md).
     implementation(libs.nv.websocket.client)
     implementation(libs.kotlinx.serialization.json)
 
@@ -158,6 +158,6 @@ dependencies {
     // AppCompatDelegate.setApplicationLocales() sous Compose (voir gradle/libs.versions.toml).
     implementation(libs.androidx.appcompat)
 
-    // Tests unitaires (JVM pur -- pas de dépendance Android, voir Documentation/AndroidMoCap_tests_unitaires.md)
+    // Tests unitaires (JVM pur -- pas de dépendance Android, voir docs/AndroidMoCap_tests_unitaires.md)
     testImplementation(libs.junit)
 }

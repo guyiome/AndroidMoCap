@@ -115,7 +115,7 @@ app/src/main/java/com/guyiome/androidmocap/
 
 Suite de tests unitaires JVM pur (aucune dépendance Android/Robolectric) sous `app/src/test/`.
 Détail fonction par fonction, avec les raisons explicites de ce qui n'est volontairement pas
-couvert, dans `Documentation/AndroidMoCap_tests_unitaires_FR.md`. Lancer avec :
+couvert, dans `docs/AndroidMoCap_tests_unitaires_FR.md`. Lancer avec :
 
 ```
 ./gradlew testDebugUnitTest
@@ -123,10 +123,10 @@ couvert, dans `Documentation/AndroidMoCap_tests_unitaires_FR.md`. Lancer avec :
 
 ## Documentation
 
-- `Documentation/AndroidMoCap_spec_fonctionnelle_FR.md` -- ce que l'app fait aujourd'hui, côté utilisateur.
-- `Documentation/AndroidMoCap_spec_technique_FR.md` -- architecture, pipeline de capture, protocoles réseau,
+- `docs/AndroidMoCap_spec_fonctionnelle_FR.md` -- ce que l'app fait aujourd'hui, côté utilisateur.
+- `docs/AndroidMoCap_spec_technique_FR.md` -- architecture, pipeline de capture, protocoles réseau,
   contraintes non-fonctionnelles.
-- `Documentation/AndroidMoCap_tests_unitaires_FR.md` -- détail de la couverture de tests.
+- `docs/AndroidMoCap_tests_unitaires_FR.md` -- détail de la couverture de tests.
 
 ## Feuille de route
 
@@ -149,8 +149,8 @@ redistribuable comme produit concurrent.
 
 ## Contribuer
 
-Voir `Documentation/CONTRIBUTING_FR.md` avant d'ouvrir une pull request -- toute contribution
-suppose l'acceptation de l'accord de licence contributeur (`Documentation/CLA_FR.md`).
+Voir `docs/CONTRIBUTING_FR.md` avant d'ouvrir une pull request -- toute contribution
+suppose l'acceptation de l'accord de licence contributeur (`docs/CLA_FR.md`).
 
 ## Publier une version (mainteneur)
 
