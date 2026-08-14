@@ -284,7 +284,7 @@ Second workflow (`.github/workflows/ci.yml`) déclenché sur chaque pull request
 `main` : build debug (non signé, aucun secret nécessaire) + tests unitaires, pour donner un signal
 objectif avant toute décision de merge -- notamment sur les PR Dependabot.
 
-Licence : PolyForm Shield 1.0.0 (voir `LICENSE`), CLA en place pour les contributions externes
+Licence : PolyForm Shield 1.0.0 (voir `../LICENSE`), CLA en place pour les contributions externes
 (`CLA_FR.md`, `CONTRIBUTING_FR.md`).
 
 ## 11. Dette technique et limites connues

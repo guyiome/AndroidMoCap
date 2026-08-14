@@ -9,7 +9,7 @@ simplified for a project of this size.*
 
 ## Why this document
 
-AndroidMoCap is distributed under the PolyForm Shield 1.0.0 license (see `LICENSE`), which reserves
+AndroidMoCap is distributed under the PolyForm Shield 1.0.0 license (see `../LICENSE`), which reserves
 to the rights holder (the project maintainer) the ability to keep distributing and evolving the
 software, including commercially. For that to stay coherent once external contributions are added
 to the code, each contributor must grant the maintainer sufficient rights over their own

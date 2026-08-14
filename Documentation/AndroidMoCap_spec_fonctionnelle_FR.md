@@ -149,7 +149,7 @@ chaque tag de version). Pas de vérification de mise à jour intégrée à l'app
   pas de flux caméra exploitable pour le tracking.
 - **Version Android minimale** : Android 11 (API 30).
 - **Licence** : usage libre du logiciel, y compris commercial, à l'exception de la construction
-  d'un produit concurrent -- voir `LICENSE`.
+  d'un produit concurrent -- voir `../LICENSE`.
 
 ## 5. Glossaire rapide
 

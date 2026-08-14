@@ -140,7 +140,7 @@ every version tag). No in-app update check.
   provide a usable camera feed for tracking.
 - **Minimum Android version**: Android 11 (API 30).
 - **License**: free use of the software, including commercial use, except building a competing
-  product -- see `LICENSE`.
+  product -- see `../LICENSE`.
 
 ## 5. Quick glossary
 

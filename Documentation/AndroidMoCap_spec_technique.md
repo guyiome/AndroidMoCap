@@ -273,7 +273,7 @@ A second workflow (`.github/workflows/ci.yml`) triggers on every pull request an
 `main`: debug build (unsigned, no secret required) + unit tests, to give an objective signal before
 any merge decision -- notably on Dependabot PRs.
 
-License: PolyForm Shield 1.0.0 (see `LICENSE`), a CLA in place for external contributions
+License: PolyForm Shield 1.0.0 (see `../LICENSE`), a CLA in place for external contributions
 (`CLA.md`, `CONTRIBUTING.md`).
 
 ## 11. Technical debt and known limitations

@@ -7,7 +7,7 @@ Merci de l'intérêt porté à ce projet. Quelques points avant d'ouvrir une pul
 ## Licence du projet
 
 Le code est distribué sous licence [PolyForm Shield 1.0.0](https://polyformproject.org/licenses/shield/1.0.0)
-(voir `LICENSE`) : usage libre, y compris commercial, à l'exception de la construction d'un produit
+(voir `../LICENSE`) : usage libre, y compris commercial, à l'exception de la construction d'un produit
 qui concurrencerait le logiciel lui-même. Ce n'est pas une licence "open source" au sens strict
 (OSI) -- choix délibéré, pour garder au mainteneur la possibilité de continuer à distribuer et faire
 évoluer le logiciel, y compris commercialement, sans qu'un tiers puisse en tirer un produit

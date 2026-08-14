@@ -7,7 +7,7 @@ Thanks for your interest in this project. A few points before opening a pull req
 ## Project license
 
 The code is distributed under the [PolyForm Shield 1.0.0](https://polyformproject.org/licenses/shield/1.0.0)
-license (see `LICENSE`): free use, including commercial, except building a product that would
+license (see `../LICENSE`): free use, including commercial, except building a product that would
 compete with the software itself. This is not an "open source" license in the strict (OSI) sense --
 a deliberate choice, to keep the maintainer able to keep distributing and evolving the software,
 including commercially, without a third party being able to turn it into a competing product.
