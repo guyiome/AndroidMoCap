@@ -45,9 +45,9 @@ l'avatar affiché côté PC qui sert de retour visuel.
   Landmarker). Deux blendshapes (`tongueOut`, `cheekPuff`) ne sont pas restitués de façon fiable
   par ce modèle -- limitation du modèle lui-même, pas un bug de l'app. `tongueOut` bénéficie d'une
   détection expérimentale alternative (voir ci-dessous) ; `cheekPuff` reste sans mitigation.
-- **Détection expérimentale de la langue tirée** (`tongueOut`) -- cascade dédiée (porte géométrique
-  bouche ouverte → recadrage/couleur → comparaison à une calibration personnelle par embedding),
-  activable dans "Fonctionnalités expérimentales" (§3.4). Une fois la calibration personnelle
+- **Détection expérimentale de la langue tirée** (`tongueOut`) -- cascade dédiée (porte d'ouverture
+  de bouche → comparaison à une calibration personnelle par embedding), activable dans
+  "Fonctionnalités expérimentales" (§3.4). Une fois la calibration personnelle
   effectuée, la valeur est envoyée aux protocoles réseau (§3.3), pas seulement affichée localement
   -- rangée en "Expérimental" du fait d'un risque résiduel de faux positif isolé.
 - Estimation de la direction du regard (par œil, pitch/yaw) reconstruite à partir des blendshapes

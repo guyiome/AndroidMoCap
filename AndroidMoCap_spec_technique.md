@@ -221,9 +221,14 @@ updates.
 never reliably restituted (the tongue doesn't exist in the landmark mesh's topology, which only
 models the visible face surface); `cheekPuff` is also unreliable in practice but for a different
 reason (the surface deformation is well present in the mesh, a model-coverage gap rather than a
-structural impossibility). `tongueOut` has an application-level mitigation built outside the mesh
-(geometric gate → color → embedding cascade), sent to the network protocols once calibrated, with an
-accepted residual risk of an isolated false positive; `cheekPuff` has no mitigation.
+structural impossibility). `tongueOut` has an application-level mitigation built outside the mesh: a
+rough gate on the existing `jawOpen` blendshape, followed by cosine-similarity classification
+against a personal embedding calibration (MediaPipe `ImageEmbedder`, a one-time calibration screen
+per user) -- a pixel-based mouth-crop/color heuristic also exists in the pipeline
+(`tracking/MouthColorAnalysis.kt`, `LipLandmarks.kt`) but stays diagnostic-only, it no longer gates
+the classification. Sent to the network protocols once calibrated, with a debounce requiring several
+consecutive classifications before confirmation, and an accepted residual risk of an isolated false
+positive; `cheekPuff` has no mitigation.
 
 **ARCore** -- used only for Augmented Faces on the `OPTIMAL` tier (see §4), not for a general
 augmented-reality use case.

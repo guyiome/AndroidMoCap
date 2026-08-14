@@ -231,9 +231,14 @@ volumineux), mode `LIVE_STREAM`, sortie de 52 blendshapes ARKit. Limitation stru
 de landmarks, qui ne modélise que la surface visible du visage) ; `cheekPuff` est également peu
 fiable en pratique mais pour une raison différente (déformation de surface bien présente dans le
 mesh, manque de couverture du modèle plutôt qu'impossibilité structurelle). `tongueOut` a une
-mitigation applicative construite en dehors du mesh (cascade porte géométrique → couleur →
-embedding), envoyée aux protocoles réseau une fois calibrée, avec un risque résiduel de faux positif
-isolé assumé ; `cheekPuff` n'a pas de mitigation.
+mitigation applicative construite en dehors du mesh : une porte grossière sur le blendshape
+`jawOpen` existant, suivie d'une classification par similarité cosinus contre une calibration
+personnelle par embedding (`ImageEmbedder` MediaPipe, écran de calibration à faire une fois par
+utilisateur) -- une heuristique de recadrage/couleur pixel existe aussi dans le pipeline
+(`tracking/MouthColorAnalysis.kt`, `LipLandmarks.kt`) mais reste purement diagnostique, elle ne
+conditionne plus la classification. Envoyée aux protocoles réseau une fois calibrée, avec un
+anti-rebond exigeant plusieurs classifications consécutives avant confirmation, et un risque
+résiduel de faux positif isolé assumé ; `cheekPuff` n'a pas de mitigation.
 
 **ARCore** -- utilisé uniquement pour Augmented Faces au palier `OPTIMAL` (voir §4), pas pour un
 usage de réalité augmentée classique.

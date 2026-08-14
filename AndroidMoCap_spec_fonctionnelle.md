@@ -44,9 +44,9 @@ visual feedback.
   blendshapes (`tongueOut`, `cheekPuff`) aren't reliably restituted by this model -- a limitation of
   the model itself, not an app bug. `tongueOut` benefits from an experimental alternative detection
   path (see below); `cheekPuff` remains without mitigation.
-- **Experimental tongue-out detection** (`tongueOut`) -- a dedicated cascade (open-mouth geometric
-  gate → crop/color → comparison against a personal embedding calibration), toggleable under
-  "Experimental features" (§3.4). Once the personal calibration is done, the value is sent to the
+- **Experimental tongue-out detection** (`tongueOut`) -- a dedicated cascade (open-mouth gate →
+  comparison against a personal embedding calibration), toggleable under "Experimental features"
+  (§3.4). Once the personal calibration is done, the value is sent to the
   network protocols (§3.3), not just displayed locally -- classified as "Experimental" due to a
   residual risk of an isolated false positive.
 - Gaze direction estimation (per eye, pitch/yaw) reconstructed from directional blendshapes
