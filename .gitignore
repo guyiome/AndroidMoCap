@@ -27,6 +27,13 @@ app/src/main/assets/*.tflite
 release.keystore
 
 # Brouillons de réflexion personnels, volontairement non commités (ex. pistes de monétisation) --
-# à la différence de AndroidMoCap_revue_technique.md/tests_unitaires.md qui font partie du suivi
-# public du projet.
+# à la différence de AndroidMoCap_tests_unitaires.md qui fait partie du suivi public du projet.
 AndroidMoCap_brouillon_*.md
+
+# Retirés du suivi en préparation du passage du dépôt en public (voir AndroidMoCap_spec_technique.md,
+# section "Documentation") : données de travail internes pour ce poste (contexte Claude Code +
+# journal de revue/backlog au jour le jour), pas destinées à un lecteur public. Restent en local,
+# non versionnées à partir de maintenant -- l'historique Git antérieur à ce commit garde leur
+# contenu passé, seule la suppression à partir d'ici a été faite (pas de purge d'historique).
+CLAUDE.md
+AndroidMoCap_revue_technique.md

@@ -1,10 +1,8 @@
 # AndroidMoCap — Spécification fonctionnelle
 
-*Document de référence sur l'état courant du périmètre fonctionnel -- pas un journal, pas d'historique
-de décisions. Pour le raisonnement derrière chaque choix et les évolutions en cours de réflexion,
-voir `AndroidMoCap_revue_technique.md` (qui garde ce rôle de journal + backlog). Pour l'architecture
-et les choix d'implémentation, voir `AndroidMoCap_spec_technique.md`. Dernière mise à jour :
-9 août 2026.*
+*Document de référence sur l'état courant du périmètre fonctionnel, à l'instant présent -- pas un
+journal, pas d'historique de décisions. Pour l'architecture et les choix d'implémentation, voir
+`AndroidMoCap_spec_technique.md`. Dernière mise à jour : 14 août 2026.*
 
 ## 1. Présentation générale
 
@@ -44,18 +42,18 @@ l'avatar affiché côté PC qui sert de retour visuel.
   la pose de tête vient d'ARCore Augmented Faces plutôt que de MediaPipe (les blendshapes restent
   toujours calculés par MediaPipe) -- repli automatique et silencieux sur le palier `STANDARD` si
   ARCore s'avère indisponible à l'usage malgré un appareil qui le supporte a priori. Confirmé
-  fonctionnel sur device (point 13 de la revue technique).
+  fonctionnel sur device.
 - Calcul de 52 blendshapes au format ARKit à partir de la caméra frontale (MediaPipe Face
   Landmarker). Deux blendshapes (`tongueOut`, `cheekPuff`) ne sont pas restitués de façon fiable
   par ce modèle -- limitation du modèle lui-même, documentée, pas un bug de l'app. `tongueOut`
   bénéficie d'une détection expérimentale alternative (voir ci-dessous) ; `cheekPuff` reste sans
-  mitigation pour l'instant (voir §4, point 16).
+  mitigation pour l'instant (voir §4).
 - **Détection expérimentale de la langue tirée** (`tongueOut`) -- cascade dédiée (porte géométrique
   bouche ouverte → recadrage/couleur → comparaison à une calibration personnelle par embedding),
   activable dans "Fonctionnalités expérimentales" (§3.4). Depuis le 13 août 2026, également envoyée
   aux protocoles réseau (§3.3), pas seulement affichée localement -- fiabilité nettement améliorée
   (calibration élargie au mouvement de mâchoire + anti-rebond avant injection) mais un risque
-  résiduel faible reste assumé, d'où le rangement en "Expérimental" (voir revue technique, point 15/56).
+  résiduel faible reste assumé, d'où le rangement en "Expérimental".
 - Estimation de la direction du regard (par œil, pitch/yaw) reconstruite à partir des blendshapes
   directionnels (`eyeLookUp/Down/In/OutLeft/Right`), MediaPipe ne fournissant pas cette donnée
   nativement.
@@ -74,7 +72,7 @@ expression neutre face à la caméra.
 tête semble avoir dérivé depuis le dernier calibrage (visage au repos mais pose qui ne revient pas
 près de zéro, ou perte de détection du visage suivie d'une redétection) -- purement informatif,
 aucune action automatique, se résout uniquement par un nouveau calibrage explicite. Confirmé
-fonctionnel sur device, tous paliers testés (point 19 de la revue technique).
+fonctionnel sur device, tous paliers testés.
 
 ### 3.3 Connectivité réseau
 
@@ -82,9 +80,8 @@ Trois protocoles de sortie, mutuellement exclusifs (un seul actif à la fois, ch
 réglages) :
 
 - **VMC/OSC** -- destiné à Blender, Unity (pas VTube Studio, qui ne reçoit vraisemblablement pas ce
-  protocole en entrée -- voir revue technique point 39). L'app envoie les données vers une IP/port
-  PC saisis manuellement dans les réglages. Confirmé fonctionnel sur device, contenu des paquets
-  vérifié (point 38 de la revue technique).
+  protocole en entrée). L'app envoie les données vers une IP/port PC saisis manuellement dans les
+  réglages. Confirmé fonctionnel sur device, contenu des paquets vérifié.
 - **Protocole compatible iFacialMocap/UDP** -- destiné à VBridger. Affiché "UDP / VBridger" dans
   l'interface (le nom "iFacialMocap" reste en mention secondaire pour rester trouvable par qui
   cherche ce terme précis, mais l'app ne se connecte pas à cette application tierce, elle implémente
@@ -97,7 +94,7 @@ réglages) :
   automatique s'il est révoqué entre-temps, plus un bouton "Oublier le jeton" en secours). Une fois
   connecté, les paramètres créés doivent être mappés une fois par l'utilisateur dans l'éditeur de
   paramètres de VTube Studio pour animer un modèle Live2D -- l'app ne peut pas le faire à sa place.
-  Confirmé fonctionnel sur device (point 39 de la revue technique).
+  Confirmé fonctionnel sur device.
 
 Le téléphone et le PC receveur doivent être sur le même réseau Wi-Fi local dans les trois cas.
 
@@ -146,8 +143,7 @@ Le téléphone et le PC receveur doivent être sur le même réseau Wi-Fi local 
 - **Throttling thermique dynamique** : le débit d'analyse cible est réduit de moitié si l'appareil
   chauffe en cours de session (icône discrète dans le bandeau HUD), et remonte automatiquement dès
   que la chauffe retombe -- aucune action requise de l'utilisateur. Confirmé fonctionnel sur device
-  via le mock de debug (le capteur thermique réel n'a pas encore été sollicité en usage normal, voir
-  point 34 de la revue technique).
+  via le mock de debug (le capteur thermique réel n'a pas encore été sollicité en usage normal).
 
 ### 3.6 Distribution
 
@@ -157,26 +153,26 @@ réflexion, voir §4).
 
 ## 4. Hors périmètre actuel -- en réflexion, non implémenté
 
-Fonctionnalités actées en conception dans `AndroidMoCap_revue_technique.md` mais sans code écrit à
-ce jour. Un résumé d'une ligne ici, le détail complet (raisonnement, architecture envisagée, points
-d'attention) reste dans la revue technique :
+Fonctionnalités actées en conception mais sans code écrit à ce jour, résumées ici en une ligne
+chacune :
 
 - **Détection expérimentale des joues gonflées** (`cheekPuff`) -- cascade géométrique allégée,
-  même famille que la détection de langue tirée déjà implémentée (§3.1, point 15). Point 16.
-  Rangée derrière le même interrupteur "Fonctionnalités expérimentales" une fois codée, avec
-  avertissement si l'appareil throttle (même mécanisme déjà en place pour la langue tirée).
+  même famille que la détection de langue tirée déjà implémentée (§3.1). Rangée derrière le même
+  interrupteur "Fonctionnalités expérimentales" une fois codée, avec avertissement si l'appareil
+  throttle (même mécanisme déjà en place pour la langue tirée).
 - **Affichage de la valeur brute à côté de la valeur ajustée** dans l'écran de sélection des
   blendshapes, si une pondération par blendshape est un jour ajoutée -- n'a de sens que ce jour-là.
   La persistance optionnelle de la sélection, elle, est déjà implémentée (voir §3.4).
 - **Adaptation des écrans de réglages à l'orientation système** sur grand écran (tablette) --
-  actuellement non adaptatif ; un constat platateforme (Android 16/17 ignore déjà le verrouillage
+  actuellement non adaptatif ; un constat plateforme (Android 16/17 ignore déjà le verrouillage
   d'orientation sur grand écran, indépendamment de ce choix) est documenté sans décision de mise en
-  œuvre. Point 20 de la revue technique.
+  œuvre.
 - **Ajustement de poids/gain par blendshape** (+ lissage réglable) -- fonctionnalité équivalente à
   ce que proposait MeowFace et propose iFacialMocap aujourd'hui. Idée retenue comme prioritaire
   lors du comparatif concurrentiel, pas encore formalisée en point de conception détaillé.
 - **Vérification de mise à jour semi-automatique** (bannière non intrusive comparant au dernier tag
-  GitHub Releases). Point 14, backlog.
+  GitHub Releases) -- en attente du passage du dépôt en public (l'API GitHub Releases exige une
+  authentification pour un dépôt privé).
 
 ## 5. Contraintes fonctionnelles transverses
 
@@ -186,8 +182,7 @@ d'attention) reste dans la revue technique :
   pas de flux caméra exploitable pour le tracking.
 - **Version Android minimale** : Android 11 (API 30).
 - **Licence** : usage libre du logiciel, y compris commercial, à l'exception de la construction
-  d'un produit concurrent -- voir `LICENSE` et le point 22 de la revue technique pour le
-  raisonnement.
+  d'un produit concurrent -- voir `LICENSE`.
 
 ## 6. Glossaire rapide
 
@@ -196,7 +191,7 @@ d'attention) reste dans la revue technique :
   coefficients).
 - **VMC (Virtual Motion Capture)** : protocole réseau basé sur OSC, standard de facto pour
   transmettre des données de mocap à des logiciels VTuber (Blender, Unity, VSeeFace... -- pas VTube
-  Studio, qui utilise sa propre API Plugin, voir §3.3 et revue technique point 39).
+  Studio, qui utilise sa propre API Plugin, voir §3.3).
 - **Palier de tracking** : niveau de pipeline choisi automatiquement selon les capacités de
   l'appareil (`COMPATIBLE` < `STANDARD` < `OPTIMAL`), déterminant le délégué (CPU/GPU), le débit
   cible et la source de pose de tête utilisée.

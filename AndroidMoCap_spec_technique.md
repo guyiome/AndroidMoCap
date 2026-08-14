@@ -1,10 +1,8 @@
 # AndroidMoCap — Spécification technique
 
-*Document de référence sur l'architecture et l'implémentation courantes -- pas un journal, pas
-d'historique de décisions. Pour le raisonnement derrière chaque choix, les alternatives écartées et
-les évolutions en cours de réflexion, voir `AndroidMoCap_revue_technique.md`. Pour le périmètre
-fonctionnel côté utilisateur, voir `AndroidMoCap_spec_fonctionnelle.md`. Dernière mise à jour :
-9 août 2026.*
+*Document de référence sur l'architecture et l'implémentation courantes, à l'instant présent -- pas
+un journal, pas d'historique de décisions. Pour le périmètre fonctionnel côté utilisateur, voir
+`AndroidMoCap_spec_fonctionnelle.md`. Dernière mise à jour : 14 août 2026.*
 
 ## 1. Vue d'ensemble
 
@@ -40,8 +38,8 @@ ajouté/retiré indépendamment selon le mode économie d'énergie, sans jamais 
 Par frame acceptée (après filtrage du débit cible, voir §3) : conversion en `Bitmap` via un pool
 réutilisé (évite une allocation par frame, point chaud historique du pipeline), rotation appliquée
 si nécessaire (matrice mise en cache, l'angle étant constant tant que l'app reste verrouillée
-portrait -- voir §7 ; hypothèse vérifiée sur device, y compris téléphone tenu en paysage, voir revue
-technique point 52), puis passage à `FaceLandmarkerHelper.detectAsync`
+portrait -- voir §7 ; hypothèse vérifiée sur device, y compris téléphone tenu en paysage), puis
+passage à `FaceLandmarkerHelper.detectAsync`
 en mode `LIVE_STREAM`. Le bitmap est suivi par timestamp de frame (pas par référence d'objet,
 MediaPipe pouvant envelopper l'image en interne) et repris dans le pool via `releaseFrame()` une
 fois le résultat MediaPipe reçu pour ce timestamp précis.
@@ -50,11 +48,11 @@ fois le résultat MediaPipe reçu pour ce timestamp précis.
 sur CPU en cas d'échec d'initialisation. Sortie par frame (`FaceTrackingResult`) : liste des
 blendshapes (`BlendshapeScore`), matrice/angles de rotation de tête, angles de regard par œil
 (calculés en fonction pure, `computeEyeGazeDegrees`, testable en JVM), et le mesh de 478 points --
-extrait en permanence depuis le point 28 (avant, uniquement si l'overlay en avait besoin) : consommé
+extrait en permanence (avant, uniquement si l'overlay en avait besoin) : consommé
 aussi par la correction du clignement par EAR ci-dessous, et MediaPipe le calcule de toute façon en
 interne, coût de copie négligeable.
 
-**Fiabilisation du clignement (point 28/45)** : `tracking/EyeAspectRatio.kt` calcule un Eye Aspect
+**Fiabilisation du clignement** : `tracking/EyeAspectRatio.kt` calcule un Eye Aspect
 Ratio géométrique par œil à partir du mesh (indices confirmés contre `eyeBlinkLeft`/`eyeBlinkRight`
 par test réel sur device, pas par convention de tutoriel). Le blendshape `eyeBlink` de MediaPipe
 fuyant d'un œil vers l'autre (mesuré sur device), `tracking/EyeBlinkCorrection.kt` atténue le score
@@ -63,14 +61,13 @@ d'un œil quand son EAR indique qu'il est encore largement ouvert -- appliqué d
 lisse la remontée de l'EAR (attaque instantanée, relâchement sur ~3s) pour ne pas confondre une
 dérive du suivi de landmarks pendant une fermeture tenue avec une vraie réouverture -- confirmé sur
 device dans les deux cas (fuite atténuée, tenue longue préservée). Une troisième piste (œil droit
-peu réactif) s'est révélée être un problème d'éclairage physique, pas logiciel -- voir revue
-technique, point 45.
+peu réactif) s'est révélée être un problème d'éclairage physique, pas logiciel.
 
 Le bouton de calibrage (`MainHud`) se teinte en rouge si une dérive de la pose calibrée est détectée
 (visage au repos mais pose qui ne revient pas près de zéro, ou perte de détection du visage puis
 redétection) -- purement informatif, jamais d'action automatique, se résout uniquement par un
 nouveau calibrage explicite. Logique pure et testée en JVM :
-`tracking/CalibrationAnomaly.kt`/`BlendshapeStability.kt`. Voir revue technique, point 19.
+`tracking/CalibrationAnomaly.kt`/`BlendshapeStability.kt`.
 
 ## 3. Sélection de palier (`TrackingTier`)
 
@@ -95,23 +92,22 @@ actif entre `ON_START`/`ON_STOP`) : en cas de chauffe, le débit cible est rédu
 chauffe retombe. Volontairement limité au débit cible -- ni le délégué GPU/CPU ni la source caméra
 (ARCore/CameraX) ne changent à chaud, seul un changement de palier complet (jamais fait en cours de
 session, voir §4 et le sélecteur de palier manuel) y toucherait. Logique pure et testée en JVM :
-`tracking/ThermalThrottle.kt` (`ThermalThrottleState.next()`). Voir revue technique, point 34.
+`tracking/ThermalThrottle.kt` (`ThermalThrottleState.next()`).
 
 À côté du sélecteur de palier manuel (`tierOverride`, diagnostic uniquement), un panneau de mocks de
 debug caché (`DiagnosticsScreen`, déverrouillé par tap multiple sur la ligne de version de l'app)
 permet de forcer trois comportements difficiles à déclencher naturellement sur un appareil donné :
 throttling thermique (en direct), ARCore indisponible et délégué GPU indisponible (ces deux derniers
-au prochain lancement, même contrainte que `tierOverride` -- voir §6). Voir revue technique, point 35.
+au prochain lancement, même contrainte que `tierOverride` -- voir §6).
 
 ## 4. Fusion ARCore (palier `OPTIMAL`) -- intégrée sur `main`, confirmée fonctionnelle sur device
 
 Intégrée directement sur `main` le 6 août 2026 (réimplémentée à neuf plutôt que fusionnée depuis
-`feature/arcore-fusion`, devenue trop divergente -- voir revue technique, point 13, pour le
-raisonnement complet). **Confirmée fonctionnelle sur device** le jour même (tracking correctement
-orienté, latence perçue nettement améliorée) après une série de correctifs réels trouvés en test
-(crash de format d'image, `Display geometry`, rotation, déport du traitement sur thread dédié) --
-voir revue technique, point 3/13, pour le détail complet et les points mineurs encore ouverts
-(vérification `ArCoreApk` synchrone au démarrage, pas de pool de bitmaps pour le chemin ARCore).
+`feature/arcore-fusion`, devenue trop divergente). **Confirmée fonctionnelle sur device** le jour
+même (tracking correctement orienté, latence perçue nettement améliorée) après une série de
+correctifs réels trouvés en test (crash de format d'image, `Display geometry`, rotation, déport du
+traitement sur thread dédié). Points mineurs encore ouverts : vérification `ArCoreApk` synchrone au
+démarrage, pas de pool de bitmaps pour le chemin ARCore.
 
 Contrainte technique identifiée : ARCore Augmented Faces gère lui-même l'accès caméra en interne et
 ne peut pas coexister avec `ImageAnalysis` de CameraX sur la même caméra frontale (un seul client
@@ -119,25 +115,24 @@ Camera2 actif à la fois). Solution retenue : pour ce palier uniquement, `Sessio
 caméra via `ArCoreHeadPoseTracker`, les frames sont récupérées via `Frame.acquireCameraImage()`
 (toujours en YUV_420_888 côté ARCore, aucune option RGBA) puis converties manuellement en `Bitmap`
 ARGB_8888 (`yuv420ToBitmap()`) avant `BitmapImageBuilder` -- pas `MediaImageBuilder` directement,
-qui exige du RGBA et faisait planter l'app au premier lancement réel (voir revue technique, point
-3/13) -- pour continuer à nourrir MediaPipe côté blendshapes ; la pose de tête utilise
+qui exige du RGBA et faisait planter l'app au premier lancement réel -- pour continuer à nourrir
+MediaPipe côté blendshapes ; la pose de tête utilise
 `AugmentedFace.centerPose` (récupérée via un callback dédié dans `MainViewModel`, thread
 GL) à la place de `facialTransformationMatrixes()`. Repli automatique et silencieux vers
 CameraX+`CameraController` (comme le palier `STANDARD`) si Augmented Faces s'avère indisponible à
 l'usage, décidé synchrone dès `MainViewModel.initializeTracking()`.
 
-**Fond caméra live, confirmé sur device le 12 août 2026** (revue technique, point 53) : le
-`GLSurfaceView` de ce palier affiche désormais un quad plein écran texturé avec la texture OES
-qu'ARCore alimente déjà via `Session#setCameraTextureName` (jusque-là jamais échantillonnée),
-comblant le manque d'aperçu live de ce palier par rapport à `PreviewView` sur CameraX -- le mesh
-overlay n'est donc plus forcé visible sur ARCore, il suit désormais le même réglage
-(`faceMeshOverlayEnabled`) que CameraX (`ui/MeshOverlayVisibility.kt`). Masqué en mode économie
-d'énergie comme l'aperçu CameraX (`ArCoreHeadPoseTracker.setBackgroundRenderingEnabled`). Rotation
-du quad **fixe et hold-independent**, exactement comme `cameraRotationDegrees` côté CPU -- trouvée
-par balayage empirique sur device après plusieurs tentatives de dérivation manuelle infructueuses
-(voir revue technique point 53 pour le détail complet) ; latéralité volontairement **non mirorée**
-(comportement natif/anatomique, ce palier n'a pas de `PreviewView` équivalent à qui rester
-cohérent, contrairement au mesh qui reste mirroré pour CameraX).
+**Fond caméra live, confirmé sur device le 12 août 2026** : le `GLSurfaceView` de ce palier affiche
+désormais un quad plein écran texturé avec la texture OES qu'ARCore alimente déjà via
+`Session#setCameraTextureName` (jusque-là jamais échantillonnée), comblant le manque d'aperçu live
+de ce palier par rapport à `PreviewView` sur CameraX -- le mesh overlay n'est donc plus forcé
+visible sur ARCore, il suit désormais le même réglage (`faceMeshOverlayEnabled`) que CameraX
+(`ui/MeshOverlayVisibility.kt`). Masqué en mode économie d'énergie comme l'aperçu CameraX
+(`ArCoreHeadPoseTracker.setBackgroundRenderingEnabled`). Rotation du quad **fixe et
+hold-independent**, exactement comme `cameraRotationDegrees` côté CPU -- trouvée par balayage
+empirique sur device après plusieurs tentatives de dérivation manuelle infructueuses ; latéralité
+volontairement **non mirorée** (comportement natif/anatomique, ce palier n'a pas de `PreviewView`
+équivalent à qui rester cohérent, contrairement au mesh qui reste mirroré pour CameraX).
 
 Classes dédiées : `ArCoreHeadPoseTracker`, `ArCoreFaceSelector` (sélection du visage principal si
 plusieurs détectés, fonction pure testée en JVM : `pickPrimary`). Rotation de l'image caméra
@@ -145,24 +140,22 @@ confirmée corrigée sur device (le miroir, lui, n'a jamais été un problème r
 jamais appliqué à l'image envoyée à MediaPipe, seulement à l'affichage, même convention que
 `CameraController`). Risque restant, non résolu : `DeviceCapabilityDetector.detect()` lit
 `ArCoreApk.checkAvailability().isSupported` de façon synchrone au démarrage -- détaillé dans le
-kdoc d'`ArCoreHeadPoseTracker.kt` et la revue technique, point 3/13.
+kdoc d'`ArCoreHeadPoseTracker.kt`.
 
 ## 5. Protocoles réseau
 
 ### VMC/OSC (`VmcOscSender`)
 
-Cible : Blender, Unity -- **pas VTube Studio** (voir revue technique point 39 : VTube Studio ne
-reçoit vraisemblablement pas le protocole VMC/OSC en entrée, contrairement à l'hypothèse initiale du
-projet). Un `OSCBundle` unique par frame envoyée, regroupant un message `/VMC/Ext/Blend/Val` par
-blendshape (~52) suivi d'un `/Apply` -- un seul appel réseau par frame plutôt qu'un paquet UDP par
-blendshape (correctif appliqué, voir revue technique point 4). IP/port cible saisis manuellement
-côté app (le téléphone est l'émetteur, il doit connaître sa destination).
+Cible : Blender, Unity -- **pas VTube Studio** (qui ne reçoit vraisemblablement pas le protocole
+VMC/OSC en entrée, contrairement à l'hypothèse initiale du projet). Un `OSCBundle` unique par frame
+envoyée, regroupant un message `/VMC/Ext/Blend/Val` par blendshape (~52) suivi d'un `/Apply` -- un
+seul appel réseau par frame plutôt qu'un paquet UDP par blendshape. IP/port cible saisis
+manuellement côté app (le téléphone est l'émetteur, il doit connaître sa destination).
 
-Détection de déconnexion best-effort (socket `connect()`-é + sonde `receive()` dédiée, revue
-technique point 55) : fonctionne en principe (ICMP "port injoignable"), **confirmé non fiable sur
-au moins un réseau de test** (le paquet ICMP n'atteint jamais le téléphone) -- l'icône "connecté"
-peut donc rester allumée même sans récepteur actif selon le réseau. N'affecte jamais l'envoi
-lui-même (best-effort, jamais bloquant).
+Détection de déconnexion best-effort (socket `connect()`-é + sonde `receive()` dédiée) : fonctionne
+en principe (ICMP "port injoignable"), **confirmé non fiable sur au moins un réseau de test** (le
+paquet ICMP n'atteint jamais le téléphone) -- l'icône "connecté" peut donc rester allumée même sans
+récepteur actif selon le réseau. N'affecte jamais l'envoi lui-même (best-effort, jamais bloquant).
 
 ### iFacialMocap/UDP (`IFacialMocapSender`)
 
@@ -171,7 +164,7 @@ dans les réglages ; c'est VBridger qui initie la connexion vers cette IP. Aucun
 requise côté téléphone pour ce chemin. Même détection de déconnexion best-effort que VMC ci-dessus,
 même limite confirmée.
 
-### VTube Studio Plugin API (`VTubeStudioSender`) -- point 39
+### VTube Studio Plugin API (`VTubeStudioSender`)
 
 Cible : VTube Studio, en direct, via son API Plugin propriétaire (WebSocket JSON, port 8001 par
 défaut) plutôt que VMC/OSC. Le téléphone est client WebSocket vers l'IP/port du PC (comme VMC, pas
@@ -188,14 +181,12 @@ kotlinx.serialization (`encodeDefaults = true` impératif -- voir son kdoc, un b
 silencieuse de champs a bloqué toute réponse serveur avant correction) ; transport WebSocket via
 **nv-websocket-client** (`VTubeStudioSender.kt`, seule pièce non testable en JVM) -- **pas OkHttp**,
 qui propose systématiquement l'extension `permessage-deflate` sans réglage public pour la
-désactiver, incompatible avec le serveur `websocket-sharp` de VTube Studio (voir revue technique,
-point 39, pour le détail du diagnostic). Les paramètres créés ne sont pas automatiquement reconnus
-par un modèle Live2D existant -- l'utilisateur doit les mapper une fois dans l'éditeur de
-paramètres de VTube Studio.
+désactiver, incompatible avec le serveur `websocket-sharp` de VTube Studio. Les paramètres créés ne
+sont pas automatiquement reconnus par un modèle Live2D existant -- l'utilisateur doit les mapper une
+fois dans l'éditeur de paramètres de VTube Studio.
 
 ✅ Confirmé fonctionnel de bout en bout sur device le 8 août 2026 : connexion, popup d'autorisation,
-création des paramètres, réception. Voir revue technique, point 39, pour le détail des bugs
-rencontrés et corrigés (encodage JSON, bibliothèque WebSocket, robustesse jeton/collisions).
+création des paramètres, réception.
 
 Nécessite `res/xml/network_security_config.xml` (`<base-config cleartextTrafficPermitted="true">`,
 référencé depuis `AndroidManifest.xml`) : les bibliothèques WebSocket respectent la politique de
@@ -210,42 +201,42 @@ Les trois protocoles (VMC, iFacialMocap, VTube Studio) sont mutuellement exclusi
 
 `AppSettingsStore` et `ConnectionSettingsStore` (DataStore Preferences) : seuil de batterie faible,
 mode économie d'énergie (activation + délai), overlay du mesh, type de connexion et cible réseau
-(IP VMC, IP + jeton d'authentification VTube Studio -- point 39), et -- optionnellement -- la
+(IP VMC, IP + jeton d'authentification VTube Studio), et -- optionnellement -- la
 sélection de blendshapes affichés sur l'écran principal. Cette dernière
 reste **non persistée par défaut** (remise à zéro à chaque lancement, comportement historique
 inchangé), mais un réglage dédié (`persistBlendshapeSelectionEnabled`) permet de la conserver d'une
-session à l'autre -- voir revue technique point 25.
+session à l'autre.
 
-Deux mocks de debug persistés (`debugForceArCoreUnavailable`, `debugForceGpuUnavailable` -- voir §3
-et revue technique point 35) suivent exactement le même patron que `tierOverride` : lus une seule
-fois au lancement, un changement ne s'applique qu'au redémarrage suivant. Le troisième mock (débit
-thermique) est volontairement **absent** de ce store -- bascule de session active en direct, pas un
-réglage de lancement.
+Deux mocks de debug persistés (`debugForceArCoreUnavailable`, `debugForceGpuUnavailable` -- voir §3)
+suivent exactement le même patron que `tierOverride` : lus une seule fois au lancement, un
+changement ne s'applique qu'au redémarrage suivant. Le troisième mock (débit thermique) est
+volontairement **absent** de ce store -- bascule de session active en direct, pas un réglage de
+lancement.
 
 ## 7. Contraintes non-fonctionnelles
 
 **Portrait verrouillé** -- l'app est verrouillée en orientation portrait, ce qui permet de mettre
 en cache la matrice de rotation caméra pour toute la session (calculée une seule fois plutôt qu'à
-chaque frame). Réserve documentée (revue technique point 20) : à partir d'Android 16 (API 36), les
-restrictions d'orientation déclarées par une app sont ignorées par défaut sur les écrans de largeur
-minimale ≥ 600dp (tablettes) ; Android 17 (API 37) supprime l'option de désactivation manifeste.
-Le projet ciblant déjà `targetSdk = 37`, cette hypothèse ne tient donc plus sur tablette récente --
-risque identifié sur la mise en page des réglages (encore ouvert, priorité basse, mise en page
-seule) et, potentiellement, sur la justesse de la rotation caméra elle-même. **Ce second risque a
-été investigué et infirmé sur device le 12 août 2026** (revue technique point 52) : la rotation
-caméra fixe fonctionne correctement dans toutes les orientations testées, y compris téléphone tenu
-en paysage (le cas d'usage le plus fréquent selon l'utilisateur). La dégradation réelle observée en
-paysage (pose de tête, surtout le roll) venait d'une référence de calibrage restée en portrait
-(`sensors/DeviceOrientationTracker`) et se résout par un nouveau calibrage explicite après tout
-changement significatif de tenue -- aucun changement de code nécessaire côté rotation caméra.
+chaque frame). Réserve documentée : à partir d'Android 16 (API 36), les restrictions d'orientation
+déclarées par une app sont ignorées par défaut sur les écrans de largeur minimale ≥ 600dp
+(tablettes) ; Android 17 (API 37) supprime l'option de désactivation manifeste. Le projet ciblant
+déjà `targetSdk = 37`, cette hypothèse ne tient donc plus sur tablette récente -- risque identifié
+sur la mise en page des réglages (encore ouvert, priorité basse, mise en page seule) et,
+potentiellement, sur la justesse de la rotation caméra elle-même. **Ce second risque a été
+investigué et infirmé sur device le 12 août 2026** : la rotation caméra fixe fonctionne correctement
+dans toutes les orientations testées, y compris téléphone tenu en paysage (le cas d'usage le plus
+fréquent selon l'utilisateur). La dégradation réelle observée en paysage (pose de tête, surtout le
+roll) venait d'une référence de calibrage restée en portrait (`sensors/DeviceOrientationTracker`) et
+se résout par un nouveau calibrage explicite après tout changement significatif de tenue -- aucun
+changement de code nécessaire côté rotation caméra.
 
 **Budget batterie/chauffe** -- préoccupation centrale de plusieurs choix d'implémentation : pool de
 bitmaps, throttling du débit par palier, mode économie d'énergie qui coupe l'aperçu affiché sans
-couper le tracking. L'extraction du mesh 478 points est passée à "toujours actif" au point 28 (avant,
-évitée quand l'overlay était inactif) -- jugé négligeable, MediaPipe calculant ces points en interne
-de toute façon. Toute fonctionnalité ajoutée (notamment les cascades de détection expérimentales,
-revue technique points 15/16) doit être évaluée à cette aune, avec un avertissement utilisateur prévu
-si l'appareil montre des signes de throttling.
+couper le tracking. L'extraction du mesh 478 points est passée à "toujours actif" (avant, évitée
+quand l'overlay était inactif) -- jugé négligeable, MediaPipe calculant ces points en interne de
+toute façon. Toute fonctionnalité ajoutée (notamment les cascades de détection expérimentales) doit
+être évaluée à cette aune, avec un avertissement utilisateur prévu si l'appareil montre des signes
+de throttling.
 
 **Cycle de vie** -- capteurs (orientation, batterie) et initialisation du tracking alignés sur le
 cycle de vie réel de l'Activity (`ON_START`/`ON_STOP`), pas seulement sur la composition Compose,
@@ -264,21 +255,20 @@ structurelle : `tongueOut` n'est jamais restitué de façon fiable (la langue n'
 topologie du mesh de landmarks, qui ne modélise que la surface visible du visage) ; `cheekPuff` est
 également peu fiable en pratique mais pour une raison différente (déformation de surface bien
 présente dans le mesh, vraisemblablement un manque de couverture du modèle officiel plutôt qu'une
-impossibilité structurelle) -- distinction qui a conditionné les pistes de correction retenues
-(revue technique points 15/16). `tongueOut` a une mitigation applicative construite en dehors du
-mesh (cascade porte géométrique → couleur → embedding, point 15), envoyée aux protocoles réseau
-depuis le 13 août 2026 malgré un risque résiduel de faux positif isolé assumé (voir point 15/56) ;
-`cheekPuff` (point 16) n'a pas encore de mitigation implémentée.
+impossibilité structurelle) -- distinction qui a conditionné les pistes de correction retenues.
+`tongueOut` a une mitigation applicative construite en dehors du mesh (cascade porte géométrique →
+couleur → embedding), envoyée aux protocoles réseau depuis le 13 août 2026 malgré un risque résiduel
+de faux positif isolé assumé ; `cheekPuff` n'a pas encore de mitigation implémentée.
 
 **ARCore** -- utilisé uniquement pour Augmented Faces au palier `OPTIMAL` (voir §4), pas pour un
 usage de réalité augmentée classique.
 
 **JavaOSC** -- implémentation du protocole OSC utilisé pour VMC.
 
-**nv-websocket-client** -- client WebSocket utilisé par `VTubeStudioSender` (point 39) pour l'API
-Plugin de VTube Studio. OkHttp essayé en premier puis abandonné : propose systématiquement
-l'extension `permessage-deflate`, sans réglage public pour la désactiver, incompatible avec le
-serveur `websocket-sharp` de VTube Studio (voir revue technique, point 39).
+**nv-websocket-client** -- client WebSocket utilisé par `VTubeStudioSender` pour l'API Plugin de
+VTube Studio. OkHttp essayé en premier puis abandonné : propose systématiquement l'extension
+`permessage-deflate`, sans réglage public pour la désactiver, incompatible avec le serveur
+`websocket-sharp` de VTube Studio.
 
 **kotlinx.serialization** -- encodage/décodage JSON pur pour le protocole de l'API Plugin VTube
 Studio (`VTubeStudioProtocol.kt`), préféré à `org.json` (déjà présent dans le SDK Android) car ce
@@ -286,8 +276,8 @@ dernier n'est qu'un stub sous le runner de tests JVM de ce projet (pas de Robole
 casserait la convention "fonctions pures testables en JVM" suivie partout ailleurs.
 
 **androidx.appcompat** (1.7.1) -- requis uniquement pour `AppCompatActivity`/`AppCompatDelegate`, le
-sélecteur de langue en-app (point 30, voir §12) ; le reste de l'UI (Compose/Material3) ne s'appuie
-sur aucun composant de support classique.
+sélecteur de langue en-app (voir §12) ; le reste de l'UI (Compose/Material3) ne s'appuie sur aucun
+composant de support classique.
 
 ## 9. Tests
 
@@ -304,8 +294,8 @@ Signature release lue depuis des variables d'environnement (jamais commitées), 
 Actions (`.github/workflows/release.yml`) déclenché par un tag `vX.Y.Z` : build, téléchargement du
 modèle MediaPipe, signature, publication d'une Release GitHub avec l'APK en pièce jointe. Pas de
 Play Store à ce jour. `isMinifyEnabled = true` en configuration release depuis le 9 août 2026 (R8
-activé, confirmé sur device -- voir revue technique point 8) : shrinking + renommage actifs,
-`-dontoptimize` conservé délibérément (voir `proguard-rules.pro`) suite à un crash confirmé au
+activé, confirmé sur device) : shrinking + renommage actifs, `-dontoptimize` conservé délibérément
+(voir `proguard-rules.pro`) suite à un crash confirmé au
 lancement causé par l'optimiseur R8 perturbant la détection d'appelant de Guava Flogger (dépendance
 transitive de MediaPipe). Sans variables d'environnement de signature release, `assembleRelease`
 retombe sur la signature debug -- seulement pour permettre de tester un build release minifié en
@@ -313,24 +303,22 @@ local (`adb install`), le workflow de publication a toujours les vraies variable
 
 Second workflow (`.github/workflows/ci.yml`) déclenché sur chaque pull request et chaque push sur
 `main` : build debug (non signé, aucun secret nécessaire) + tests unitaires, pour donner un signal
-objectif avant toute décision de merge -- notamment sur les PR Dependabot. Reste **informatif, pas
-contraignant** : le plan GitHub Free ne permet les "required status checks" bloquants que sur les
-dépôts publics, pas privés -- voir revue technique point 17 (le second, celui de la CI -- collision
-de numérotation documentée dans l'index de la revue technique).
+objectif avant toute décision de merge -- notamment sur les PR Dependabot. Le plan GitHub Free ne
+permet les "required status checks" bloquants que sur les dépôts publics, pas privés -- redevient
+donc pertinent à activer maintenant que le dépôt est public.
 
 Licence : PolyForm Shield 1.0.0 (voir `LICENSE`), CLA en place pour les contributions externes
-(`CLA.md`, `CONTRIBUTING.md`) -- détail du raisonnement au point 22 de la revue technique.
+(`CLA.md`, `CONTRIBUTING.md`).
 
 ## 11. Dette technique et limites connues
 
-Liste vivante tenue dans `AndroidMoCap_revue_technique.md`, pas dupliquée ici. Points ouverts
-principaux au moment de la rédaction : vérification de mise à jour non implémentée (point 14),
-comportement non défini sur grand écran/tablette (point 20). Le minify release (point 8) est traité
--- voir §10. La
-localisation de l'UI (point 23) est traitée -- voir §12. La fusion ARCore (point 3/13) est intégrée
-sur `main` et confirmée fonctionnelle sur device -- voir §4. Le throttling thermique dynamique (point 34)
-est branché et vérifié sur device via mock (point 35) -- le capteur thermique réel reste non exercé,
-l'appareil de test ne chauffant pas suffisamment en usage normal, voir §3.
+Les limitations connues et points encore ouverts sont documentés directement dans la section
+concernée plutôt que dans une liste séparée : vérification de mise à jour semi-automatique non
+implémentée (voir `AndroidMoCap_spec_fonctionnelle.md`, §4), comportement non défini sur grand
+écran/tablette (§7). Le minify release, la fusion ARCore, la localisation de l'UI et le throttling
+thermique dynamique, autrefois en chantier, sont désormais traités -- voir respectivement §10, §4,
+§12 et §3 (le capteur thermique réel reste non exercé, l'appareil de test ne chauffant pas
+suffisamment en usage normal).
 
 ## 12. Localisation
 
@@ -350,11 +338,10 @@ fonctionner sous Compose), et le manifeste déclare `AppLocalesMetadataHolderSer
 plateforme au-delà) -- sans DataStore ni code de persistance propre à ce projet. Changer la langue
 recrée l'Activity (comportement AppCompat documenté) : un écran de réglages ouvert au moment du
 changement se ferme et revient à l'écran principal, cosmétique mineur plutôt qu'un bug. **✅ Confirmé
-fonctionnel sur device (Android 11)**, y compris la persistance après redémarrage complet -- voir
-revue technique, point 30/43. Les 52 noms de blendshapes ARKit (`jawOpen`,
-`mouthSmileLeft`...) et les identifiants techniques de protocole (`ConnectionType.IFACIALMOCAP`...)
-ne sont volontairement pas traduits -- vocabulaire de protocole, pas texte d'affichage. Les messages
-d'erreur émis hors `@Composable` (`MainViewModel`, `CameraController`, `FaceLandmarkerHelper`) sont
-résolus via `Context.getString()`, chacune de ces classes ayant déjà accès à un `Context`/
-`Application`. Détail du travail d'extraction : revue technique, point 23. Traductions FR/EN pas
-encore validées par un locuteur natif -- revue technique, point 29.
+fonctionnel sur device (Android 11)**, y compris la persistance après redémarrage complet. Les 52
+noms de blendshapes ARKit (`jawOpen`, `mouthSmileLeft`...) et les identifiants techniques de
+protocole (`ConnectionType.IFACIALMOCAP`...) ne sont volontairement pas traduits -- vocabulaire de
+protocole, pas texte d'affichage. Les messages d'erreur émis hors `@Composable` (`MainViewModel`,
+`CameraController`, `FaceLandmarkerHelper`) sont résolus via `Context.getString()`, chacune de ces
+classes ayant déjà accès à un `Context`/`Application`. Traductions FR/EN pas encore validées par un
+locuteur natif.

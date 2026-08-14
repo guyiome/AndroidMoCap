@@ -58,7 +58,7 @@ L'app propose une intégration directe via l'API Plugin propriétaire de VTube S
 "VTube Studio" dans les réglages de connexion, IP du PC + port 8001 par défaut) : un popup
 d'autorisation apparaît dans VTube Studio à la première connexion, puis les paramètres créés
 doivent être mappés une fois dans l'éditeur de paramètres de VTube Studio pour animer le modèle.
-Confirmé fonctionnel sur device -- voir `AndroidMoCap_revue_technique.md`, point 39.
+Confirmé fonctionnel sur device.
 
 **VBridger** : sélectionner le protocole iFacialMocap dans les réglages de l'app, puis suivre les
 instructions VBridger en pointant vers l'IP affichée sur le téléphone -- c'est VBridger qui vient se
@@ -124,27 +124,19 @@ couvert, dans `AndroidMoCap_tests_unitaires.md`. Lancer avec :
 - `AndroidMoCap_spec_fonctionnelle.md` -- ce que l'app fait aujourd'hui, côté utilisateur.
 - `AndroidMoCap_spec_technique.md` -- architecture, pipeline de capture, protocoles réseau,
   contraintes non-fonctionnelles.
-- `AndroidMoCap_revue_technique.md` -- journal de revue et backlog : raisonnement détaillé derrière
-  chaque décision, chantiers en cours ou en réflexion.
 - `AndroidMoCap_tests_unitaires.md` -- détail de la couverture de tests.
 
 ## Feuille de route
 
-Suivi détaillé dans `AndroidMoCap_revue_technique.md`. Points principaux :
+État courant détaillé dans `AndroidMoCap_spec_fonctionnelle.md` (§4, "Hors périmètre actuel") et
+`AndroidMoCap_spec_technique.md`. Points principaux encore ouverts :
 
-- **Fusion ARCore** (pose de tête, palier `OPTIMAL`) : intégrée sur `main` et fonctionnelle sur
-  device (bascule de la source caméra vers ARCore pour ce palier) -- voir le point 13 de la revue
-  technique pour le détail et les points mineurs encore ouverts.
-- Throttling thermique dynamique : débit cible réduit de moitié pendant une chauffe détectée
-  (`DeviceCapabilityDetector.isThermalThrottling`, sondée en continu pendant la capture), remonte
-  automatiquement une fois la chauffe retombée -- implémenté, pas encore confirmé sur device, voir
-  le point 34 de la revue technique.
-- Lissage temporel (One Euro Filter) sur les blendshapes.
-- Détection expérimentale de la langue tirée et des joues gonflées, derrière un interrupteur
-  "Fonctionnalités expérimentales" dédié -- encore au stade de conception, voir les points 15 et 16.
+- Détection expérimentale des joues gonflées (`cheekPuff`) -- même famille que la détection de
+  langue tirée déjà implémentée, encore au stade de conception.
 - Vérification de mise à jour semi-automatique (comparaison au dernier tag GitHub Releases, lien
   direct plutôt qu'installation silencieuse -- impossible hors store).
-- R8/minify sur le build release, une fois les tests sur device de nouveau possibles.
+- Adaptation des écrans de réglages à l'orientation système sur grand écran (tablette).
+- Ajustement de poids/gain par blendshape (+ lissage réglable).
 
 ## Licence
 
