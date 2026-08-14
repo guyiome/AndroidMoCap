@@ -15,7 +15,7 @@ jobs:
       contents: write  # nécessaire pour créer la Release GitHub et y attacher l'APK
     steps:
       - name: Récupérer le code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Installer le JDK 17
         uses: actions/setup-java@v4
