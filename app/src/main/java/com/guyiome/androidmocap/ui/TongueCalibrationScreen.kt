@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -63,14 +64,28 @@ private const val CALIBRATION_DONE_DISPLAY_MS = 1500L
  * **tel que perçu par l'utilisateur**, quelle que soit l'orientation physique du téléphone --
  * retour utilisateur explicite : une simple rotation du contenu (comme [BlendshapePanel], qui reste
  * ancré au même coin de la mise en page portrait sous-jacente) ne suffit pas, il faut aussi
- * **changer d'ancrage** selon l'orientation. [snapToRotationBucket] donne un palier {0,90,180,270} ;
- * pour chaque palier, `messageAlignment`/`buttonAlignment` ci-dessous choisissent le coin/bord de la
- * mise en page portrait sous-jacente qui, une fois la rotation physique appliquée, retombe sur le
- * coin/bord voulu à l'écran (message : toujours en haut à gauche perçu ; bouton : toujours en bas
- * perçu) -- dérivé géométriquement de la convention `OrientationEventListener` déjà utilisée pour
- * `panelRotationDegrees` (`MainScreen.kt`), pas revérifié visuellement sur les 4 paliers (aucun
- * device dans ce sandbox) : à confirmer sur device, un seul palier à corriger si l'un d'eux part
- * dans le mauvais sens plutôt que de tout redevoir.
+ * **changer d'ancrage** selon l'orientation. L'app est verrouillée en portrait
+ * (`android:screenOrientation="portrait"`, `AndroidManifest.xml`) : la mise en page Compose elle-même
+ * ne connaît jamais de vraies dimensions paysage, seul le capteur (`iconRotationDegrees`) sait que le
+ * téléphone est physiquement tourné -- un simple offset fixe par rapport aux bords réels de l'écran
+ * ne peut donc pas suffire à lui seul, le palier reste nécessaire pour savoir vers quel coin de la
+ * mise en page portrait ancrer le contenu.
+ *
+ * [snapToRotationBucket] donne un palier {0,90,180,270} ; pour chaque palier,
+ * `messageAlignment`/`buttonAlignment` choisissent le coin/bord de la mise en page portrait
+ * sous-jacente qui, une fois la rotation physique appliquée, retombe sur le coin/bord voulu à
+ * l'écran (message : toujours en haut à gauche perçu ; bouton : toujours en bas perçu) -- cette
+ * partie est confirmée correcte sur device en portrait.
+ *
+ * **Bug identifié et corrigé sur retour device (paysage) :** `graphicsLayer(rotationZ = ...)` pivote
+ * par défaut autour du **centre** du bloc, pas du coin où `align()` l'a placé -- une fois tourné, un
+ * bloc large-et-bas (le message) et un bloc étroit-et-haut (le bouton) dérivent chacun différemment
+ * de leur ancrage voulu selon leur propre ratio largeur/hauteur, symptôme exact du retour utilisateur
+ * ("bloc à mi-hauteur, à moitié découpé" / bouton "en plein milieu de l'écran"). Fix : faire pivoter
+ * chaque bloc autour du **même coin que son ancrage** (`messageTransformOrigin`/
+ * `buttonTransformOrigin`, en fraction 0..1 de sa propre taille) plutôt que du centre -- ce coin
+ * reste alors fixe à l'écran et le reste du bloc pivote autour, quelle que soit sa taille réelle
+ * (texte plus ou moins long, panneau debug déplié ou non).
  */
 @Composable
 fun TongueCalibrationScreen(
@@ -118,11 +133,26 @@ fun TongueCalibrationScreen(
         270 -> Alignment.TopEnd
         else -> Alignment.TopStart
     }
+    // Même coin que messageAlignment ci-dessus, exprimé en fraction (0..1) de la taille du bloc --
+    // pivot de rotation, voir kdoc de la fonction (corrige le bug de dérive constaté en paysage).
+    val messageTransformOrigin = when (rotationBucket) {
+        90 -> TransformOrigin(0f, 1f)
+        180 -> TransformOrigin(1f, 1f)
+        270 -> TransformOrigin(1f, 0f)
+        else -> TransformOrigin(0f, 0f)
+    }
     val buttonAlignment = when (rotationBucket) {
         90 -> Alignment.CenterEnd
         180 -> Alignment.TopCenter
         270 -> Alignment.CenterStart
         else -> Alignment.BottomCenter
+    }
+    // Même coin/bord que buttonAlignment ci-dessus -- voir messageTransformOrigin.
+    val buttonTransformOrigin = when (rotationBucket) {
+        90 -> TransformOrigin(1f, 0.5f)
+        180 -> TransformOrigin(0.5f, 0f)
+        270 -> TransformOrigin(0f, 0.5f)
+        else -> TransformOrigin(0.5f, 1f)
     }
 
     var previousPhase by remember { mutableStateOf(phase) }
@@ -144,9 +174,8 @@ fun TongueCalibrationScreen(
         // MainHud) plutôt qu'un plein écran noir, pour laisser l'aperçu caméra visible en dessous.
         // Ancrage (messageAlignment) ET rotation du contenu (contentRotationZ) changent tous les
         // deux avec le palier -- reste perçu en haut à gauche quelle que soit l'orientation physique,
-        // voir kdoc de la fonction. Pivot centré par défaut (pas de TransformOrigin custom) : chaque
-        // ancrage est déjà le bon coin pour ce palier, pas besoin de compenser un débordement comme
-        // BlendshapePanel (qui, lui, garde un ancrage fixe).
+        // voir kdoc de la fonction. Pivot (messageTransformOrigin) = le même coin que l'ancrage, pas
+        // le centre par défaut -- corrige la dérive constatée en paysage (voir kdoc).
         //
         // La flèche de retour vit DANS ce même bloc, au bout de la ligne de titre -- même convention
         // que les autres écrans de réglages (titre à gauche, flèche à droite d'une même Row), et
@@ -156,7 +185,7 @@ fun TongueCalibrationScreen(
                 .align(messageAlignment)
                 .windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(20.dp)
-                .graphicsLayer(rotationZ = contentRotationZ)
+                .graphicsLayer(rotationZ = contentRotationZ, transformOrigin = messageTransformOrigin)
                 .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
                 .padding(horizontal = 20.dp, vertical = 14.dp)
                 .widthIn(max = 300.dp),
@@ -248,6 +277,7 @@ fun TongueCalibrationScreen(
         // Bouton d'action + panneau debug -- ancrage (buttonAlignment) ET rotation (contentRotationZ)
         // changent tous les deux avec le palier, même raisonnement que le message de phase : reste
         // perçu en bas de l'écran quelle que soit l'orientation physique, voir kdoc de la fonction.
+        // Pivot (buttonTransformOrigin) = le même coin/bord que l'ancrage, même fix que le message.
         // ⚠️ Volontairement PAS de fillMaxWidth() ici (avant rotation) : un bloc large comme tout
         // l'écran, une fois tourné à ±90°, devient un pavé aussi haut que l'écran est large --
         // exactement le bug du bouton "Recalibrer" démesuré constaté sur device. Largeur bornée à la
