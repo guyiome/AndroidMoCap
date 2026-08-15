@@ -41,6 +41,14 @@ class VBridgerFormulasTest {
     }
 
     @Test
+    fun `vbridgerCompositeFormulas demandent aussi toutes ParameterCreationRequest`() {
+        // Le jeu exact de paramètres nativement disponibles côté VTS n'est pas fiable depuis la
+        // documentation tierce disponible (voir kdoc de tête du fichier) -- toutes les formules
+        // composites tentent donc une création, sans distinction.
+        assertTrue(VBridgerFormulas.vbridgerCompositeFormulas.all { it.requiresParameterCreation })
+    }
+
+    @Test
     fun `activeFormulas sans traduction retourne uniquement les formules brutes`() {
         val active = VBridgerFormulas.activeFormulas(useVBridgerTranslation = false)
         assertEquals(VBridgerFormulas.rawArkitFormulas, active)

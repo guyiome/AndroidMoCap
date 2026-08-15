@@ -31,12 +31,21 @@ import com.guyiome.androidmocap.tracking.FaceTrackingResult
  * structure de données générique (liste pondérée d'entrées), un vrai chantier à part vu que certaines
  * formules ne sont pas de simples combinaisons linéaires (ex. [mouthX], un produit de deux termes).
  *
- * [VtsParameterFormula.requiresParameterCreation] reste utile malgré le mode exclusif : les 52 brutes
- * sont des paramètres personnalisés (besoin de `ParameterCreationRequest` avant usage), les
- * composites visent des paramètres déjà natifs à VTS (`InjectParameterDataRequest` accepte d'écrire
- * directement dedans, vérifié sur la doc officielle) -- `VTubeStudioSender` crée donc toujours les 52
- * noms bruts (les seuls à en avoir besoin, un jour ou l'autre si le réglage est basculé en cours de
- * connexion) indépendamment du réglage courant, voir son kdoc.
+ * ⚠️ **Toutes les formules composites demandent aussi `ParameterCreationRequest`** (correction du
+ * même jour -- la version précédente supposait qu'elles visaient toutes des paramètres déjà natifs à
+ * VTS, donc jamais besoin de création). Recherché sur la doc officielle et sur un plugin tiers
+ * comparable (`VTube-IFacial-Link`, même pont ARKit -> VTS) : VTS a bien un jeu de paramètres natifs
+ * (`FaceAngleX`, `MouthSmile`, `EyeOpenLeft`...), mais les sources disponibles se contredisent sur le
+ * détail exact de ce jeu -- certaines formules composites d'ici (`Eye_Squint_L/R`, `MouthPucker`,
+ * `BrowInnerUp`, le groupe `Body*`...) sont très probablement des ajouts propres à VBridger, pas des
+ * natifs VTS, et ont donc réellement besoin d'être créées. Plutôt que de deviner laquelle des 28 est
+ * native et laquelle ne l'est pas depuis une doc tierce non fiable, [VtsParameterFormula.requiresParameterCreation]
+ * vaut `true` pour les 80 formules (52 brutes + 28 composites) sans distinction : `VTubeStudioSender`
+ * tente donc de créer les deux groupes en une fois, indépendamment du réglage courant (résilient à un
+ * basculement en cours de connexion, voir son kdoc). Pour les formules qui s'avèrent réellement déjà
+ * natives à VTS, cette tentative de création est sans conséquence -- déjà géré avec tolérance par le
+ * code existant (`APIError` pendant `Authenticated` : le paramètre concerné est simplement journalisé
+ * puis ignoré, sans faire échouer la connexion, voir `VTubeStudioSender.onTextMessage`).
  *
  * ⚠️ **`EyeLeftX`/`EyeLeftY` ne sont PAS transcrits depuis la capture d'écran source** -- seuls
  * `EyeRightX/Y` étaient visibles. Reconstruits par symétrie miroir (substituer `_L` par `_R` dans la
@@ -83,47 +92,47 @@ object VBridgerFormulas {
     /** Les formules composites VBridger (Face/Eyes/Mouth/Brows/Body) -- voir kdoc de tête du fichier. */
     val vbridgerCompositeFormulas: List<VtsParameterFormula> = listOf(
         // --- Face (tête, réaction 1:1) ---
-        VtsParameterFormula("FaceAngleX", requiresParameterCreation = false) { _, head -> faceAngleX(head) },
-        VtsParameterFormula("FaceAngleY", requiresParameterCreation = false) { b, head -> faceAngleY(b, head) },
-        VtsParameterFormula("FaceAngleZ", requiresParameterCreation = false) { _, head -> faceAngleZ(head) },
+        VtsParameterFormula("FaceAngleX", requiresParameterCreation = true) { _, head -> faceAngleX(head) },
+        VtsParameterFormula("FaceAngleY", requiresParameterCreation = true) { b, head -> faceAngleY(b, head) },
+        VtsParameterFormula("FaceAngleZ", requiresParameterCreation = true) { _, head -> faceAngleZ(head) },
 
         // --- Eyes ---
-        VtsParameterFormula("EyeOpenLeft", requiresParameterCreation = false) { b, _ -> eyeOpen(b, "eyeBlinkLeft", "eyeWideLeft") },
-        VtsParameterFormula("EyeOpenRight", requiresParameterCreation = false) { b, _ -> eyeOpen(b, "eyeBlinkRight", "eyeWideRight") },
-        VtsParameterFormula("Eye_Squint_L", requiresParameterCreation = false) { b, _ -> b["eyeSquintLeft"] ?: 0f },
-        VtsParameterFormula("Eye_Squint_R", requiresParameterCreation = false) { b, _ -> b["eyeSquintRight"] ?: 0f },
-        VtsParameterFormula("EyeRightX", requiresParameterCreation = false) { b, _ -> eyeGazeX(b, "eyeLookInLeft", "eyeLookOutLeft") },
-        VtsParameterFormula("EyeRightY", requiresParameterCreation = false) { b, _ -> eyeGazeY(b, "eyeLookUpLeft", "eyeLookDownLeft") },
+        VtsParameterFormula("EyeOpenLeft", requiresParameterCreation = true) { b, _ -> eyeOpen(b, "eyeBlinkLeft", "eyeWideLeft") },
+        VtsParameterFormula("EyeOpenRight", requiresParameterCreation = true) { b, _ -> eyeOpen(b, "eyeBlinkRight", "eyeWideRight") },
+        VtsParameterFormula("Eye_Squint_L", requiresParameterCreation = true) { b, _ -> b["eyeSquintLeft"] ?: 0f },
+        VtsParameterFormula("Eye_Squint_R", requiresParameterCreation = true) { b, _ -> b["eyeSquintRight"] ?: 0f },
+        VtsParameterFormula("EyeRightX", requiresParameterCreation = true) { b, _ -> eyeGazeX(b, "eyeLookInLeft", "eyeLookOutLeft") },
+        VtsParameterFormula("EyeRightY", requiresParameterCreation = true) { b, _ -> eyeGazeY(b, "eyeLookUpLeft", "eyeLookDownLeft") },
         // Reconstruits par symétrie miroir, pas transcrits depuis la capture source -- voir kdoc de tête du fichier.
-        VtsParameterFormula("EyeLeftX", requiresParameterCreation = false) { b, _ -> eyeGazeX(b, "eyeLookInRight", "eyeLookOutRight") },
-        VtsParameterFormula("EyeLeftY", requiresParameterCreation = false) { b, _ -> eyeGazeY(b, "eyeLookUpRight", "eyeLookDownRight") },
+        VtsParameterFormula("EyeLeftX", requiresParameterCreation = true) { b, _ -> eyeGazeX(b, "eyeLookInRight", "eyeLookOutRight") },
+        VtsParameterFormula("EyeLeftY", requiresParameterCreation = true) { b, _ -> eyeGazeY(b, "eyeLookUpRight", "eyeLookDownRight") },
 
         // --- Mouth ---
-        VtsParameterFormula("JawOpen", requiresParameterCreation = false) { b, _ -> b["jawOpen"] ?: 0f },
-        VtsParameterFormula("MouthOpen", requiresParameterCreation = false) { b, _ -> mouthOpen(b) },
-        VtsParameterFormula("MouthSmile", requiresParameterCreation = false) { b, _ -> mouthSmile(b) },
-        VtsParameterFormula("MouthX", requiresParameterCreation = false) { b, _ -> mouthX(b) },
-        VtsParameterFormula("MouthPucker", requiresParameterCreation = false) { b, _ -> mouthPuckerOut(b) },
-        VtsParameterFormula("MouthFunnel", requiresParameterCreation = false) { b, _ -> b["mouthFunnel"] ?: 0f },
-        VtsParameterFormula("MouthShrug", requiresParameterCreation = false) { b, _ -> mouthShrug(b) },
-        VtsParameterFormula("MouthPressLipOpen", requiresParameterCreation = false) { b, _ -> mouthPressLipOpen(b) },
-        VtsParameterFormula("TongueOut", requiresParameterCreation = false) { b, _ -> b["tongueOut"] ?: 0f },
-        VtsParameterFormula("CheekPuff", requiresParameterCreation = false) { b, _ -> b["cheekPuff"] ?: 0f },
+        VtsParameterFormula("JawOpen", requiresParameterCreation = true) { b, _ -> b["jawOpen"] ?: 0f },
+        VtsParameterFormula("MouthOpen", requiresParameterCreation = true) { b, _ -> mouthOpen(b) },
+        VtsParameterFormula("MouthSmile", requiresParameterCreation = true) { b, _ -> mouthSmile(b) },
+        VtsParameterFormula("MouthX", requiresParameterCreation = true) { b, _ -> mouthX(b) },
+        VtsParameterFormula("MouthPucker", requiresParameterCreation = true) { b, _ -> mouthPuckerOut(b) },
+        VtsParameterFormula("MouthFunnel", requiresParameterCreation = true) { b, _ -> b["mouthFunnel"] ?: 0f },
+        VtsParameterFormula("MouthShrug", requiresParameterCreation = true) { b, _ -> mouthShrug(b) },
+        VtsParameterFormula("MouthPressLipOpen", requiresParameterCreation = true) { b, _ -> mouthPressLipOpen(b) },
+        VtsParameterFormula("TongueOut", requiresParameterCreation = true) { b, _ -> b["tongueOut"] ?: 0f },
+        VtsParameterFormula("CheekPuff", requiresParameterCreation = true) { b, _ -> b["cheekPuff"] ?: 0f },
 
         // --- Brows ---
-        VtsParameterFormula("BrowLeftY", requiresParameterCreation = false) { b, _ ->
+        VtsParameterFormula("BrowLeftY", requiresParameterCreation = true) { b, _ ->
             browY(b, outerUpName = "browOuterUpLeft", downName = "browDownLeft", mouthPlusName = "mouthRight", mouthMinusName = "mouthLeft")
         },
-        VtsParameterFormula("BrowRightY", requiresParameterCreation = false) { b, _ ->
+        VtsParameterFormula("BrowRightY", requiresParameterCreation = true) { b, _ ->
             browY(b, outerUpName = "browOuterUpRight", downName = "browDownRight", mouthPlusName = "mouthLeft", mouthMinusName = "mouthRight")
         },
-        VtsParameterFormula("Brows", requiresParameterCreation = false) { b, _ -> brows(b) },
-        VtsParameterFormula("BrowInnerUp", requiresParameterCreation = false) { b, _ -> b["browInnerUp"] ?: 0f },
+        VtsParameterFormula("Brows", requiresParameterCreation = true) { b, _ -> brows(b) },
+        VtsParameterFormula("BrowInnerUp", requiresParameterCreation = true) { b, _ -> b["browInnerUp"] ?: 0f },
 
         // --- Body (copie secondaire de Face, coefficient d'angle x1.5, position omise) ---
-        VtsParameterFormula("BodyAngleX", requiresParameterCreation = false) { _, head -> bodyAngleX(head) },
-        VtsParameterFormula("BodyAngleY", requiresParameterCreation = false) { b, head -> bodyAngleY(b, head) },
-        VtsParameterFormula("BodyAngleZ", requiresParameterCreation = false) { _, head -> bodyAngleZ(head) },
+        VtsParameterFormula("BodyAngleX", requiresParameterCreation = true) { _, head -> bodyAngleX(head) },
+        VtsParameterFormula("BodyAngleY", requiresParameterCreation = true) { b, head -> bodyAngleY(b, head) },
+        VtsParameterFormula("BodyAngleZ", requiresParameterCreation = true) { _, head -> bodyAngleZ(head) },
     )
 
     /**

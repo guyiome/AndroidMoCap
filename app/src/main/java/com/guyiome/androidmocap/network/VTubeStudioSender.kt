@@ -144,18 +144,20 @@ class VTubeStudioSender(
      * [VBridgerFormulas]). Lu à chaque appel plutôt que figé à la construction, pour que basculer le
      * réglage prenne effet immédiatement sans reconnexion.
      *
-     * La phase de création de paramètres (`Authenticated`), elle, crée **toujours** les 52 noms
-     * bruts (`VBridgerFormulas.rawArkitFormulas`) indépendamment de [useVBridgerTranslation] --
-     * les composites n'en ont de toute façon jamais besoin (paramètres déjà natifs à VTS), et créer
-     * les bruts par avance, même si le réglage démarre activé, évite qu'un basculement vers le mode
-     * brut plus tard dans la même connexion tente d'injecter des noms jamais enregistrés.
+     * La phase de création de paramètres (`Authenticated`), elle, crée **toujours** les deux groupes
+     * (52 noms bruts + 28 formules composites, voir [VBridgerFormulas] -- toutes demandent
+     * `ParameterCreationRequest`, y compris celles qui s'avèrent déjà natives à VTS, sans
+     * conséquence dans ce cas, voir le kdoc de tête de [VBridgerFormulas]) indépendamment de
+     * [useVBridgerTranslation] -- créer les deux par avance, même si le réglage démarre dans un seul
+     * des deux modes, évite qu'un basculement plus tard dans la même connexion tente d'injecter des
+     * noms jamais enregistrés.
      */
     fun send(result: FaceTrackingResult, useVBridgerTranslation: Boolean = false) {
         val socket = webSocket ?: return
         when (connectionState) {
             VTubeStudioConnectionState.Authenticated -> {
                 if (parametersRequested.getAndSet(true)) return
-                val names = VBridgerFormulas.rawArkitFormulas
+                val names = (VBridgerFormulas.rawArkitFormulas + VBridgerFormulas.vbridgerCompositeFormulas)
                     .filter { it.requiresParameterCreation }
                     .map { it.outputName }
                 pendingParameterCreationResponses.set(names.size)
