@@ -18,7 +18,8 @@ app/src/main/java/com/guyiome/androidmocap/
   tracking/             Tier selection, MediaPipe Face Landmarker wrapper, rotation math
   camera/                CameraX driving (front camera -> MPImage, bitmap pool)
   sensors/               Phone orientation, HUD icons, battery
-  network/               OSC/UDP sending (VMC) and UDP sending (iFacialMocap)
+  network/               OSC/UDP sending (VMC), UDP sending (iFacialMocap), WebSocket sending
+                          (VTube Studio Plugin API) + the ARKit-to-VBridger formula registry
   settings/              Settings persistence (DataStore)
   ui/                    ViewModel + Compose screens (HUD, settings, mesh overlay)
 ```
@@ -87,7 +88,7 @@ tier change (never done mid-session) would touch those. Pure, JVM-tested logic:
 `tracking/ThermalThrottle.kt` (`ThermalThrottleState.next()`).
 
 Alongside the manual tier selector (`tierOverride`, diagnostics only), a hidden debug mock panel
-(`DiagnosticsScreen`, unlocked by multi-tapping the app's version row) allows forcing three
+(`AdvancedSettingsScreen`, unlocked by multi-tapping the app's version row) allows forcing three
 behaviors that are hard to trigger naturally on a given device: thermal throttling (live), ARCore
 unavailable, and GPU delegate unavailable (the latter two on next launch, same constraint as
 `tierOverride` -- see §6).
@@ -154,17 +155,35 @@ VMC, unlike iFacialMocap). Multi-step asynchronous connection cycle
 (`VTubeStudioConnectionState`, pure and tested): socket opening, authentication (a token persisted
 after a first user-authorization popup in VTube Studio, reused on subsequent connections -- with an
 automatic retry via a new popup if the stored token is rejected/revoked, plus a manual "Forget
-token" button in the Connection screen), creation of one custom parameter per blendshape (ARKit
-names, discovered dynamically on the first frame rather than a hardcoded list -- a name collision
-with another already-connected plugin, e.g. VBridger, doesn't abort the whole connection, only that
-one parameter is lost), then value injection every frame (`InjectParameterDataRequest`). Pure and
-tested JSON encoding/decoding (`VTubeStudioProtocol.kt`) via kotlinx.serialization
-(`encodeDefaults = true` is load-bearing -- see its kdoc); WebSocket transport via
-**nv-websocket-client** (`VTubeStudioSender.kt`, the only piece not testable in the JVM) -- not
+token" button in the Connection screen), creation of one custom parameter per formula in the active
+group (see below -- a name collision with another already-connected plugin, e.g. VBridger, doesn't
+abort the whole connection, only that one parameter is lost), then value injection every frame
+(`InjectParameterDataRequest`). Pure and tested JSON encoding/decoding (`VTubeStudioProtocol.kt`) via
+kotlinx.serialization (`encodeDefaults = true` is load-bearing -- see its kdoc); WebSocket transport
+via **nv-websocket-client** (`VTubeStudioSender.kt`, the only piece not testable in the JVM) -- not
 OkHttp, which unconditionally proposes the `permessage-deflate` extension with no public setting to
 disable it, incompatible with VTube Studio's `websocket-sharp` server. Created parameters aren't
 automatically recognized by an existing Live2D model -- the user must map them once in VTube
 Studio's parameter editor.
+
+**VBridger-equivalent parameter translation** (`network/VBridgerFormulas.kt`, opt-in via
+`ConnectionSettingsStore.vtsUseVBridgerTranslation`, default off). A single, unified list of named
+formulas (`VtsParameterFormula`: output parameter name, whether it needs `ParameterCreationRequest`,
+and a `(blendshapes, headEulerDegrees) -> Float` compute function) models both the 52 raw ARKit
+blendshapes (as trivial identity formulas) and 28 composite formulas reproducing VBridger's own
+`AdvancedARKitSettings` panel (`FaceAngleX/Y/Z`, `MouthSmile`, `EyeOpenLeft/Right`...) -- one shared
+mechanism rather than two, so that a future formula-editing screen (not built yet) doesn't require
+restructuring. `activeFormulas(useVBridgerTranslation)` is **exclusive, not additive**: either the 52
+raw formulas or the 28 composite ones, never both, matching what VBridger itself sends to VTube
+Studio (its own composite set only, never the raw blendshapes alongside it). Every formula in the
+active group requests parameter creation uniformly, including the composite ones -- VTube Studio's
+exact native-vs-plugin-added parameter split couldn't be reliably determined from available
+documentation, so a creation attempt is made for all of them; a failed attempt on an already-native
+parameter is tolerated the same way as a name collision (see above). The composite formulas carry no
+mirror logic of their own -- `mirrorModeEnabled` (applied once, upstream, in `MainViewModel`) decides
+uniformly for every field sent to every network protocol, translation mode included. A read-only
+screen (`ui/VtsFormulasScreen.kt`) lists exactly which parameter names are currently being sent,
+reflecting the active group.
 
 Requires `res/xml/network_security_config.xml` (`<base-config cleartextTrafficPermitted="true">`,
 referenced from `AndroidManifest.xml`): WebSocket libraries honor Android's network security policy
@@ -177,10 +196,17 @@ The three protocols (VMC, iFacialMocap, VTube Studio) are mutually exclusive at 
 ## 6. Settings persistence
 
 `AppSettingsStore` and `ConnectionSettingsStore` (DataStore Preferences): low-battery threshold,
-power-save mode (toggle + delay), mesh overlay, connection type and network target (VMC IP, VTube
-Studio IP + auth token), and -- optionally -- the selection of blendshapes displayed on the main
-screen. The latter is not persisted by default (reset on every launch), but a dedicated setting
-(`persistBlendshapeSelectionEnabled`) allows keeping it across sessions.
+power-save mode (toggle + delay), mesh overlay, mirror mode, connection type and network target (VMC
+IP, VTube Studio IP + auth token + `vtsUseVBridgerTranslation`, see §5), and -- optionally -- the
+selection of blendshapes displayed on the main screen. The latter is not persisted by default (reset
+on every launch), but a dedicated setting (`persistBlendshapeSelectionEnabled`) allows keeping it
+across sessions.
+
+`AppSettingsStore.blendshapeWeights` (one `floatPreferencesKey` per blendshape, default 1.0 for any
+absent entry) is persisted but **not yet wired into the tracking pipeline** -- scaffolding for a
+future per-blendshape gain adjustment, not a functional feature yet. `resetBlendshapeWeights()`
+clears the keys rather than rewriting them, so an unset entry and a freshly-reset one are
+indistinguishable.
 
 Two debug mocks (`debugForceArCoreUnavailable`, `debugForceGpuUnavailable` -- see §3) persisted
 follow exactly the same pattern as `tierOverride`: read once at launch, a change only applies on the
@@ -193,10 +219,11 @@ active-session toggle, not a launch-time setting.
 rotation matrix for the whole session (computed once rather than per frame). Known limitation:
 starting with Android 16 (API 36), orientation restrictions declared by an app are ignored by
 default on screens with a minimum width ≥ 600dp (tablets); Android 17 (API 37) removes the manifest
-opt-out entirely -- affects the settings screens' layout on recent tablets. The fixed camera
-rotation itself works correctly across all tested physical orientations (portrait, landscape both
-ways). A significant change in how the phone is held mid-session requires a new explicit calibration
-to keep head pose consistent.
+opt-out entirely -- affects the settings screens' layout on recent tablets, confirmed to not crash or
+otherwise break functionally on a real tablet (15 Aug 2026), only not visually adapted to the
+system's orientation yet. The fixed camera rotation itself works correctly across all tested physical
+orientations (portrait, landscape both ways). A significant change in how the phone is held
+mid-session requires a new explicit calibration to keep head pose consistent.
 
 **Battery/heat budget** -- a central concern behind several implementation choices: bitmap pool,
 per-tier rate throttling, a power-save mode that cuts the displayed preview without cutting
@@ -213,6 +240,18 @@ listening when the app goes to background without being destroyed.
 rarely) is separated from the `trackingFrame` flow (blendshapes, latency, detection -- changes at
 20-60 Hz) to limit Compose recomposition to only the components that actually need per-frame
 updates.
+
+**Startup loading screen** -- `MainUiState.isInitializing` (default `true`, flipped to `false` as
+the last statement of `initializeTracking()`) gates `ui/LoadingScreen.kt` in `MainScreen`, shown
+instead of the camera preview/HUD while the tier is chosen, the MediaPipe model loads, and the
+camera source is built. Deliberately indeterminate progress bar -- no real intermediate milestones
+exist to reflect in a determinate one.
+
+**Settings-screen stacking and click-through** -- every settings screen and sub-category is kept
+composed underneath the active one (booleans in `MainScreen`, never unmounted) rather than replacing
+it, so returning reveals the screen below without rebuilding it. Each overlay's full-screen root
+consumes touch events via `Modifier.blockClicksBehind()` (`ui/ClickBlocking.kt`) -- without it, a tap
+on an empty area of a sub-screen fell through to whatever screen was stacked underneath.
 
 ## 8. External dependencies and known limitations
 
@@ -254,8 +293,9 @@ Pure JVM unit test suite (`app/src/test/`, no Android/Robolectric dependency),
 `./gradlew testDebugUnitTest`. Philosophy: extract into pure, testable functions any computation
 that doesn't directly depend on the Android/MediaPipe/CameraX framework -- examples: `RotationMath`
 (matrix/quaternion/Euler conversions), `computeEyeGazeDegrees`, `CameraController.rotatedDimensions`,
-`ArCoreFaceSelector.pickPrimary`. Function-by-function detail, with explicit reasons for what's
-deliberately not covered, in `AndroidMoCap_unit_tests.md`.
+`ArCoreFaceSelector.pickPrimary`, `VBridgerFormulas` (the ARKit-to-VBridger formula registry, §5).
+Function-by-function detail, with explicit reasons for what's deliberately not covered, in
+`AndroidMoCap_unit_tests.md`.
 
 ## 10. Build and distribution
 
@@ -291,7 +331,7 @@ English, falls back to English); `res/values-fr/strings.xml` holds French, used 
 system language (or the choice made via the per-app selector) is French. `android:localeConfig`
 declared in `AndroidManifest.xml` (`res/xml/locales_config.xml`, en/fr order) for the system's
 native per-app language selector (system settings, Android 13+ only). On earlier versions, an
-in-app selector covers the same need (`DisplaySettingsScreen`, "App language" section):
+in-app selector covers the same need (`ComfortSettingsScreen`, "App language" section):
 `MainActivity` extends `AppCompatActivity` (theme `Theme.AppCompat.DayNight.NoActionBar`, required
 -- `android:Theme.Material.NoActionBar` alone would prevent
 `AppCompatDelegate.setApplicationLocales()` from working under Compose), and the manifest declares

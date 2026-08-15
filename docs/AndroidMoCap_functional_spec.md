@@ -80,36 +80,51 @@ Three output protocols, mutually exclusive (only one active at a time, chosen in
 - **VTube Studio Plugin API** -- direct integration, bypassing VMC/OSC which VTube Studio doesn't
   accept. IP/port (8001 by default) entered manually, same as VMC. An authorization popup must be
   accepted in VTube Studio on first connection (the token is then remembered, with an automatic new
-  request if it's revoked in the meantime, plus a "Forget token" button as a fallback). Once
-  connected, the created parameters must be mapped once by the user in VTube Studio's parameter
-  editor to animate a Live2D model -- the app cannot do this on the user's behalf.
+  request if it's revoked in the meantime, plus a "Forget token" button as a fallback). By default,
+  the app sends the 52 raw ARKit blendshapes as custom parameters, which must be mapped once by the
+  user in VTube Studio's parameter editor to animate a Live2D model -- the app cannot do this on the
+  user's behalf. An optional setting ("Send VBridger-equivalent parameters") switches instead to
+  VTube Studio's own default parameters (`FaceAngleX`, `MouthSmile`, `EyeOpenLeft`...), computed with
+  the same formulas VBridger itself uses -- for a model already rigged for VBridger or for VTube
+  Studio's defaults, this lets the app fully replace VBridger, without remapping anything. The two
+  modes are exclusive (never combined), and a read-only screen lists exactly which parameters are
+  currently being sent.
 
 The phone and the receiving PC must be on the same local Wi-Fi network in all three cases.
 
 ### 3.4 User interface
 
+- **Startup loading screen**: a brief screen (app logo, "Loading" message, indeterminate progress
+  bar) shown while the tracking pipeline initializes (tier selection, MediaPipe model load, camera
+  setup) -- usually fast enough on a modern device that the progress bar's animation isn't even
+  perceptible.
 - **Minimal HUD bar**, always shown over the full-screen camera preview: face-detection indicator,
   connect/disconnect button, calibration button (with countdown ring), settings access. Each icon
   rotates in place to stay readable regardless of the angle the phone is held or set down at.
-- **Settings screen**, organized into a 5-category menu (each its own screen, back to the menu via
-  a standard arrow or the system back button/gesture): Diagnostics (read-only -- active tier,
-  GPU/CPU delegate, face detected, inference latency, calibration state), Connection (type + network
-  target, only the sub-block for the chosen type is shown), Display & comfort (access to the
-  displayed-blendshapes selection screen + its persistence, tracking mesh overlay, power-save mode,
-  low-battery alert threshold), Experimental features (tongue-out detection toggle + access to its
-  dedicated calibration screen, see above), Logging (log level, log file sharing).
+- **Settings screen**, organized into a 6-category menu (each its own screen, back to the menu via
+  a standard arrow or the system back button/gesture): Display (tracking mesh overlay, mirror mode),
+  Displayed blendshapes (the blendshape selection screen, see below), Connection (type + network
+  target, only the sub-block for the chosen type is shown), Comfort (power-save mode, low-battery
+  alert threshold, app language), Experimental features (tongue-out detection toggle + access to its
+  dedicated calibration screen, see above), Advanced (diagnostics -- active tier, GPU/CPU delegate,
+  face detected, inference latency, calibration state -- and log level / log file sharing, merged
+  into one category since both mainly serve troubleshooting).
+- **Mirror mode** (Display category, on by default): mirrors head orientation, gaze, and every
+  left/right blendshape together, matching the always-mirrored camera preview -- turning your head
+  right moves the avatar's own right side, like looking at yourself in a mirror. Turning it off sends
+  your actual anatomy instead (turn your head right, the avatar turns its own right).
 - **Displayed-blendshapes selection screen**: full catalog of the 52 ARKit blendshapes, grouped by
-  category (eyebrows, eyes, cheeks, nose, jaw, mouth, tongue), with search. Shows the live value of
-  each checked blendshape on the main screen. A discreet warning icon next to blendshapes known to
-  be poorly restituted by MediaPipe (`jawForward`, `jawLeft`, `jawRight`, `mouthDimpleLeft/Right`,
-  `cheekPuff`, `tongueOut`) -- informational, doesn't prevent selection. Not kept across sessions by
-  default, but persistence can be enabled in settings (Display & comfort).
-- **Navigation**: every overlay screen (settings and its 5 categories, blendshape selection) closes
+  category (eyebrows, eyes, cheeks, nose, jaw, mouth, tongue), with search, plus a "Deselect all"
+  button. Shows the live value of each checked blendshape on the main screen. A discreet warning icon
+  next to blendshapes known to be poorly restituted by MediaPipe (`jawForward`, `jawLeft`, `jawRight`,
+  `mouthDimpleLeft/Right`, `cheekPuff`, `tongueOut`) -- informational, doesn't prevent selection. Not
+  kept across sessions by default, but persistence can be enabled in the same screen.
+- **Navigation**: every overlay screen (settings and its 6 categories, blendshape selection) closes
   via a standard back arrow, the hardware back button, or the system swipe gesture (predictive back,
   Android 13+) -- all three trigger the same action.
 - **Language**: interface available in French (default) and English. Two ways to choose it: the
-  system per-app selector (Android settings, Android 13+ only), or an **in-app** selector (Display &
-  comfort > "App language" -- "Follow system" / "Français" / "English"), which works on every
+  system per-app selector (Android settings, Android 13+ only), or an **in-app** selector (Comfort >
+  "App language" -- "Follow system" / "Français" / "English"), which works on every
   Android version and remembers the choice automatically across launches. Changing the language from
   this selector closes the currently open settings screen (back to the main screen) while the change
   is applied. ARKit blendshape names (`jawOpen`, `mouthSmileLeft`...) stay in technical English

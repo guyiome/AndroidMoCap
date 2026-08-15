@@ -85,39 +85,55 @@ réglages) :
 - **API Plugin VTube Studio** -- intégration directe, en contournant VMC/OSC que VTube Studio ne
   reçoit pas. IP/port (8001 par défaut) saisis manuellement, comme pour VMC. Popup d'autorisation à
   accepter dans VTube Studio à la première connexion (jeton ensuite mémorisé, avec nouvelle demande
-  automatique s'il est révoqué entre-temps, plus un bouton "Oublier le jeton" en secours). Une fois
-  connecté, les paramètres créés doivent être mappés une fois par l'utilisateur dans l'éditeur de
-  paramètres de VTube Studio pour animer un modèle Live2D -- l'app ne peut pas le faire à sa place.
+  automatique s'il est révoqué entre-temps, plus un bouton "Oublier le jeton" en secours). Par
+  défaut, l'app envoie les 52 blendshapes ARKit bruts en paramètres personnalisés, à mapper une fois
+  par l'utilisateur dans l'éditeur de paramètres de VTube Studio pour animer un modèle Live2D -- l'app
+  ne peut pas le faire à sa place. Un réglage optionnel ("Envoyer les paramètres équivalents à
+  VBridger") bascule à la place vers les paramètres par défaut de VTube Studio (`FaceAngleX`,
+  `MouthSmile`, `EyeOpenLeft`...), calculés avec les mêmes formules que VBridger lui-même -- pour un
+  modèle déjà riggé pour VBridger ou pour les paramètres par défaut de VTube Studio, ça permet à
+  l'app de remplacer VBridger entièrement, sans rien remapper. Les deux modes sont exclusifs (jamais
+  combinés), et un écran en lecture seule liste précisément les paramètres actuellement envoyés.
 
 Le téléphone et le PC receveur doivent être sur le même réseau Wi-Fi local dans les trois cas.
 
 ### 3.4 Interface utilisateur
 
+- **Écran de chargement au démarrage** : bref écran (logo de l'app, message "Chargement", barre de
+  progression indéterminée) affiché pendant l'initialisation du pipeline de tracking (choix du
+  palier, chargement du modèle MediaPipe, préparation de la caméra) -- généralement assez rapide sur
+  un appareil récent pour que l'animation de la barre ne soit même pas perceptible.
 - **Bandeau HUD minimal**, affiché en permanence sur l'aperçu caméra plein écran : indicateur de
   détection du visage, bouton connexion/déconnexion, bouton de calibrage (avec anneau de compte à
   rebours), accès aux réglages. Chaque icône pivote sur elle-même pour rester lisible quel que soit
   l'angle auquel le téléphone est tenu ou posé.
-- **Écran de réglages**, organisé en menu à 5 catégories (chacune son propre écran, retour vers
-  le menu par flèche standard ou bouton/geste retour système) : Diagnostics (lecture seule -- palier
-  actif, délégué GPU/CPU, visage détecté, latence d'inférence, état de calibration), Connexion
-  (type + cible réseau, seul le sous-bloc du type choisi affiché), Affichage & confort (accès à
-  l'écran de sélection des blendshapes affichés + sa persistance, overlay du mesh de tracking, mode
-  économie d'énergie, seuil d'alerte batterie), Fonctionnalités expérimentales (interrupteur de
-  détection de la langue tirée + accès à son écran de calibration dédié, voir ci-dessus), Journalisation
-  (niveau de log, partage du fichier de logs).
+- **Écran de réglages**, organisé en menu à 6 catégories (chacune son propre écran, retour vers
+  le menu par flèche standard ou bouton/geste retour système) : Affichage (overlay du mesh de
+  tracking, mode miroir), Blendshapes affichés (l'écran de sélection des blendshapes, voir
+  ci-dessous), Connexion (type + cible réseau, seul le sous-bloc du type choisi affiché), Confort
+  (mode économie d'énergie, seuil d'alerte batterie, langue de l'app), Fonctionnalités
+  expérimentales (interrupteur de détection de la langue tirée + accès à son écran de calibration
+  dédié, voir ci-dessus), Avancé (diagnostics -- palier actif, délégué GPU/CPU, visage détecté,
+  latence d'inférence, état de calibration -- et niveau de log / partage du fichier de logs,
+  fusionnés en une seule catégorie puisque les deux servent surtout au dépannage).
+- **Mode miroir** (catégorie Affichage, activé par défaut) : mirrore ensemble l'orientation de tête,
+  le regard et tous les blendshapes gauche/droite, cohérent avec l'aperçu caméra toujours mirroré --
+  tourner la tête à droite fait bouger le côté droit de l'avatar, comme se regarder dans un miroir.
+  Désactivé, envoie l'anatomie réelle à la place (tourner la tête à droite fait bouger le côté droit
+  réel de l'avatar).
 - **Écran de sélection des blendshapes affichés** : catalogue complet des 52 blendshapes ARKit,
-  groupés par catégorie (sourcils, yeux, joues, nez, mâchoire, bouche, langue), avec recherche.
-  Affiche la valeur en direct de chaque blendshape coché sur l'écran principal. Icône d'avertissement
-  discrète à côté des blendshapes connus pour être mal restitués par MediaPipe (`jawForward`,
-  `jawLeft`, `jawRight`, `mouthDimpleLeft/Right`, `cheekPuff`, `tongueOut`) -- informatif, n'empêche
-  pas la sélection. Non conservée d'une session à l'autre par défaut, mais persistance activable
-  dans les réglages (Affichage & confort).
-- **Navigation** : chaque écran superposé (réglages et ses 5 catégories, sélection des blendshapes)
+  groupés par catégorie (sourcils, yeux, joues, nez, mâchoire, bouche, langue), avec recherche, plus
+  un bouton "Tout désélectionner". Affiche la valeur en direct de chaque blendshape coché sur l'écran
+  principal. Icône d'avertissement discrète à côté des blendshapes connus pour être mal restitués par
+  MediaPipe (`jawForward`, `jawLeft`, `jawRight`, `mouthDimpleLeft/Right`, `cheekPuff`, `tongueOut`)
+  -- informatif, n'empêche pas la sélection. Non conservée d'une session à l'autre par défaut, mais
+  persistance activable dans ce même écran.
+- **Navigation** : chaque écran superposé (réglages et ses 6 catégories, sélection des blendshapes)
   se ferme via une flèche retour standard, le bouton retour matériel, ou le geste de balayage
   système (predictive back, Android 13+) -- les trois déclenchent la même action.
 - **Langue** : interface disponible en français (défaut) et anglais. Deux façons de la choisir :
   le sélecteur système par app (réglages Android, Android 13+ seulement), ou un sélecteur **dans
-  l'app** (Affichage & confort > "Langue de l'app" -- "Suivre le système" / "Français" / "English"),
+  l'app** (Confort > "Langue de l'app" -- "Suivre le système" / "Français" / "English"),
   qui fonctionne sur toutes les versions d'Android et mémorise le choix automatiquement d'un
   lancement à l'autre. Changer la langue depuis ce sélecteur ferme l'écran de réglages en cours
   (retour à l'écran principal) le temps d'appliquer le changement. Les noms de blendshapes ARKit

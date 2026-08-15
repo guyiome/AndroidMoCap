@@ -65,6 +65,7 @@ not covered, the precise reason is given each time rather than a plain "not test
 | `VTubeStudioProtocol.kt` | JSON encoding/decoding of every VTube Studio Plugin API message (auth, parameter creation, injection) -- pure, kotlinx.serialization | `VTubeStudioProtocolTest.kt` | ✅ Covered. Includes decoding real server payloads (copied from the official docs) and tolerance to unknown fields (`ignoreUnknownKeys`). |
 | `VTubeStudioConnectionState.kt` | `nextVTubeStudioConnectionState()` (pure state machine) | `VTubeStudioConnectionStateTest.kt` | ✅ Covered. All valid transitions, plus out-of-sequence events (ignored without crashing) and `Disconnect`/`SocketFailed` valid from any state. |
 | `VTubeStudioSender.kt` | Real WebSocket socket (nv-websocket-client), driving the state machine in response to incoming messages | -- | ❌ Depends on a real `WebSocket`/VTube Studio server -- same limitation as `VmcOscSender.send()`/`connect()`. The at-risk part (JSON protocol, state transitions) is already covered separately. |
+| `VBridgerFormulas.kt` | `rawArkitFormulas`, `vbridgerCompositeFormulas`, `activeFormulas()`, `evaluate()`, and every composite formula (`faceAngleX/Y/Z`, `eyeOpen`, `eyeGazeX/Y`, `mouthSmile`, `mouthPuckerOut`, `mouthX`, `mouthShrug`, `mouthPressLipOpen`, `browY`, `brows`, `bodyAngleX/Y/Z`) -- ARKit-to-VBridger translation for VTube Studio, pure | `VBridgerFormulasTest.kt` | ✅ Covered -- registry structure (`rawArkitFormulas` size/creation-flag/`tongueOut` presence, `activeFormulas(false/true)` exclusive not additive, `evaluate()` ordering), neutral-face rest values matching VBridger's own documented defaults, non-neutral cases for the more elaborate formulas (`MouthSmile`, `MouthPressLipOpen`, `MouthX`), the `mouthDimpleLeft/Right` damping weight, direct-yaw-tracking (no redundant mirror-canceling negation) for `FaceAngleX`/`BodyAngleX`, and the VTS-axis-convention inversions for `FaceAngleZ`/`BodyAngleZ`/`EyeRightX`/`EyeLeftX`. |
 
 ## camera/
 
@@ -104,7 +105,7 @@ not covered, the precise reason is given each time rather than a plain "not test
 | `MainViewModel.kt` | Orchestration (camera, sensors, network, DataStore, power-save timer...) | -- | ❌ Depends on `AndroidViewModel`/`Application` and every component above. Deliberately kept "thin": its only non-trivial logic (calibration composition) has been extracted into `RotationMath.composeCalibratedEuler`, tested separately -- a strategy to keep following for any new logic added to the ViewModel. |
 | `MainViewModel.kt` | `initializeTracking()` idempotency (`trackingInitialized` guard) | -- | ❌ A meaningful test would require instantiating a real `MainViewModel` (Application, ArCoreApk, ActivityManager...) and calling `initializeTracking()` twice -- needs Robolectric. A one-line guard, low regression risk; worth covering if Robolectric is introduced for other needs (e.g. `AppSettingsStore`). |
 | `MainScreen.kt` | Attaching `IconOrientationTracker`/`BatteryMonitor` to the lifecycle (`ON_START`/`ON_STOP`) | -- | ❌ A Compose composable observing a real `Lifecycle` -- needs a Compose UI test or Robolectric to simulate lifecycle transitions. Verified manually. |
-| `MainScreen.kt`, `MainHud.kt`, `SettingsScreen.kt`, `DiagnosticsScreen.kt`, `ConnectionSettingsScreen.kt`, `DisplaySettingsScreen.kt`, `ExperimentalFeaturesScreen.kt`, `LoggingSettingsScreen.kt`, `BlendshapeSelectionScreen.kt`, `BlendshapePanel.kt`, `PowerSaveOverlay.kt`, `LowBatteryAlert.kt`, `FaceMeshOverlay.kt`, `Theme.kt` | Composables | -- | ❌ Out of scope for JVM unit tests: need either Compose UI tests (`androidx.compose.ui.test`, instrumented or Robolectric) or manual verification. |
+| `MainScreen.kt`, `MainHud.kt`, `SettingsScreen.kt`, `AdvancedSettingsScreen.kt`, `ConnectionSettingsScreen.kt`, `DisplaySettingsScreen.kt`, `ComfortSettingsScreen.kt`, `ExperimentalFeaturesScreen.kt`, `BlendshapesScreen.kt`, `BlendshapePanel.kt`, `VtsFormulasScreen.kt`, `TongueCalibrationScreen.kt`, `LoadingScreen.kt`, `ConfirmationDialog.kt`, `ClickBlocking.kt`, `PowerSaveOverlay.kt`, `LowBatteryAlert.kt`, `FaceMeshOverlay.kt`, `Theme.kt` | Composables | -- | ❌ Out of scope for JVM unit tests: need either Compose UI tests (`androidx.compose.ui.test`, instrumented or Robolectric) or manual verification. `AdvancedSettingsScreen.kt` merges the former `DiagnosticsScreen.kt`/`LoggingSettingsScreen.kt`; `BlendshapesScreen.kt` is the former `BlendshapeSelectionScreen.kt`, promoted to a top-level settings category. `ClickBlocking.kt`/`ConfirmationDialog.kt` have no logic of their own to isolate (a `clickable {}` no-op consumer, a generic Material `AlertDialog` wrapper). |
 | `LandmarkProjection.kt` | `toScreenPoint()` (normalized -> screen projection, `PreviewView`-style centered crop when the image/canvas ratio differs, with/without mirroring, fallback if image dimensions are unknown) | `LandmarkProjectionTest.kt` | ✅ Covered -- the only math part of the mesh overlay (see `FaceMeshOverlay.kt` above, which uses it but stays itself out of JUnit scope). Handles a screen/camera-image ratio mismatch (e.g. phones with an unusual screen aspect ratio) so the mesh doesn't drift/squash on screen. |
 | `DebugPanelUnlock.kt` | `DebugPanelUnlockState.registerTap()` | `DebugPanelUnlockTest.kt` | ✅ Covered (pure function, no Android dependency -- consecutive-tap counting within a time window, reset outside the window, inclusive bound, no-op once unlocked). |
 | `RotationBucket.kt` | `snapToRotationBucket()` | `RotationBucketTest.kt` | ✅ Covered (6 tests -- the 4 tier boundaries {0,90,180,270} and normalizing out-of-[0,360) values). Used for the blendshape panel's cosmetic rotation (`MainScreen.kt`). |
@@ -117,7 +118,7 @@ not covered, the precise reason is given each time rather than a plain "not test
 
 ## Current state
 
-35 test files, all pure JVM (no device/emulator required): `RotationMathTest`,
+37 test files, all pure JVM (no device/emulator required): `RotationMathTest`,
 `TrackingTierSelectorTest`, `BlendshapeCatalogTest`, `FaceLandmarkerHelperTest`,
 `IFacialMocapSenderTest`, `CameraControllerTest`, `VmcOscSenderTest`, `LandmarkProjectionTest`,
 `ArCoreFaceSelectorTest`, `MeshOverlayVisibilityTest`, `ThermalThrottleTest`, `DebugPanelUnlockTest`,
@@ -127,17 +128,19 @@ not covered, the precise reason is given each time rather than a plain "not test
 `TongueOutGateTest`, `LipLandmarksTest`, `MouthColorAnalysisTest`, `TongueColorBaselineTest`,
 `InferenceLoadMonitorTest`, `TongueEmbeddingClassifierTest`, `TongueCalibrationAveragingTest`,
 `TongueCalibrationRecordingStateTest`, `TongueCalibrationStoreTest`, `TongueOutDisplaySmoothingTest`,
-`TongueOutInjectionGateTest`. They cover the entirety of the logic identified as the most fragile
-math/formatting (rotation/calibration -- including mirror mode, blendshape name mapping, eye gaze,
-tier selection (including its manual override), camera rotation dimensions, OSC message grouping,
-mesh screen projection, ARCore primary-face selection, overlay visibility, thermal-throttling
-response, debug-mock-panel unlock, calibration-anomaly detection, VTube Studio Plugin API protocol
-and state machine, in-app language mapping, Eye Aspect Ratio and its anti-leak/smoothing correction
-for blink reliability, generic adaptive-cutoff filter, self-adaptive per-eye "closed" EAR reference,
-log formatting/masking/rotation, geometric brow height, the tongue-out detection cascade -- jawOpen
-gate, mouth crop, color analysis, adaptive color reference, inference-load monitor, embedding
-classification and stage-3 personal calibration), relying on a few pure-function extractions
-(`internal` visibility) that change no behavior.
+`TongueOutInjectionGateTest`, `RotationBucketTest`, `VBridgerFormulasTest`. They cover the entirety
+of the logic identified as the most fragile math/formatting (rotation/calibration -- including
+mirror mode, blendshape name mapping, eye gaze, tier selection (including its manual override),
+camera rotation dimensions, OSC message grouping, mesh screen projection, ARCore primary-face
+selection, overlay visibility, thermal-throttling response, debug-mock-panel unlock,
+calibration-anomaly detection, VTube Studio Plugin API protocol and state machine, its
+ARKit-to-VBridger formula translation, in-app language mapping, Eye Aspect Ratio and its
+anti-leak/smoothing correction for blink reliability, generic adaptive-cutoff filter, self-adaptive
+per-eye "closed" EAR reference, log formatting/masking/rotation, geometric brow height, the
+tongue-out detection cascade -- jawOpen gate, mouth crop, color analysis, adaptive color reference,
+inference-load monitor, embedding classification and stage-3 personal calibration, the blendshape
+panel's cosmetic rotation bucketing), relying on a few pure-function extractions (`internal`
+visibility) that change no behavior.
 
 ## Tracking mesh overlay (toggleable option)
 
