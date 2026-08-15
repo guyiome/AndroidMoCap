@@ -176,9 +176,6 @@
     <string name="logging_share_empty_hint">Rien d\'enregistré pour l\'instant à ce niveau.</string>
 
     <!-- Menu Réglages (sous-titres) -->
-    <string name="settings_diagnostics_subtitle">Palier %1$s · visage %2$s</string>
-    <string name="state_face_detected">détecté</string>
-    <string name="state_face_not_detected">non détecté</string>
     <string name="settings_vmc_connected_subtitle">VMC connecté à %1$s</string>
     <string name="settings_vmc_not_connected_subtitle">VMC choisi, pas encore connecté</string>
     <string name="settings_udp_listening_subtitle">UDP / VBridger en écoute</string>
@@ -186,9 +183,10 @@
     <string name="settings_vts_connected_subtitle">VTube Studio connecté à %1$s</string>
     <string name="settings_vts_not_connected_subtitle">VTube Studio choisi, pas encore connecté</string>
     <string name="settings_no_connection_type_subtitle">Aucun type choisi</string>
-    <string name="settings_display_subtitle">Blendshapes affichés, overlay du mesh, mode éco, seuil batterie</string>
+    <string name="settings_display_subtitle">Overlay du mesh de tracking, mode miroir</string>
+    <string name="settings_comfort_subtitle">Économie d\'énergie, batterie, langue</string>
     <string name="settings_experimental_subtitle">Aucune pour l\'instant</string>
-    <string name="settings_logging_subtitle">Niveau de log, partage des logs</string>
+    <string name="settings_advanced_subtitle">Diagnostics, journalisation</string>
 
     <!-- Erreurs (MainViewModel, non-@Composable, résolues via Context/Application) -->
     <string name="error_vmc_ip_missing">Renseigne d\'abord une IP VMC dans les réglages.</string>

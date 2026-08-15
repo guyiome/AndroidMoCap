@@ -74,17 +74,17 @@ fun MainScreen(
     // seulement attaché à ArCoreHeadPoseTracker quand uiState.usingArCoreCameraSource est actif,
     // voir plus bas.
     val glSurfaceView = remember { GLSurfaceView(context) }
-    // Menu des réglages + ses quatre sous-écrans (voir rapport technique, point 21) -- même
-    // principe "un booléen par écran conditionnel" que showBlendshapeSelection ci-dessous,
-    // désormais ouvert depuis DisplaySettingsScreen plutôt que directement depuis ce menu.
+    // Menu des réglages + ses six catégories (refonte des menus, regroupement par intention
+    // utilisateur) -- un booléen par écran conditionnel, chacun ouvert directement depuis
+    // SettingsScreen.
     var showSettings by remember { mutableStateOf(false) }
-    var showDiagnostics by remember { mutableStateOf(false) }
-    var showConnectionSettings by remember { mutableStateOf(false) }
     var showDisplaySettings by remember { mutableStateOf(false) }
+    var showBlendshapes by remember { mutableStateOf(false) }
+    var showConnectionSettings by remember { mutableStateOf(false) }
+    var showComfortSettings by remember { mutableStateOf(false) }
     var showExperimentalFeatures by remember { mutableStateOf(false) }
+    var showAdvancedSettings by remember { mutableStateOf(false) }
     var showTongueCalibration by remember { mutableStateOf(false) }
-    var showLoggingSettings by remember { mutableStateOf(false) }
-    var showBlendshapeSelection by remember { mutableStateOf(false) }
     var iconRotationDegrees by remember { mutableFloatStateOf(0f) }
     var batteryPercent by remember { mutableIntStateOf(100) }
     var isCharging by remember { mutableStateOf(true) }
@@ -279,22 +279,18 @@ fun MainScreen(
                     uiState = uiState,
                     faceDetected = trackingFrame.faceDetected,
                     onClose = { showSettings = false },
-                    onOpenDiagnostics = { showDiagnostics = true },
-                    onOpenConnection = { showConnectionSettings = true },
                     onOpenDisplay = { showDisplaySettings = true },
+                    onOpenBlendshapes = { showBlendshapes = true },
+                    onOpenConnection = { showConnectionSettings = true },
+                    onOpenComfort = { showComfortSettings = true },
                     onOpenExperimental = { showExperimentalFeatures = true },
-                    onOpenLogging = { showLoggingSettings = true },
+                    onOpenAdvanced = { showAdvancedSettings = true },
                 )
             }
 
-            if (showDiagnostics || showLoggingSettings) {
-                // Fusion Diagnostics+Journalisation en une seule catégorie "Avancé" -- câblage
-                // temporaire sur les deux booléens existants (n'importe lequel ouvre l'écran
-                // fusionné) le temps de ce chantier ; le renommage propre (un seul booléen
-                // showAdvancedSettings, une seule entrée dans SettingsScreen) arrive dans un commit
-                // séparé de cette série.
+            if (showAdvancedSettings) {
                 var hasLogsToShare by remember { mutableStateOf(false) }
-                LaunchedEffect(showDiagnostics, showLoggingSettings) { hasLogsToShare = viewModel.hasLogsToShare() }
+                LaunchedEffect(showAdvancedSettings) { hasLogsToShare = viewModel.hasLogsToShare() }
                 AdvancedSettingsScreen(
                     uiState = uiState,
                     faceDetected = trackingFrame.faceDetected,
@@ -307,7 +303,7 @@ fun MainScreen(
                     eyeAspectRatioGroupB = eyeAspectRatioFromLandmarks(trackingFrame.faceLandmarks, EyeLandmarkIndices.LEFT_EYE),
                     logLevel = uiState.logLevel,
                     hasLogsToShare = hasLogsToShare,
-                    onClose = { showDiagnostics = false; showLoggingSettings = false },
+                    onClose = { showAdvancedSettings = false },
                     onSetTierOverride = { tier -> viewModel.setTierOverride(tier) },
                     onSetDebugForceArCoreUnavailable = { enabled -> viewModel.setDebugForceArCoreUnavailable(enabled) },
                     onSetDebugForceGpuUnavailable = { enabled -> viewModel.setDebugForceGpuUnavailable(enabled) },
@@ -338,14 +334,23 @@ fun MainScreen(
             }
 
             if (showDisplaySettings) {
-                // Écran slimmé à Affichage seul (mesh/miroir) -- énergie/batterie/langue rejoignent
-                // ComfortSettingsScreen dans un commit séparé de ce chantier.
                 DisplaySettingsScreen(
                     uiState = uiState,
                     onClose = { showDisplaySettings = false },
                     onSetFaceMeshOverlay = { enabled -> viewModel.setFaceMeshOverlayEnabled(enabled) },
                     onSetKeepMeshOverlayInPowerSave = { enabled -> viewModel.setKeepMeshOverlayInPowerSave(enabled) },
                     onSetMirrorMode = { enabled -> viewModel.setMirrorModeEnabled(enabled) },
+                )
+            }
+
+            if (showComfortSettings) {
+                ComfortSettingsScreen(
+                    uiState = uiState,
+                    onClose = { showComfortSettings = false },
+                    onSetLowBatteryThreshold = { percent -> viewModel.setLowBatteryThresholdPercent(percent) },
+                    onSetPowerSaveMode = { enabled -> viewModel.setPowerSaveModeEnabled(enabled) },
+                    onSetPowerSaveDelay = { seconds -> viewModel.setPowerSaveDelaySeconds(seconds) },
+                    onSetAppLanguage = { language -> viewModel.setAppLanguage(language) },
                 )
             }
 
@@ -373,11 +378,7 @@ fun MainScreen(
                 )
             }
 
-
-            if (showBlendshapeSelection) {
-                // Câblage minimal pour rester compilable pendant la refonte des menus -- la
-                // promotion complète en catégorie de premier niveau (renommage du booléen, entrée
-                // dans SettingsScreen) arrive dans un commit séparé de ce chantier.
+            if (showBlendshapes) {
                 BlendshapesScreen(
                     selectedNames = uiState.selectedBlendshapeNames,
                     onToggle = { name -> viewModel.toggleBlendshapeSelection(name) },
@@ -385,7 +386,7 @@ fun MainScreen(
                     onSetPersistSelection = { enabled -> viewModel.setPersistBlendshapeSelectionEnabled(enabled) },
                     onDeselectAll = { viewModel.deselectAllBlendshapes() },
                     onResetWeights = { viewModel.resetBlendshapeWeights() },
-                    onClose = { showBlendshapeSelection = false },
+                    onClose = { showBlendshapes = false },
                 )
             }
 

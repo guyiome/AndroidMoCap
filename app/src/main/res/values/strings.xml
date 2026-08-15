@@ -178,9 +178,6 @@
     <string name="logging_share_empty_hint">Nothing logged yet at this level.</string>
 
     <!-- Settings menu (subtitles) -->
-    <string name="settings_diagnostics_subtitle">Tier %1$s · face %2$s</string>
-    <string name="state_face_detected">detected</string>
-    <string name="state_face_not_detected">not detected</string>
     <string name="settings_vmc_connected_subtitle">VMC connected to %1$s</string>
     <string name="settings_vmc_not_connected_subtitle">VMC selected, not connected yet</string>
     <string name="settings_udp_listening_subtitle">UDP / VBridger listening</string>
@@ -188,9 +185,10 @@
     <string name="settings_vts_connected_subtitle">VTube Studio connected to %1$s</string>
     <string name="settings_vts_not_connected_subtitle">VTube Studio selected, not connected yet</string>
     <string name="settings_no_connection_type_subtitle">No type selected</string>
-    <string name="settings_display_subtitle">Displayed blendshapes, mesh overlay, power save, battery threshold</string>
+    <string name="settings_display_subtitle">Tracking mesh overlay, mirror mode</string>
+    <string name="settings_comfort_subtitle">Power save, battery, language</string>
     <string name="settings_experimental_subtitle">None for now</string>
-    <string name="settings_logging_subtitle">Log level, share logs</string>
+    <string name="settings_advanced_subtitle">Diagnostics, logs</string>
 
     <!-- Errors (MainViewModel, non-@Composable, resolved via Context/Application) -->
     <string name="error_vmc_ip_missing">Enter a VMC IP address in settings first.</string>

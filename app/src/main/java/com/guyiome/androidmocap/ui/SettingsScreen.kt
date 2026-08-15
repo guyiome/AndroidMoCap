@@ -33,28 +33,27 @@ import com.guyiome.androidmocap.settings.ConnectionType
 
 /**
  * Menu des réglages, affiché par-dessus l'écran caméra quand on appuie sur l'icône réglages de
- * [MainHud] -- regroupe l'ensemble en quatre catégories (voir rapport technique, point 21) plutôt
- * qu'un unique long panneau qui défile : [DiagnosticsScreen] (lecture seule),
- * [ConnectionSettingsScreen], [DisplaySettingsScreen] (affichage & confort) et
- * [ExperimentalFeaturesScreen]. Même patron de navigation que celui déjà utilisé pour
- * [BlendshapeSelectionScreen] : une ligne cliquable avec chevron ouvre l'écran dédié.
+ * [MainHud] -- regroupe l'ensemble en six catégories, par intention utilisateur plutôt que par
+ * couche technique (refonte des menus) : [DisplaySettingsScreen] (affichage du tracking),
+ * [BlendshapesScreen] (catalogue + sélection, promue en premier niveau car la pondération par
+ * blendshape y sera ajoutée), [ConnectionSettingsScreen], [ComfortSettingsScreen] (énergie/batterie/
+ * langue), [ExperimentalFeaturesScreen], [AdvancedSettingsScreen] (diagnostics + journalisation,
+ * fusionnés). Même patron de navigation partout : une ligne cliquable avec chevron ouvre l'écran
+ * dédié.
  */
 @Composable
 fun SettingsScreen(
     uiState: MainUiState,
-    // Reçu séparément de [uiState] (issu de [MainViewModel.trackingFrame], mis à jour à chaque
-    // frame) -- uniquement pour le sous-titre de la ligne "Diagnostics" ci-dessous ; le détail
-    // complet (latence incluse) reste dans DiagnosticsScreen lui-même.
     faceDetected: Boolean,
     onClose: () -> Unit,
-    onOpenDiagnostics: () -> Unit,
-    onOpenConnection: () -> Unit,
     onOpenDisplay: () -> Unit,
+    onOpenBlendshapes: () -> Unit,
+    onOpenConnection: () -> Unit,
+    onOpenComfort: () -> Unit,
     onOpenExperimental: () -> Unit,
-    onOpenLogging: () -> Unit,
+    onOpenAdvanced: () -> Unit,
 ) {
-    // Bouton système/geste retour équivalent au bouton de fermeture affiché -- voir rapport
-    // technique, point 22 (ergonomie navigation).
+    // Bouton système/geste retour équivalent au bouton de fermeture affiché.
     BackHandler(onBack = onClose)
     Box(
         modifier = Modifier
@@ -87,13 +86,14 @@ fun SettingsScreen(
             Spacer(Modifier.height(16.dp))
 
             SettingsMenuRow(
-                title = stringResource(R.string.diagnostics_title),
-                subtitle = stringResource(
-                    R.string.settings_diagnostics_subtitle,
-                    uiState.tier?.name ?: stringResource(R.string.placeholder_unknown),
-                    if (faceDetected) stringResource(R.string.state_face_detected) else stringResource(R.string.state_face_not_detected),
-                ),
-                onClick = onOpenDiagnostics,
+                title = stringResource(R.string.display_settings_title),
+                subtitle = stringResource(R.string.settings_display_subtitle),
+                onClick = onOpenDisplay,
+            )
+            SettingsMenuRow(
+                title = stringResource(R.string.blendshape_selection_title),
+                subtitle = stringResource(R.string.blendshape_selected_count, uiState.selectedBlendshapeNames.size),
+                onClick = onOpenBlendshapes,
             )
             SettingsMenuRow(
                 title = stringResource(R.string.connection_title),
@@ -101,9 +101,9 @@ fun SettingsScreen(
                 onClick = onOpenConnection,
             )
             SettingsMenuRow(
-                title = stringResource(R.string.display_settings_title),
-                subtitle = stringResource(R.string.settings_display_subtitle),
-                onClick = onOpenDisplay,
+                title = stringResource(R.string.settings_comfort_title),
+                subtitle = stringResource(R.string.settings_comfort_subtitle),
+                onClick = onOpenComfort,
             )
             SettingsMenuRow(
                 title = stringResource(R.string.experimental_features_title),
@@ -111,9 +111,9 @@ fun SettingsScreen(
                 onClick = onOpenExperimental,
             )
             SettingsMenuRow(
-                title = stringResource(R.string.logging_settings_title),
-                subtitle = stringResource(R.string.settings_logging_subtitle),
-                onClick = onOpenLogging,
+                title = stringResource(R.string.settings_advanced_title),
+                subtitle = stringResource(R.string.settings_advanced_subtitle),
+                onClick = onOpenAdvanced,
             )
 
             uiState.errorMessage?.let { message ->
