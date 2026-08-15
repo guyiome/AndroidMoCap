@@ -370,6 +370,7 @@ fun MainScreen(
                     isCalibrated = uiState.tongueReferencesCalibrated,
                     recordingDurationMs = uiState.tongueCalibrationRecordingDurationMs,
                     classificationMargin = uiState.tongueClassificationMargin,
+                    iconRotationDegrees = iconRotationDegrees,
                     onStartCalibration = { viewModel.startTongueCalibration() },
                     onCancel = { viewModel.cancelTongueCalibration() },
                     onSetRecordingDurationMs = { durationMs -> viewModel.setTongueCalibrationRecordingDurationMs(durationMs) },
