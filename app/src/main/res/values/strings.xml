@@ -144,8 +144,7 @@
 
     <!-- Experimental features screen -->
     <string name="experimental_features_title">Experimental features</string>
-    <string name="experimental_features_placeholder">Cheek-puff detection is not implemented yet.</string>
-    <string name="experimental_tongue_detection_title">Tongue-out detection (diagnostic)</string>
+    <string name="experimental_tongue_detection_title">Tongue-out detection</string>
     <string name="experimental_tongue_detection_description">Off by default. Runs a 3-stage cascade (mouth-opening gate, color heuristic, personal-calibration embedding) and shows the result live in the blendshape panel if tongueOut is checked. Also sent over the network once calibrated — experimental, occasional false positives are still possible.</string>
     <string name="experimental_tongue_calibration_button">Calibrate detection…</string>
 

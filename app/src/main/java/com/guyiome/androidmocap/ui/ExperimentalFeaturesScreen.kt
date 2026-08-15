@@ -28,11 +28,12 @@ import androidx.compose.ui.unit.dp
 import com.guyiome.androidmocap.R
 
 /**
- * Catégorie dédiée aux fonctionnalités expérimentales -- une des cinq catégories de
- * [SettingsScreen] (voir revue technique, point 21), créée par anticipation des points 15
- * (détection de la langue tirée) et 16 (détection des joues gonflées). Point 16 reste un
- * placeholder pur ; point 15 a désormais un vrai réglage (cascade à 3 étages, injectée dans les
- * données réseau depuis le 13 août 2026 -- voir `AppSettingsStore.tongueOutDetectionEnabled`).
+ * Catégorie dédiée aux fonctionnalités expérimentales -- une des six catégories de
+ * [SettingsScreen] (refonte des menus, regroupement par intention utilisateur). Détection de la
+ * langue tirée : cascade à 3 étages, injectée dans les données réseau une fois calibrée -- voir
+ * `AppSettingsStore.tongueOutDetectionEnabled`. Pas de mention de la détection des joues gonflées
+ * ici tant qu'elle n'existe pas réellement -- résultat concluant pas garanti sur cette piste,
+ * mieux vaut ne rien promettre dans l'UI en attendant.
  */
 @Composable
 fun ExperimentalFeaturesScreen(
@@ -87,13 +88,6 @@ fun ExperimentalFeaturesScreen(
                     Text(stringResource(R.string.experimental_tongue_calibration_button))
                 }
             }
-
-            Spacer(Modifier.height(16.dp))
-            Text(
-                stringResource(R.string.experimental_features_placeholder),
-                color = Color.White.copy(alpha = 0.7f),
-                style = MaterialTheme.typography.bodySmall,
-            )
         }
     }
 }
