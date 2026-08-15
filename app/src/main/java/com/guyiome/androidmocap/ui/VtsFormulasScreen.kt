@@ -32,10 +32,11 @@ import com.guyiome.androidmocap.network.VBridgerFormulas
 
 /**
  * Consultation en lecture seule des paramètres actuellement envoyés à VTube Studio (point 41) --
- * toujours les 52 blendshapes ARKit bruts, plus les formules composites VBridger si
- * [useVBridgerTranslation] est actif. Première brique visible d'un futur écran d'édition (activer/
+ * exclusif, pas additif : les 52 blendshapes ARKit bruts si [useVBridgerTranslation] est désactivé,
+ * les formules composites VBridger seules s'il est activé (jamais les deux à la fois, voir le kdoc
+ * de tête de [VBridgerFormulas]). Première brique visible d'un futur écran d'édition (activer/
  * désactiver une formule, modifier ses coefficients ou les blendshapes qui l'alimentent) -- pour
- * l'instant, juste la liste de ce qui part réellement, groupée pour la lisibilité.
+ * l'instant, juste la liste de ce qui part réellement.
  *
  * `EyeLeftX`/`EyeLeftY` portent une icône d'avertissement distincte (même esprit que
  * [BlendshapeCatalog.unreliable] dans [BlendshapesScreen]) : reconstruits par symétrie miroir, pas
@@ -75,18 +76,7 @@ fun VtsFormulasScreen(useVBridgerTranslation: Boolean, onClose: () -> Unit) {
             }
 
             Spacer(Modifier.height(16.dp))
-            Text(
-                stringResource(R.string.vts_formulas_group_raw),
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Spacer(Modifier.height(4.dp))
-            VBridgerFormulas.rawArkitFormulas.forEach { formula ->
-                VtsParameterRow(name = formula.outputName, unverified = false)
-            }
-
             if (useVBridgerTranslation) {
-                Spacer(Modifier.height(16.dp))
                 Text(
                     stringResource(R.string.vts_formulas_group_vbridger),
                     color = Color.White,
@@ -98,6 +88,16 @@ fun VtsFormulasScreen(useVBridgerTranslation: Boolean, onClose: () -> Unit) {
                         name = formula.outputName,
                         unverified = formula.outputName == "EyeLeftX" || formula.outputName == "EyeLeftY",
                     )
+                }
+            } else {
+                Text(
+                    stringResource(R.string.vts_formulas_group_raw),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(Modifier.height(4.dp))
+                VBridgerFormulas.rawArkitFormulas.forEach { formula ->
+                    VtsParameterRow(name = formula.outputName, unverified = false)
                 }
             }
         }

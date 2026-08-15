@@ -41,19 +41,17 @@ class VBridgerFormulasTest {
     }
 
     @Test
-    fun `activeFormulas sans traduction ne contient que les formules brutes`() {
+    fun `activeFormulas sans traduction retourne uniquement les formules brutes`() {
         val active = VBridgerFormulas.activeFormulas(useVBridgerTranslation = false)
-        assertEquals(VBridgerFormulas.rawArkitFormulas.size, active.size)
+        assertEquals(VBridgerFormulas.rawArkitFormulas, active)
         assertTrue(active.none { it.outputName == "MouthSmile" })
     }
 
     @Test
-    fun `activeFormulas avec traduction contient les brutes et les composites`() {
+    fun `activeFormulas avec traduction retourne uniquement les formules composites -- exclusif, pas additif`() {
         val active = VBridgerFormulas.activeFormulas(useVBridgerTranslation = true)
-        assertEquals(
-            VBridgerFormulas.rawArkitFormulas.size + VBridgerFormulas.vbridgerCompositeFormulas.size,
-            active.size,
-        )
+        assertEquals(VBridgerFormulas.vbridgerCompositeFormulas, active)
+        assertTrue(active.none { it.outputName == "jawOpen" }) // aucun blendshape ARKit brut mélangé
     }
 
     @Test

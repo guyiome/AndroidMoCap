@@ -137,20 +137,25 @@ class VTubeStudioSender(
      * [IFacialMocapSender.send]) -- laisse VTube Studio revenir aux valeurs par défaut plutôt que
      * de forcer un keep-alive avec les dernières valeurs connues.
      *
-     * [useVBridgerTranslation] active en plus les formules composites VBridger (point 41,
-     * [VBridgerFormulas]) -- lu à chaque appel plutôt que figé à la construction, pour que
-     * basculer le réglage prenne effet immédiatement sans reconnexion. N'affecte que la phase
-     * d'injection ([VTubeStudioConnectionState.ParametersRegistered]) : la phase de création de
-     * paramètres crée toujours uniquement les 52 noms ARKit bruts (seuls à avoir
-     * `requiresParameterCreation = true`, voir [VBridgerFormulas.VtsParameterFormula]), le flag n'y
-     * change donc rien.
+     * [useVBridgerTranslation] bascule entre les 52 blendshapes ARKit bruts (`false`, comportement
+     * historique) et les formules composites VBridger seules (`true`, point 41, [VBridgerFormulas])
+     * -- **exclusif, pas additif** : en mode traduction, les bruts ne partent plus du tout, pour une
+     * parité exacte avec ce que VBridger lui-même envoie à VTS (voir le kdoc de tête de
+     * [VBridgerFormulas]). Lu à chaque appel plutôt que figé à la construction, pour que basculer le
+     * réglage prenne effet immédiatement sans reconnexion.
+     *
+     * La phase de création de paramètres (`Authenticated`), elle, crée **toujours** les 52 noms
+     * bruts (`VBridgerFormulas.rawArkitFormulas`) indépendamment de [useVBridgerTranslation] --
+     * les composites n'en ont de toute façon jamais besoin (paramètres déjà natifs à VTS), et créer
+     * les bruts par avance, même si le réglage démarre activé, évite qu'un basculement vers le mode
+     * brut plus tard dans la même connexion tente d'injecter des noms jamais enregistrés.
      */
     fun send(result: FaceTrackingResult, useVBridgerTranslation: Boolean = false) {
         val socket = webSocket ?: return
         when (connectionState) {
             VTubeStudioConnectionState.Authenticated -> {
                 if (parametersRequested.getAndSet(true)) return
-                val names = VBridgerFormulas.activeFormulas(useVBridgerTranslation)
+                val names = VBridgerFormulas.rawArkitFormulas
                     .filter { it.requiresParameterCreation }
                     .map { it.outputName }
                 pendingParameterCreationResponses.set(names.size)

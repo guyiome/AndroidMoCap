@@ -10,25 +10,33 @@ import com.guyiome.androidmocap.tracking.FaceTrackingResult
  * VBridger -- capturées et vérifiées (calcul à zéro conforme à VBridger) dans
  * `E:\WorkSpaces\VTuberApp\Docs\VBridgerFormulaReference.md` (projet "VTuberApp", même traduction
  * déjà testée côté réception PC). But : qu'un streamer déjà riggé pour VBridger/VTS puisse se passer
- * de VBridger, sans revoir son mapping -- la liste envoyée doit donc être une parité exacte avec ce
- * que VBridger lui-même produirait, ni plus ni moins (décision explicite, voir revue technique).
+ * de VBridger, sans revoir son mapping -- la sortie doit donc être une parité exacte avec ce que
+ * VBridger lui-même produirait.
  *
- * **Modèle unifié** : les 52 blendshapes ARKit bruts (déjà envoyés aujourd'hui en paramètres
- * personnalisés) sont eux-mêmes modélisés comme des formules triviales (`ParamètreEnvoyé =
- * ParamètreBrut`, [rawArkitFormulas]), au même titre que les formules composites VBridger
- * ([vbridgerCompositeFormulas]) -- une seule liste, pas deux mécanismes séparés. Prépare le futur
- * mode d'édition (activer/désactiver ou ajouter une formule, y compris une identité) sans
- * restructurer le code plus tard -- ce que ce mode d'édition ne couvre PAS encore : réassigner quels
- * blendshapes alimentent une formule composite (VBridger le permet dans son propre panneau) --
- * demanderait de remplacer les lambdas [VtsParameterFormula.compute] par une structure de données
- * générique (liste pondérée d'entrées), un vrai chantier à part vu que certaines formules ne sont
- * pas de simples combinaisons linéaires (ex. [mouthX], un produit de deux termes).
+ * ⚠️ **Mode exclusif, pas additif** (correction du 15 août 2026 -- la première version envoyait les
+ * 52 blendshapes ARKit bruts EN PLUS des formules composites en pensant reproduire VBridger, ce qui
+ * était faux : VBridger n'envoie à VTS que ses paramètres composites, jamais les blendshapes ARKit
+ * bruts en paramètres personnalisés à côté). [activeFormulas] retourne donc soit [rawArkitFormulas]
+ * (comportement historique de l'app, réglage désactivé), soit [vbridgerCompositeFormulas] seules
+ * (réglage activé) -- jamais les deux à la fois.
  *
- * [VtsParameterFormula.requiresParameterCreation] distingue les deux groupes malgré l'unification :
- * les 52 brutes sont des paramètres personnalisés (besoin de `ParameterCreationRequest` avant
- * usage), les composites visent des paramètres déjà natifs à VTS (`InjectParameterDataRequest`
- * accepte d'écrire directement dedans, vérifié sur la doc officielle) -- fait protocolaire, pas
- * contournable par l'unification du modèle de données.
+ * **Modèle unifié** : les 52 blendshapes ARKit bruts sont eux-mêmes modélisés comme des formules
+ * triviales (`ParamètreEnvoyé = ParamètreBrut`, [rawArkitFormulas]), au même titre que les formules
+ * composites VBridger ([vbridgerCompositeFormulas]) -- une seule structure de formule nommée
+ * ([VtsParameterFormula]), pas deux types séparés, même si un seul des deux groupes est actif à la
+ * fois côté envoi. Prépare le futur mode d'édition (activer/désactiver ou ajouter une formule, y
+ * compris une identité) sans restructurer le code plus tard -- ce que ce mode d'édition ne couvre PAS
+ * encore : réassigner quels blendshapes alimentent une formule composite (VBridger le permet dans son
+ * propre panneau) -- demanderait de remplacer les lambdas [VtsParameterFormula.compute] par une
+ * structure de données générique (liste pondérée d'entrées), un vrai chantier à part vu que certaines
+ * formules ne sont pas de simples combinaisons linéaires (ex. [mouthX], un produit de deux termes).
+ *
+ * [VtsParameterFormula.requiresParameterCreation] reste utile malgré le mode exclusif : les 52 brutes
+ * sont des paramètres personnalisés (besoin de `ParameterCreationRequest` avant usage), les
+ * composites visent des paramètres déjà natifs à VTS (`InjectParameterDataRequest` accepte d'écrire
+ * directement dedans, vérifié sur la doc officielle) -- `VTubeStudioSender` crée donc toujours les 52
+ * noms bruts (les seuls à en avoir besoin, un jour ou l'autre si le réglage est basculé en cours de
+ * connexion) indépendamment du réglage courant, voir son kdoc.
  *
  * ⚠️ **`EyeLeftX`/`EyeLeftY` ne sont PAS transcrits depuis la capture d'écran source** -- seuls
  * `EyeRightX/Y` étaient visibles. Reconstruits par symétrie miroir (substituer `_L` par `_R` dans la
@@ -118,9 +126,12 @@ object VBridgerFormulas {
         VtsParameterFormula("BodyAngleZ", requiresParameterCreation = false) { _, head -> bodyAngleZ(head) },
     )
 
-    /** Formules actives compte tenu du réglage -- les 52 brutes toujours, les composites en plus si activé. */
+    /**
+     * Formules actives compte tenu du réglage -- exclusif, pas additif (voir kdoc de tête du
+     * fichier) : les 52 brutes si désactivé, les formules composites VBridger seules si activé.
+     */
     fun activeFormulas(useVBridgerTranslation: Boolean): List<VtsParameterFormula> =
-        rawArkitFormulas + if (useVBridgerTranslation) vbridgerCompositeFormulas else emptyList()
+        if (useVBridgerTranslation) vbridgerCompositeFormulas else rawArkitFormulas
 
     /** Évalue [formulas] contre [result] -- construit la map de lookup une seule fois pour tout [formulas]. */
     fun evaluate(formulas: List<VtsParameterFormula>, result: FaceTrackingResult): List<BlendshapeScore> {
