@@ -111,47 +111,46 @@ fun TongueCalibrationScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        IconButton(
-            onClick = onClose,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(16.dp)
-                .graphicsLayer(rotationZ = rotationDegrees),
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = stringResource(R.string.cd_back),
-                tint = Color.White,
-                modifier = Modifier.size(28.dp),
-            )
-        }
-
         // Message de phase -- pastille semi-transparente (même style que le bandeau d'icônes de
         // MainHud) plutôt qu'un plein écran noir, pour laisser l'aperçu caméra visible en dessous.
         // Pivote comme un seul bloc (graphicsLayer, pas juste le texte dans un cadre fixe) par pas
         // de 90° -- même pattern que BlendshapePanel, pivot au bas du bloc (TransformOrigin(0.5f, 1f)
         // plutôt que le centre par défaut) pour que la rotation déborde vers l'intérieur de l'écran,
         // pas au-dessus du bord physique (voir kdoc de BlendshapePanel pour le raisonnement complet).
+        // Ancrée TopStart (pas TopCenter) et la flèche de retour vit maintenant DANS ce même bloc,
+        // au bout de la ligne de titre -- même convention que les autres écrans de réglages (titre à
+        // gauche, flèche à droite d'une même Row), et la flèche suit ainsi la même rotation que le
+        // reste du contenu au lieu d'être positionnée indépendamment (retour utilisateur explicite
+        // sur les deux points : cohérence de position + suivre la rotation).
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .align(Alignment.TopCenter)
+                .align(Alignment.TopStart)
                 .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(top = 24.dp)
-                .graphicsLayer(rotationZ = rotationDegrees, transformOrigin = TransformOrigin(0.5f, 1f))
+                .padding(start = 20.dp, top = 24.dp)
+                .graphicsLayer(rotationZ = rotationDegrees, transformOrigin = TransformOrigin(0f, 1f))
                 .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
                 .padding(horizontal = 20.dp, vertical = 14.dp)
                 .widthIn(max = 300.dp),
         ) {
-            Text(
-                stringResource(R.string.tongue_calibration_title),
-                color = Color.White.copy(alpha = 0.6f),
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.clickable {
-                    debugUnlock = debugUnlock.registerTap(System.currentTimeMillis())
-                },
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    stringResource(R.string.tongue_calibration_title),
+                    color = Color.White.copy(alpha = 0.6f),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable {
+                            debugUnlock = debugUnlock.registerTap(System.currentTimeMillis())
+                        },
+                )
+                IconButton(onClick = onClose, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.cd_back),
+                        tint = Color.White,
+                    )
+                }
+            }
 
             Spacer(Modifier.height(6.dp))
             when {
@@ -221,6 +220,11 @@ fun TongueCalibrationScreen(
         // rotation), pivot cette fois au HAUT du bloc (TransformOrigin(0.5f, 0f)) puisqu'il est
         // ancré en bas d'écran : la rotation doit déborder vers l'intérieur de l'écran, donc vers le
         // haut ici, symétrique du raisonnement pour le message de phase ancré en haut.
+        // ⚠️ Volontairement PAS de fillMaxWidth() ici (avant rotation) : un bloc large comme tout
+        // l'écran, une fois tourné à ±90°, devient un pavé aussi haut que l'écran est large --
+        // exactement le bug du bouton "Recalibrer" démesuré constaté sur device. Largeur bornée à la
+        // place, même logique que BlendshapePanel qui évite pour la même raison tout élément large
+        // avant rotation.
         if (!justFinished) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -229,7 +233,7 @@ fun TongueCalibrationScreen(
                     .windowInsetsPadding(WindowInsets.safeDrawing)
                     .padding(20.dp)
                     .graphicsLayer(rotationZ = rotationDegrees, transformOrigin = TransformOrigin(0.5f, 0f))
-                    .fillMaxWidth(),
+                    .widthIn(min = 220.dp, max = 280.dp),
             ) {
                 if (debugUnlock.unlocked) {
                     Column(
