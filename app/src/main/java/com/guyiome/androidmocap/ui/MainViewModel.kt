@@ -107,6 +107,13 @@ import java.net.InetAddress
  */
 @Immutable
 data class MainUiState(
+    // Vrai depuis la construction du ViewModel jusqu'à la fin d'initializeTracking() (palier
+    // choisi, modèle MediaPipe chargé, source caméra construite) -- piloté par MainScreen
+    // (LoadingScreen affiché à la place de l'aperçu caméra/HUD tant que c'est vrai). Reste vrai tant
+    // que la permission caméra n'est pas accordée : initializeTracking() n'est appelée qu'une fois
+    // accordée (voir LaunchedEffect(hasCameraPermission) côté MainScreen), l'écran de permission
+    // s'affiche avant, pas cet écran de chargement.
+    val isInitializing: Boolean = true,
     val tier: TrackingTier? = null,
     // Force un palier au lieu de la sélection automatique -- null = automatique (comportement par
     // défaut). Outil de diagnostic (voir AdvancedSettingsScreen), persisté mais appliqué seulement au
@@ -814,6 +821,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 else -> Unit
             }
         })
+
+        // Dernière étape : tout ce qui précède est fait (palier choisi, modèle MediaPipe chargé,
+        // source caméra construite) -- MainScreen peut remplacer l'écran de chargement par l'aperçu
+        // caméra/HUD. startCamera(), appelé juste après par MainScreen dans le même LaunchedEffect,
+        // n'est pas suspend et retourne avant la toute première frame -- simplification acceptée
+        // (écran de chargement volontairement simple) plutôt que d'attendre un signal plus tardif
+        // comme la première frame réellement traitée.
+        _uiState.update { it.copy(isInitializing = false) }
     }
 
     /**

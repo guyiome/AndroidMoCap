@@ -43,6 +43,7 @@
     <!-- Camera permission -->
     <string name="camera_permission_rationale">The front camera is required for facial capture.</string>
     <string name="action_grant_camera_permission">Allow camera access</string>
+    <string name="loading_message">Loading…</string>
 
     <!-- Connection screen -->
     <string name="connection_title">Connection</string>

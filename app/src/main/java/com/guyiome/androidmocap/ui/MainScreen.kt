@@ -178,7 +178,12 @@ fun MainScreen(
                 }
             },
     ) {
-        if (hasCameraPermission) {
+        if (hasCameraPermission && uiState.isInitializing) {
+            // Le temps qu'initializeTracking() choisisse un palier, charge le modèle MediaPipe et
+            // construise la source caméra (LaunchedEffect(hasCameraPermission) plus haut) -- voir
+            // kdoc de LoadingScreen et de MainUiState.isInitializing.
+            LoadingScreen()
+        } else if (hasCameraPermission) {
             // Aperçu caméra : PreviewView (CameraX) normalement, ou GLSurfaceView (ARCore) au
             // palier OPTIMAL avec ARCore actif -- les deux ne coexistent jamais (voir revue
             // technique, point 13). Le fond caméra live du GLSurfaceView est dessiné en interne par

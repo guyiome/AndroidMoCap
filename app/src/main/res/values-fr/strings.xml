@@ -41,6 +41,7 @@
     <!-- Permission caméra -->
     <string name="camera_permission_rationale">La caméra frontale est nécessaire pour la capture faciale.</string>
     <string name="action_grant_camera_permission">Autoriser la caméra</string>
+    <string name="loading_message">Chargement…</string>
 
     <!-- Écran Connexion -->
     <string name="connection_title">Connexion</string>
