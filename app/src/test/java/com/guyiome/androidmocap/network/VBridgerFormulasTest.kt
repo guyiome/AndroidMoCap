@@ -136,6 +136,17 @@ class VBridgerFormulasTest {
     }
 
     @Test
+    fun `mouthDimple pese moins que mouthSmile dans MouthSmile -- signal MediaPipe peu fiable`() {
+        // mouthDimpleLeft/Right sont répertoriés peu fiables chez MediaPipe (BlendshapeCatalog.unreliable)
+        // -- retour utilisateur (15 août 2026, point 41) : plafonnent vers 0.5 même en forçant
+        // l'expression. Poids réduit (MOUTH_DIMPLE_COEFFICIENT) plutôt que retiré, voir kdoc du fichier.
+        // mouthSmileLeft=1 seul : smile=1, MouthSmile=(2+1)/4=0.75.
+        assertEquals(0.75f, valueFor("MouthSmile", result(listOf(BlendshapeScore("mouthSmileLeft", 1f)))), 0.0001f)
+        // mouthDimpleLeft=1 seul : moyenne L/R=0.5, pondérée x0.5=0.25, MouthSmile=(2+0.25)/4=0.5625.
+        assertEquals(0.5625f, valueFor("MouthSmile", result(listOf(BlendshapeScore("mouthDimpleLeft", 1f)))), 0.0001f)
+    }
+
+    @Test
     fun `MouthPressLipOpen combine les levres retroussees et les levres roulees`() {
         val value = valueFor(
             "MouthPressLipOpen",

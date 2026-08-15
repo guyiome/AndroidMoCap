@@ -260,6 +260,15 @@ object VBridgerFormulas {
     private const val MOUTH_PRESS_LIP_OPEN_RANGE_MIN = -1.3f
     private const val MOUTH_PRESS_LIP_OPEN_RANGE_MAX = 1.3f
 
+    // `mouthDimpleLeft`/`mouthDimpleRight` sont répertoriés peu fiables chez MediaPipe
+    // (BlendshapeCatalog.unreliable, quasi immobiles ou très bruités) -- confirmé par l'utilisateur
+    // le 15 août 2026 (plafonnent vers 0.5 même en forçant l'expression). Poids réduit plutôt que
+    // retiré (décision explicite : garder une trace du référentiel VBridger d'origine) dans
+    // [mouthSmile]/[mouthPuckerOut], les deux seules formules composites à s'appuyer dessus -- laisse
+    // les composantes plus fiables de chaque formule (le sourire lui-même, `mouthPucker` brut)
+    // dominer le résultat plutôt que d'hériter directement du bruit de ce blendshape précis.
+    private const val MOUTH_DIMPLE_COEFFICIENT = 0.5f
+
     private fun mouthOpen(b: Map<String, Float>): Float {
         val jawOpen = b["jawOpen"] ?: 0f
         val mouthClose = b["mouthClose"] ?: 0f
@@ -269,8 +278,8 @@ object VBridgerFormulas {
 
     private fun mouthSmile(b: Map<String, Float>): Float {
         val frown = (b["mouthFrownLeft"] ?: 0f) + (b["mouthFrownRight"] ?: 0f) + (b["mouthPucker"] ?: 0f)
-        val smile = (b["mouthSmileRight"] ?: 0f) + (b["mouthSmileLeft"] ?: 0f) +
-            ((b["mouthDimpleLeft"] ?: 0f) + (b["mouthDimpleRight"] ?: 0f)) / 2f
+        val dimple = ((b["mouthDimpleLeft"] ?: 0f) + (b["mouthDimpleRight"] ?: 0f)) / 2f
+        val smile = (b["mouthSmileRight"] ?: 0f) + (b["mouthSmileLeft"] ?: 0f) + dimple * MOUTH_DIMPLE_COEFFICIENT
         return ((2f - frown + smile) / 4f).coerceIn(PLUS_MINUS_ONE_RANGE_MIN, PLUS_MINUS_ONE_RANGE_MAX)
     }
 
@@ -285,7 +294,8 @@ object VBridgerFormulas {
         val dimple = ((b["mouthDimpleRight"] ?: 0f) + (b["mouthDimpleLeft"] ?: 0f)) / 2f
         val pucker = b["mouthPucker"] ?: 0f
         val tongueOut = b["tongueOut"] ?: 0f
-        return ((dimple - pucker) * (1f - tongueOut)).coerceIn(PLUS_MINUS_ONE_RANGE_MIN, PLUS_MINUS_ONE_RANGE_MAX)
+        return ((dimple * MOUTH_DIMPLE_COEFFICIENT - pucker) * (1f - tongueOut))
+            .coerceIn(PLUS_MINUS_ONE_RANGE_MIN, PLUS_MINUS_ONE_RANGE_MAX)
     }
 
     private fun mouthShrug(b: Map<String, Float>): Float {
