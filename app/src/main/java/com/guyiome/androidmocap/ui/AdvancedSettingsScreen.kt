@@ -37,47 +37,50 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.guyiome.androidmocap.BuildConfig
 import com.guyiome.androidmocap.R
+import com.guyiome.androidmocap.logging.LogLevel
 import com.guyiome.androidmocap.tracking.TierCompatibility
 import com.guyiome.androidmocap.tracking.TrackingTier
 import com.guyiome.androidmocap.tracking.TrackingTierSelector
 
 /**
- * Diagnostics -- une des quatre catégories de [SettingsScreen] (voir rapport technique, point 21).
- * Très majoritairement en lecture seule (palier de tracking, délégué, détection, latence,
- * calibration), à l'exception du forçage de palier ([onSetTierOverride]) et du panneau de mocks de
- * debug caché ci-dessous -- outils de diagnostic, pas des fonctionnalités utilisateur normales.
- * Reçoit l'état chaud ([faceDetected]/[inferenceTimeMs], issus de [MainViewModel.trackingFrame])
- * séparément de [uiState], même séparation froid/chaud que partout ailleurs dans l'app.
+ * Catégorie "Avancé" -- une des six catégories de [SettingsScreen] (refonte des menus, regroupement
+ * par intention plutôt que par couche technique). Fusionne les anciens écrans `DiagnosticsScreen` et
+ * `LoggingSettingsScreen` : les deux s'adressent au même public (dépannage), regroupés ici avec des
+ * sous-titres de section plutôt que dispersés en catégories séparées.
+ *
+ * Section Diagnostics très majoritairement en lecture seule, à l'exception du forçage de palier
+ * ([onSetTierOverride]) et du panneau de mocks de debug caché ci-dessous -- outils de diagnostic,
+ * pas des fonctionnalités utilisateur normales. La valeur EAR brute ([eyeAspectRatioGroupA]/[eyeAspectRatioGroupB],
+ * diagnostic de fiabilisation du clignement) est désormais rangée **dans** le panneau de mocks caché
+ * plutôt que toujours visible -- elle n'a de sens que pour du diagnostic dev.
  *
  * **Panneau de mocks de debug** (voir revue technique, point 35) : révélé en tapant
- * [DEBUG_PANEL_UNLOCK_TAP_COUNT] fois sur la ligne "Version de l'app" en bas de l'écran, même
- * principe que le menu développeur Android. Permet de mocker trois comportements difficiles à
- * déclencher naturellement sur un appareil donné (chauffe, ARCore, délégué GPU) -- voir
- * [onSetDebugThermalOverride]/[onSetDebugForceArCoreUnavailable]/[onSetDebugForceGpuUnavailable].
- * Le bandeau d'avertissement piloté par [onResetDebugOverrides] reste volontairement visible même
- * sans déverrouiller le panneau : un mock persistant resté actif par erreur (ARCore/GPU forcés,
- * survivent à un redémarrage -- voir leur doc côté `AppSettingsStore`) doit rester réparable sans
- * avoir à refaire le geste.
+ * [DEBUG_PANEL_UNLOCK_TAP_COUNT] fois sur la ligne "Version de l'app" en bas de la section
+ * Diagnostics, même principe que le menu développeur Android. Le bandeau d'avertissement piloté par
+ * [onResetDebugOverrides] reste volontairement visible même sans déverrouiller le panneau : un mock
+ * persistant resté actif par erreur doit rester réparable sans avoir à refaire le geste.
+ *
+ * Section Journalisation : niveau minimal conservé dans le fichier de logs exportable (ERROR par
+ * défaut, réglable jusqu'à WARN/INFO), et partage de ce fichier via le système
+ * ([MainViewModel.buildShareLogsIntent]).
  */
 @Composable
-fun DiagnosticsScreen(
+fun AdvancedSettingsScreen(
     uiState: MainUiState,
     faceDetected: Boolean,
     inferenceTimeMs: Long,
-    // Diagnostic Eye Aspect Ratio (revue technique, point 28) -- affiché à côté du blendshape
-    // eyeBlink brut (à sélectionner dans le panneau de blendshapes de l'écran principal pour
-    // comparer). A servi à diagnostiquer les correctifs de fiabilisation du clignement
-    // (EyeBlinkCorrection.kt) ; conservé comme outil de diagnostic permanent, utile si un futur
-    // souci de clignement doit être investigué sans repasser par adb logcat. GROUP_A/GROUP_B
-    // désignent les mêmes indices que EyeLandmarkIndices.RIGHT_EYE/LEFT_EYE.
     eyeAspectRatioGroupA: Float,
     eyeAspectRatioGroupB: Float,
+    logLevel: LogLevel,
+    hasLogsToShare: Boolean,
     onClose: () -> Unit,
     onSetTierOverride: (TrackingTier?) -> Unit,
     onSetDebugForceArCoreUnavailable: (Boolean) -> Unit,
     onSetDebugForceGpuUnavailable: (Boolean) -> Unit,
     onSetDebugThermalOverride: (Boolean?) -> Unit,
     onResetDebugOverrides: () -> Unit,
+    onSetLogLevel: (LogLevel) -> Unit,
+    onShareLogs: () -> Unit,
 ) {
     BackHandler(onBack = onClose)
     // État local, volontairement non hoisté au ViewModel/persisté -- voir kdoc de DebugPanelUnlockState.
@@ -99,7 +102,7 @@ fun DiagnosticsScreen(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    stringResource(R.string.diagnostics_title),
+                    stringResource(R.string.settings_advanced_title),
                     color = Color.White,
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.weight(1f),
@@ -139,14 +142,19 @@ fun DiagnosticsScreen(
             }
 
             Spacer(Modifier.height(16.dp))
-
             Text(
-                stringResource(R.string.diagnostics_tier, uiState.tier?.name ?: stringResource(R.string.placeholder_unknown)),
+                stringResource(R.string.diagnostics_title),
                 color = Color.White,
                 style = MaterialTheme.typography.titleMedium,
             )
 
             Spacer(Modifier.height(12.dp))
+            Text(
+                stringResource(R.string.diagnostics_tier, uiState.tier?.name ?: stringResource(R.string.placeholder_unknown)),
+                color = Color.White,
+            )
+
+            Spacer(Modifier.height(8.dp))
             Text(
                 stringResource(R.string.diagnostics_tier_override_label),
                 color = Color.White.copy(alpha = 0.7f),
@@ -162,14 +170,12 @@ fun DiagnosticsScreen(
                     onClick = { onSetTierOverride(null) },
                     label = { Text(stringResource(R.string.diagnostics_tier_override_auto)) },
                 )
-                // Garde-fou (demande explicite, 6 août 2026) : un palier réellement incompatible
-                // avec l'appareil (ex. OPTIMAL sans ARCore -- déclencherait de toute façon le repli
-                // silencieux déjà en place, autant l'empêcher clairement) désactive sa puce plutôt
-                // que de laisser sélectionner quelque chose qui ne fera pas ce que l'utilisateur
-                // croit. Un simple risque de performance (palier plus exigeant que ce que
-                // l'automatique aurait choisi pour cet appareil) reste sélectionnable, juste
-                // signalé par une icône d'avertissement -- même code couleur que
-                // BlendshapeSelectionScreen pour les blendshapes peu fiables.
+                // Garde-fou : un palier réellement incompatible avec l'appareil (ex. OPTIMAL sans
+                // ARCore -- déclencherait de toute façon le repli silencieux déjà en place, autant
+                // l'empêcher clairement) désactive sa puce plutôt que de laisser sélectionner
+                // quelque chose qui ne fera pas ce que l'utilisateur croit. Un simple risque de
+                // performance reste sélectionnable, juste signalé par une icône d'avertissement --
+                // même code couleur que BlendshapesScreen pour les blendshapes peu fiables.
                 val capabilities = uiState.capabilities
                 TrackingTier.entries.forEach { tier ->
                     Spacer(Modifier.width(8.dp))
@@ -216,29 +222,6 @@ fun DiagnosticsScreen(
                 color = Color.White,
             )
             Text(stringResource(R.string.diagnostics_inference_latency, inferenceTimeMs), color = Color.White)
-            // Diagnostic temporaire EAR (voir kdoc du paramètre ci-dessus) -- valeurs à 0,00 tant
-            // que l'overlay du mesh de tracking (Affichage & confort) n'est pas activé, seul
-            // moment où les landmarks sont extraits aujourd'hui.
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(R.string.diagnostics_ear_debug_label),
-                color = Color.White.copy(alpha = 0.7f),
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(
-                stringResource(
-                    R.string.diagnostics_ear_debug_value,
-                    "%.2f".format(eyeAspectRatioGroupA),
-                    "%.2f".format(eyeAspectRatioGroupB),
-                ),
-                color = Color(0xFF7CE0FF),
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(
-                stringResource(R.string.diagnostics_ear_debug_hint),
-                color = Color.White.copy(alpha = 0.5f),
-                style = MaterialTheme.typography.bodySmall,
-            )
             // Source caméra actuelle -- utile pour vérifier sur device si le repli silencieux
             // CameraX (ArCoreHeadPoseTracker.onUnavailable) s'est déclenché malgré le palier
             // OPTIMAL choisi. Sans objet pour les autres paliers (toujours CameraX).
@@ -316,6 +299,35 @@ fun DiagnosticsScreen(
                 Text(
                     stringResource(R.string.diagnostics_debug_section_hint),
                     color = Color.White.copy(alpha = 0.6f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+
+                // Diagnostic EAR (revue technique, point 28) -- affiché à côté du blendshape
+                // eyeBlink brut (à sélectionner dans le panneau de blendshapes de l'écran principal
+                // pour comparer). A servi à diagnostiquer les correctifs de fiabilisation du
+                // clignement (EyeBlinkCorrection.kt) ; conservé comme outil de diagnostic permanent,
+                // rangé ici (pas en dehors du panneau caché comme avant la refonte des menus) --
+                // n'a de sens que pour du diagnostic dev, pas une info utilisateur normale. Valeurs
+                // à 0,00 tant que l'overlay du mesh de tracking (Affichage) n'est pas activé, seul
+                // moment où les landmarks sont extraits aujourd'hui.
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    stringResource(R.string.diagnostics_ear_debug_label),
+                    color = Color.White.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    stringResource(
+                        R.string.diagnostics_ear_debug_value,
+                        "%.2f".format(eyeAspectRatioGroupA),
+                        "%.2f".format(eyeAspectRatioGroupB),
+                    ),
+                    color = Color(0xFF7CE0FF),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    stringResource(R.string.diagnostics_ear_debug_hint),
+                    color = Color.White.copy(alpha = 0.5f),
                     style = MaterialTheme.typography.bodySmall,
                 )
 
@@ -410,6 +422,59 @@ fun DiagnosticsScreen(
                 Text(
                     stringResource(R.string.diagnostics_debug_taps_remaining, debugUnlock.remainingTaps),
                     color = Color.White.copy(alpha = 0.5f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+
+            Spacer(Modifier.height(32.dp))
+            Text(
+                stringResource(R.string.logging_settings_title),
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+            )
+
+            Spacer(Modifier.height(12.dp))
+            Text(
+                stringResource(R.string.logging_level_label),
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Row(modifier = Modifier.padding(top = 8.dp)) {
+                FilterChip(
+                    selected = logLevel == LogLevel.ERROR,
+                    onClick = { onSetLogLevel(LogLevel.ERROR) },
+                    label = { Text(stringResource(R.string.logging_level_error)) },
+                )
+                Spacer(Modifier.width(8.dp))
+                FilterChip(
+                    selected = logLevel == LogLevel.WARN,
+                    onClick = { onSetLogLevel(LogLevel.WARN) },
+                    label = { Text(stringResource(R.string.logging_level_warn)) },
+                )
+                Spacer(Modifier.width(8.dp))
+                FilterChip(
+                    selected = logLevel == LogLevel.INFO,
+                    onClick = { onSetLogLevel(LogLevel.INFO) },
+                    label = { Text(stringResource(R.string.logging_level_info)) },
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Text(
+                stringResource(R.string.logging_explanation),
+                color = Color.White.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.bodySmall,
+            )
+
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = onShareLogs, enabled = hasLogsToShare) {
+                Text(stringResource(R.string.logging_share_button))
+            }
+            if (!hasLogsToShare) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.logging_share_empty_hint),
+                    color = Color.White.copy(alpha = 0.7f),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }

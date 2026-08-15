@@ -49,8 +49,9 @@ import com.guyiome.androidmocap.tracking.eyeAspectRatioFromLandmarks
 /**
  * Écran unique de l'app : preview caméra pleine page + bandeau d'icônes minimal ([MainHud]) +
  * menu de réglages ([SettingsScreen]) affiché par-dessus à la demande, qui ouvre à son tour l'une
- * de ses quatre catégories ([DiagnosticsScreen], [ConnectionSettingsScreen],
- * [DisplaySettingsScreen], [ExperimentalFeaturesScreen] -- voir rapport technique, point 21).
+ * de ses six catégories ([DisplaySettingsScreen], [BlendshapesScreen], [ConnectionSettingsScreen],
+ * [ComfortSettingsScreen], [ExperimentalFeaturesScreen], [AdvancedSettingsScreen] -- regroupées par
+ * intention utilisateur plutôt que par couche technique, refonte des menus).
  */
 @Composable
 fun MainScreen(
@@ -286,23 +287,38 @@ fun MainScreen(
                 )
             }
 
-            if (showDiagnostics) {
-                DiagnosticsScreen(
+            if (showDiagnostics || showLoggingSettings) {
+                // Fusion Diagnostics+Journalisation en une seule catégorie "Avancé" -- câblage
+                // temporaire sur les deux booléens existants (n'importe lequel ouvre l'écran
+                // fusionné) le temps de ce chantier ; le renommage propre (un seul booléen
+                // showAdvancedSettings, une seule entrée dans SettingsScreen) arrive dans un commit
+                // séparé de cette série.
+                var hasLogsToShare by remember { mutableStateOf(false) }
+                LaunchedEffect(showDiagnostics, showLoggingSettings) { hasLogsToShare = viewModel.hasLogsToShare() }
+                AdvancedSettingsScreen(
                     uiState = uiState,
                     faceDetected = trackingFrame.faceDetected,
                     inferenceTimeMs = trackingFrame.inferenceTimeMs,
-                    // Diagnostic temporaire EAR (revue technique, point 28) -- voir kdoc dans
-                    // DiagnosticsScreen. Recalculé seulement quand la liste de landmarks change
+                    // Diagnostic EAR (revue technique, point 28) -- voir kdoc dans
+                    // AdvancedSettingsScreen. Recalculé seulement quand la liste de landmarks change
                     // réellement (elle est déjà stable/vide hors overlay du mesh activé), pas de
                     // remember nécessaire ici : trackingFrame change de toute façon à 20-60 Hz.
                     eyeAspectRatioGroupA = eyeAspectRatioFromLandmarks(trackingFrame.faceLandmarks, EyeLandmarkIndices.RIGHT_EYE),
                     eyeAspectRatioGroupB = eyeAspectRatioFromLandmarks(trackingFrame.faceLandmarks, EyeLandmarkIndices.LEFT_EYE),
-                    onClose = { showDiagnostics = false },
+                    logLevel = uiState.logLevel,
+                    hasLogsToShare = hasLogsToShare,
+                    onClose = { showDiagnostics = false; showLoggingSettings = false },
                     onSetTierOverride = { tier -> viewModel.setTierOverride(tier) },
                     onSetDebugForceArCoreUnavailable = { enabled -> viewModel.setDebugForceArCoreUnavailable(enabled) },
                     onSetDebugForceGpuUnavailable = { enabled -> viewModel.setDebugForceGpuUnavailable(enabled) },
                     onSetDebugThermalOverride = { override -> viewModel.setDebugThermalOverride(override) },
                     onResetDebugOverrides = { viewModel.resetDebugOverrides() },
+                    onSetLogLevel = { level -> viewModel.setLogLevel(level) },
+                    onShareLogs = {
+                        viewModel.buildShareLogsIntent()?.let { intent ->
+                            context.startActivity(Intent.createChooser(intent, null))
+                        }
+                    },
                 )
             }
 
@@ -357,24 +373,6 @@ fun MainScreen(
                 )
             }
 
-            if (showLoggingSettings) {
-                // Vérifié une seule fois à l'ouverture (pas à chaque recomposition -- MainScreen
-                // recompose jusqu'à 60Hz via trackingFrame ci-dessus, une vérification disque à ce
-                // rythme serait du gaspillage pour un simple indicateur d'écran de réglages).
-                var hasLogsToShare by remember { mutableStateOf(false) }
-                LaunchedEffect(showLoggingSettings) { hasLogsToShare = viewModel.hasLogsToShare() }
-                LoggingSettingsScreen(
-                    logLevel = uiState.logLevel,
-                    hasLogsToShare = hasLogsToShare,
-                    onClose = { showLoggingSettings = false },
-                    onSetLogLevel = { level -> viewModel.setLogLevel(level) },
-                    onShareLogs = {
-                        viewModel.buildShareLogsIntent()?.let { intent ->
-                            context.startActivity(Intent.createChooser(intent, null))
-                        }
-                    },
-                )
-            }
 
             if (showBlendshapeSelection) {
                 // Câblage minimal pour rester compilable pendant la refonte des menus -- la

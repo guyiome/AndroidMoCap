@@ -75,6 +75,7 @@
 
     <!-- Écran Diagnostics -->
     <string name="diagnostics_title">Diagnostics</string>
+    <string name="settings_advanced_title">Avancé</string>
     <string name="diagnostics_tier">Palier : %1$s</string>
     <string name="diagnostics_tier_override_label">Forcer le palier (diagnostic)</string>
     <string name="diagnostics_tier_override_auto">Automatique</string>
