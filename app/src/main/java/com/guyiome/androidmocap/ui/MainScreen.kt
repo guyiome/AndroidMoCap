@@ -322,18 +322,14 @@ fun MainScreen(
             }
 
             if (showDisplaySettings) {
+                // Écran slimmé à Affichage seul (mesh/miroir) -- énergie/batterie/langue rejoignent
+                // ComfortSettingsScreen dans un commit séparé de ce chantier.
                 DisplaySettingsScreen(
                     uiState = uiState,
                     onClose = { showDisplaySettings = false },
-                    onOpenBlendshapeSelection = { showBlendshapeSelection = true },
-                    onSetPersistBlendshapeSelection = { enabled -> viewModel.setPersistBlendshapeSelectionEnabled(enabled) },
-                    onSetLowBatteryThreshold = { percent -> viewModel.setLowBatteryThresholdPercent(percent) },
-                    onSetPowerSaveMode = { enabled -> viewModel.setPowerSaveModeEnabled(enabled) },
-                    onSetPowerSaveDelay = { seconds -> viewModel.setPowerSaveDelaySeconds(seconds) },
                     onSetFaceMeshOverlay = { enabled -> viewModel.setFaceMeshOverlayEnabled(enabled) },
                     onSetKeepMeshOverlayInPowerSave = { enabled -> viewModel.setKeepMeshOverlayInPowerSave(enabled) },
                     onSetMirrorMode = { enabled -> viewModel.setMirrorModeEnabled(enabled) },
-                    onSetAppLanguage = { language -> viewModel.setAppLanguage(language) },
                 )
             }
 
