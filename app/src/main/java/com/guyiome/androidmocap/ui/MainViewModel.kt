@@ -146,6 +146,8 @@ data class MainUiState(
     val vtsTargetLabel: String = "",
     val vtsConnectionState: VTubeStudioConnectionState = VTubeStudioConnectionState.Disconnected,
     val savedVtsHost: String = "",
+    // Traduction VBridger -> paramètres par défaut VTS (point 41) -- voir VBridgerFormulas.kt.
+    val vtsUseVBridgerTranslation: Boolean = false,
     // Calibration : pose de tête courante prise comme "zéro" pour compenser un téléphone
     // légèrement décalé/tourné par rapport au visage (contrainte physique de positionnement).
     val isCalibrated: Boolean = false,
@@ -514,6 +516,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             connectionSettingsStore.vtsAuthToken.collect { token -> savedVtsAuthToken = token }
+        }
+        viewModelScope.launch {
+            connectionSettingsStore.vtsUseVBridgerTranslation.collect { enabled ->
+                _uiState.update { it.copy(vtsUseVBridgerTranslation = enabled) }
+            }
         }
         viewModelScope.launch {
             appSettingsStore.lowBatteryThresholdPercent.collect { percent ->
@@ -1314,7 +1321,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } ?: final
         vmcSender?.send(finalToSend)
         iFacialMocapSender?.send(finalToSend)
-        vtubeStudioSender?.send(finalToSend)
+        vtubeStudioSender?.send(finalToSend, _uiState.value.vtsUseVBridgerTranslation)
     }
 
     /**
@@ -1864,6 +1871,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         vtubeStudioSender = null
         _uiState.update { it.copy(vtsTargetLabel = "", vtsConnectionState = VTubeStudioConnectionState.Disconnected) }
         if (wasConnected) AppLog.i(TAG, "VTube Studio déconnecté")
+    }
+
+    /**
+     * Réglage lu à chaque frame par [VTubeStudioSender.send] (voir son kdoc) -- prend effet
+     * immédiatement, sans reconnexion nécessaire.
+     */
+    fun setVtsUseVBridgerTranslation(enabled: Boolean) {
+        _uiState.update { it.copy(vtsUseVBridgerTranslation = enabled) }
+        viewModelScope.launch(Dispatchers.IO) { connectionSettingsStore.setVtsUseVBridgerTranslation(enabled) }
     }
 
     /**

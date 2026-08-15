@@ -136,14 +136,23 @@ class VTubeStudioSender(
      * Retour anticipé si `!result.faceDetected` (même convention que [VmcOscSender.send]/
      * [IFacialMocapSender.send]) -- laisse VTube Studio revenir aux valeurs par défaut plutôt que
      * de forcer un keep-alive avec les dernières valeurs connues.
+     *
+     * [useVBridgerTranslation] active en plus les formules composites VBridger (point 41,
+     * [VBridgerFormulas]) -- lu à chaque appel plutôt que figé à la construction, pour que
+     * basculer le réglage prenne effet immédiatement sans reconnexion. N'affecte que la phase
+     * d'injection ([VTubeStudioConnectionState.ParametersRegistered]) : la phase de création de
+     * paramètres crée toujours uniquement les 52 noms ARKit bruts (seuls à avoir
+     * `requiresParameterCreation = true`, voir [VBridgerFormulas.VtsParameterFormula]), le flag n'y
+     * change donc rien.
      */
-    fun send(result: FaceTrackingResult) {
+    fun send(result: FaceTrackingResult, useVBridgerTranslation: Boolean = false) {
         val socket = webSocket ?: return
         when (connectionState) {
             VTubeStudioConnectionState.Authenticated -> {
-                if (!result.faceDetected || result.blendshapes.isEmpty()) return
                 if (parametersRequested.getAndSet(true)) return
-                val names = result.blendshapes.map { it.name }
+                val names = VBridgerFormulas.activeFormulas(useVBridgerTranslation)
+                    .filter { it.requiresParameterCreation }
+                    .map { it.outputName }
                 pendingParameterCreationResponses.set(names.size)
                 AppLog.d(TAG, "Envoi de ${names.size} ParameterCreationRequest")
                 buildParameterCreationRequestsJson(nextRequestId("params"), names)
@@ -154,7 +163,8 @@ class VTubeStudioSender(
                 // envoi en régime établi, contrairement à la phase de connexion (ouverture, auth,
                 // création des paramètres) qui ne survient qu'une fois et vaut la peine d'être tracée.
                 if (!result.faceDetected || result.blendshapes.isEmpty()) return
-                socket.sendText(buildInjectParameterDataRequestJson(nextRequestId("inject"), result.blendshapes))
+                val values = VBridgerFormulas.evaluate(VBridgerFormulas.activeFormulas(useVBridgerTranslation), result)
+                socket.sendText(buildInjectParameterDataRequestJson(nextRequestId("inject"), values))
             }
             else -> Unit
         }
