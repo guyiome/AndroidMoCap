@@ -25,7 +25,7 @@ data class TierConfig(
 
 /**
  * Compatibilité d'un [TrackingTier] avec les capacités réelles d'un appareil, pour le sélecteur
- * manuel de palier ([DiagnosticsScreen][com.guyiome.androidmocap.ui.DiagnosticsScreen]) -- voir
+ * manuel de palier ([AdvancedSettingsScreen][com.guyiome.androidmocap.ui.AdvancedSettingsScreen]) -- voir
  * [TrackingTierSelector.compatibility]. Distingue une incompatibilité dure (le palier ne peut
  * littéralement pas fonctionner) d'un simple risque de performance dégradée (le palier
  * fonctionnera, mais est plus exigeant que ce que cet appareil justifierait normalement).
@@ -45,7 +45,7 @@ object TrackingTierSelector {
 
     /**
      * [override], s'il est non nul, court-circuite complètement la sélection automatique --
-     * utilisé pour forcer un palier depuis les réglages (voir `DiagnosticsScreen`,
+     * utilisé pour forcer un palier depuis les réglages (voir `AdvancedSettingsScreen`,
      * `AppSettingsStore.tierOverride`), pensé comme outil de diagnostic/test (ex. forcer
      * `STANDARD` sur un appareil qui qualifierait normalement pour `OPTIMAL`, pour tester le
      * chemin CameraX sans dépendre d'un second appareil), pas une fonctionnalité utilisateur

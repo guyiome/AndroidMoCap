@@ -8,7 +8,7 @@ import kotlin.math.sqrt
  * l'œil -- piste explorée en complément du blendshape `eyeBlink` de MediaPipe (un classifieur ML,
  * sensible aux reflets de verres de lunettes) pour la fiabilisation du clignement avec lunettes
  * (revue technique, point 28). Ce fichier ne fait QUE le calcul géométrique -- diagnostic
- * temporaire dans `DiagnosticsScreen` pour l'instant, pas encore branché à une vraie logique de
+ * temporaire dans `AdvancedSettingsScreen` pour l'instant, pas encore branché à une vraie logique de
  * fusion/correction.
  *
  * `EAR = (‖p2-p6‖ + ‖p3-p5‖) / (2·‖p1-p4‖)` -- p1/p4 : coins de l'œil (mesure horizontale) ; p2/p3 :

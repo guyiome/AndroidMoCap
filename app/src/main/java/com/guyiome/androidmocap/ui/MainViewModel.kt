@@ -109,7 +109,7 @@ import java.net.InetAddress
 data class MainUiState(
     val tier: TrackingTier? = null,
     // Force un palier au lieu de la sélection automatique -- null = automatique (comportement par
-    // défaut). Outil de diagnostic (voir DiagnosticsScreen), persisté mais appliqué seulement au
+    // défaut). Outil de diagnostic (voir AdvancedSettingsScreen), persisté mais appliqué seulement au
     // prochain lancement de l'app (voir initializeTracking) : changer ce réglage ne reconstruit
     // pas le pipeline caméra/MediaPipe à chaud.
     val tierOverride: TrackingTier? = null,
@@ -201,7 +201,7 @@ data class MainUiState(
     // sticky comme thermalDowngradeSuggested) : redevient faux dès que la charge redescend, pensé
     // pour un avertissement à l'écran qui doit disparaître quand la situation redevient normale.
     val inferenceRunningHigh: Boolean = false,
-    // Mocks de debug (panneau caché de DiagnosticsScreen, voir revue technique point 35) --
+    // Mocks de debug (panneau caché de AdvancedSettingsScreen, voir revue technique point 35) --
     // permettent d'exercer des chemins de code qu'un appareil de test donné (ex. haut de gamme,
     // thermiquement irréprochable) ne peut pas naturellement déclencher.
     //
@@ -589,7 +589,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // chaque log, pas seulement au lancement. La toute première valeur est aussi
             // synchronisée de façon anticipée/bloquante dans initializeTracking() -- voir son kdoc
             // -- ce collecteur reste nécessaire pour les changements faits en direct depuis
-            // LoggingSettingsScreen, après le démarrage.
+            // AdvancedSettingsScreen, après le démarrage.
             appSettingsStore.logLevel.collect { level ->
                 _uiState.update { it.copy(logLevel = level) }
                 AppLog.setMinimumPersistedLevel(level)
@@ -676,7 +676,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val capabilities = DeviceCapabilityDetector.detect(context)
         val tierOverride = appSettingsStore.tierOverride.first()
         // Mocks de debug (voir MainUiState.debugForceArCoreUnavailable/debugForceGpuUnavailable,
-        // AppSettingsStore, DiagnosticsScreen) -- lus une seule fois ici, même contrainte que
+        // AppSettingsStore, AdvancedSettingsScreen) -- lus une seule fois ici, même contrainte que
         // tierOverride : pas de reconstruction à chaud du pipeline caméra/MediaPipe.
         val debugForceArCoreUnavailable = appSettingsStore.debugForceArCoreUnavailable.first()
         val debugForceGpuUnavailable = appSettingsStore.debugForceGpuUnavailable.first()
@@ -824,7 +824,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         thermalPollingJob = viewModelScope.launch {
             while (true) {
                 delay(THERMAL_POLL_INTERVAL_MS)
-                // Mock de debug (voir MainUiState.debugThermalOverride, DiagnosticsScreen) : lu en
+                // Mock de debug (voir MainUiState.debugThermalOverride, AdvancedSettingsScreen) : lu en
                 // direct à chaque sondage, prioritaire sur le capteur réel tant qu'il est non-null.
                 val throttling = _uiState.value.debugThermalOverride
                     ?: DeviceCapabilityDetector.isThermalThrottling(context)
@@ -1497,7 +1497,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Niveau minimal conservé dans le fichier de logs exportable (voir logging/AppLog.kt, revue
-     * technique point 50) -- persisté, réglable depuis LoggingSettingsScreen, effet immédiat (voir
+     * technique point 50) -- persisté, réglable depuis AdvancedSettingsScreen, effet immédiat (voir
      * le collecteur `appSettingsStore.logLevel` dans init{}).
      */
     fun setLogLevel(level: LogLevel) {
@@ -1583,7 +1583,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Construit l'intent de partage du fichier de logs (bouton "Partager les logs",
-     * LoggingSettingsScreen) -- `null` si rien n'a encore été loggé au niveau configuré (pas
+     * AdvancedSettingsScreen) -- `null` si rien n'a encore été loggé au niveau configuré (pas
      * d'erreur affichée dans ce cas, juste rien à partager). URI `content://` via [FileProvider]
      * (voir AndroidManifest.xml/res/xml/file_paths.xml) plutôt qu'une URI `file://` directe,
      * bloquée par le système sur les versions récentes d'Android (`FileUriExposedException`).
@@ -1615,7 +1615,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setTierOverride(tier) }
     }
 
-    // --- Mocks de debug (panneau caché de DiagnosticsScreen, voir revue technique point 35) ---
+    // --- Mocks de debug (panneau caché de AdvancedSettingsScreen, voir revue technique point 35) ---
 
     /**
      * Mock de debug : force le repli CameraX au palier OPTIMAL même si ARCore est supporté --
@@ -1641,7 +1641,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Réinitialise en un seul geste les trois mocks de debug -- accessible depuis le panneau
-     * déverrouillé ET depuis l'indicateur toujours visible (voir DiagnosticsScreen), sans avoir à
+     * déverrouillé ET depuis l'indicateur toujours visible (voir AdvancedSettingsScreen), sans avoir à
      * refaire le geste de déverrouillage juste pour "réparer" un mock resté actif par erreur.
      */
     fun resetDebugOverrides() {

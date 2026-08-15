@@ -157,7 +157,7 @@ class AppSettingsStore(private val context: Context) {
      * automatique (comportement par défaut, voir `TrackingTierSelector.select`). Pensé comme
      * outil de diagnostic (ex. forcer `STANDARD` sur un appareil qui qualifierait pour `OPTIMAL`,
      * pour tester le chemin CameraX sans dépendre d'un second appareil), pas une fonctionnalité
-     * utilisateur normale -- voir `DiagnosticsScreen`. Lu une seule fois au lancement
+     * utilisateur normale -- voir `AdvancedSettingsScreen`. Lu une seule fois au lancement
      * (`initializeTracking`, comme `persistBlendshapeSelectionEnabled`) : un changement en cours
      * de session ne s'applique qu'au prochain redémarrage de l'app, le pipeline caméra/MediaPipe
      * n'étant pas reconstruit à chaud.
@@ -173,7 +173,7 @@ class AppSettingsStore(private val context: Context) {
     }
 
     /**
-     * Mock de debug (panneau caché de `DiagnosticsScreen`, voir revue technique point 35) : force
+     * Mock de debug (panneau caché de `AdvancedSettingsScreen`, voir revue technique point 35) : force
      * le repli CameraX au palier `OPTIMAL` même sur un appareil qui supporte réellement ARCore --
      * permet de vérifier `ArCoreHeadPoseTracker.onUnavailable` sans dépendre d'un appareil
      * incompatible. Désactivé par défaut. Persisté mais lu une seule fois au lancement
@@ -203,7 +203,7 @@ class AppSettingsStore(private val context: Context) {
 
     /**
      * Réinitialise en un seul appel les mocks de debug persistés ci-dessus -- accessible depuis
-     * l'indicateur toujours visible de `DiagnosticsScreen` sans avoir à refaire le geste de
+     * l'indicateur toujours visible de `AdvancedSettingsScreen` sans avoir à refaire le geste de
      * déverrouillage juste pour corriger un mock resté actif par erreur. Ne touche pas à
      * [tierOverride] (réglage diagnostic préexistant et distinct) ni au mock thermique
      * (`MainUiState.debugThermalOverride`, volontairement non persisté -- voir `MainViewModel`).
@@ -218,7 +218,7 @@ class AppSettingsStore(private val context: Context) {
     /**
      * Niveau minimal conservé dans le fichier de logs exportable (voir `logging/AppLog.kt`, revue
      * technique point 50) -- `ERROR` par défaut, réglable jusqu'à `WARN`/`INFO` depuis
-     * `LoggingSettingsScreen`. `VERBOSE`/`DEBUG` ne sont volontairement pas des valeurs valides ici
+     * `AdvancedSettingsScreen`. `VERBOSE`/`DEBUG` ne sont volontairement pas des valeurs valides ici
      * (convention Android officielle -- jamais persistés, voir kdoc de `LogLevel`) ; une valeur
      * stockée invalide ou absente retombe sur `ERROR` plutôt que de planter.
      */

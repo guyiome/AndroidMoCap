@@ -6,7 +6,7 @@ package com.guyiome.androidmocap.logging
  * sont volontairement pas proposés dans le réglage utilisateur ([AppSettingsStore] -- convention
  * Android officielle, jamais censés survivre dans un build release) ; seuls INFO/WARN/ERROR sont
  * sélectionnables, ERROR par défaut. Public (pas `internal`) : traverse volontairement des API
- * publiques (`MainUiState`, `LoggingSettingsScreen`, `AppSettingsStore`), contrairement au reste du
+ * publiques (`MainUiState`, `AdvancedSettingsScreen`, `AppSettingsStore`), contrairement au reste du
  * package `logging` qui reste `internal`.
  */
 enum class LogLevel(val shortCode: Char) {

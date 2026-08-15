@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import com.guyiome.androidmocap.R
 
 /**
- * Valeurs en direct des blendshapes cochées dans [BlendshapeSelectionScreen]. Pivote par pas de
+ * Valeurs en direct des blendshapes cochées dans [BlendshapesScreen]. Pivote par pas de
  * 90° selon que le téléphone est tenu à la verticale ou à l'horizontale ([panelRotationDegrees] --
  * calculé dans [MainScreen] à partir de l'orientation physique) : pas de rotation continue ici
  * comme pour les icônes du HUD, un bloc de texte tournant en continu serait illisible pendant la

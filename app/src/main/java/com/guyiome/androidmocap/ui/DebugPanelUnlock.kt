@@ -1,6 +1,6 @@
 package com.guyiome.androidmocap.ui
 
-/** Nombre de taps consécutifs requis pour révéler le panneau de mocks de debug (voir [DiagnosticsScreen]). */
+/** Nombre de taps consécutifs requis pour révéler le panneau de mocks de debug (voir [AdvancedSettingsScreen]). */
 internal const val DEBUG_PANEL_UNLOCK_TAP_COUNT = 7
 
 /** Fenêtre de temps (ms) tolérée entre deux taps consécutifs -- au-delà, le compteur repart de 1 plutôt que de continuer. */
@@ -9,7 +9,7 @@ internal const val DEBUG_PANEL_UNLOCK_TAP_WINDOW_MS = 1000L
 /**
  * État pur du geste de déverrouillage du panneau de mocks de debug (voir revue technique, point
  * 35) -- même principe que le menu développeur Android ("taper 7 fois sur le numéro de build"),
- * appliqué ici à la ligne "Version de l'app" de [DiagnosticsScreen]. Volontairement non persisté
+ * appliqué ici à la ligne "Version de l'app" de [AdvancedSettingsScreen]. Volontairement non persisté
  * (état Compose local, `remember`) : le geste ne coûte que quelques secondes à refaire, contrairement
  * aux mocks eux-mêmes (voir `AppSettingsStore.debugForceArCoreUnavailable`/`debugForceGpuUnavailable`,
  * qui doivent survivre au redémarrage nécessaire à leur propre test).

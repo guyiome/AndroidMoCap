@@ -57,7 +57,7 @@ fun TongueCalibrationScreen(
     onClose: () -> Unit,
 ) {
     BackHandler(onBack = onClose)
-    // État local, volontairement non hoisté/persisté -- même patron que DiagnosticsScreen (voir
+    // État local, volontairement non hoisté/persisté -- même patron que AdvancedSettingsScreen (voir
     // DebugPanelUnlock.kt) : le geste (7 taps sur le titre) ne coûte que quelques secondes à refaire.
     var debugUnlock by remember { mutableStateOf(DebugPanelUnlockState()) }
     Box(

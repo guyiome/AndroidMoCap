@@ -22,7 +22,7 @@ class FaceLandmarkerHelper(
     private val context: Context,
     private val tierConfig: TierConfig,
     /**
-     * Mock de debug (panneau caché de `DiagnosticsScreen`, voir `AppSettingsStore.debugForceGpuUnavailable`
+     * Mock de debug (panneau caché de `AdvancedSettingsScreen`, voir `AppSettingsStore.debugForceGpuUnavailable`
      * et revue technique point 35) : force le repli CPU même si [TierConfig.preferGpuDelegate] est
      * vrai -- réutilise le chemin de repli CPU déjà existant dans [setup] sans le modifier.
      */

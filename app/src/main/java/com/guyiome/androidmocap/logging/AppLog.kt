@@ -8,7 +8,7 @@ import java.io.File
  * Point d'entrée unique de journalisation de l'app (revue technique, point 50) -- remplace les
  * appels directs à `android.util.Log` dans le reste du code, pour deux raisons : un format
  * cohérent d'un appel à l'autre, et un chemin secondaire vers un fichier exportable par
- * l'utilisateur (voir `ui/LoggingSettingsScreen.kt`), en plus de `logcat`.
+ * l'utilisateur (voir `ui/AdvancedSettingsScreen.kt`), en plus de `logcat`.
  *
  * - [v]/[d] (verbose/debug) sont des no-op hors build debug ([BuildConfig.DEBUG]) -- ni `logcat`,
  *   ni fichier -- convention Android officielle (voir kdoc de [LogLevel]), et garantie explicite en

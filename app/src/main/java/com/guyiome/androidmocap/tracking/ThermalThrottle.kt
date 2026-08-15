@@ -32,7 +32,7 @@ internal const val SUSTAINED_THROTTLE_TICKS = 12
  *
  * [downgradeSuggested] devient vrai (et le reste pour le reste de la session, jamais remis à faux)
  * après [SUSTAINED_THROTTLE_TICKS] sondages consécutifs en throttling -- signal purement informatif
- * affiché en diagnostic (voir `DiagnosticsScreen`), à côté du sélecteur de palier manuel déjà
+ * affiché en diagnostic (voir `AdvancedSettingsScreen`), à côté du sélecteur de palier manuel déjà
  * existant -- jamais appliqué automatiquement : rétrograder le palier reste toujours un choix
  * explicite de l'utilisateur, pas une action prise pour lui à sa place.
  */
