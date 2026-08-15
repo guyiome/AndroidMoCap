@@ -122,6 +122,7 @@
     <string name="diagnostics_debug_reset_all">Réinitialiser tous les mocks de debug</string>
     <string name="diagnostics_debug_override_active_warning">Un mock de debug est actif -- ne reflète pas forcément le comportement réel de l\'appareil</string>
     <string name="cd_thermal_throttling">Débit réduit pour cause de chauffe</string>
+    <string name="cd_update_available">Mise à jour disponible -- appuyer pour ouvrir la page de la Release</string>
 
     <!-- Écran Affichage & confort -->
     <string name="display_settings_title">Affichage</string>

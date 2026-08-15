@@ -2,6 +2,7 @@ package com.guyiome.androidmocap.ui
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
 import android.opengl.GLSurfaceView
 import android.view.WindowManager
 import androidx.camera.view.PreviewView
@@ -282,6 +283,13 @@ fun MainScreen(
                     onToggleConnection = { viewModel.toggleActiveConnection() },
                     onOpenSettings = { showSettings = true },
                     onOpenExperimental = { showExperimentalFeatures = true },
+                    // Lien direct vers la page de la Release GitHub -- jamais d'install silencieuse
+                    // possible hors store (voir MainViewModel.checkForUpdate, point 14).
+                    onOpenUpdate = {
+                        uiState.updateAvailableUrl?.let { url ->
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        }
+                    },
                 )
             }
 

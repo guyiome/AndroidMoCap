@@ -50,6 +50,7 @@ class AppSettingsStore(private val context: Context) {
         val TONGUE_REFERENCES_CALIBRATED = booleanPreferencesKey("tongue_references_calibrated")
         val TONGUE_CALIBRATION_RECORDING_DURATION_MS = longPreferencesKey("tongue_calibration_recording_duration_ms")
         val TONGUE_CLASSIFICATION_MARGIN = floatPreferencesKey("tongue_classification_margin")
+        val LAST_UPDATE_CHECK_TIMESTAMP_MS = longPreferencesKey("last_update_check_timestamp_ms")
     }
 
     val lowBatteryThresholdPercent: Flow<Int> = context.appSettingsDataStore.data.map { prefs ->
@@ -310,5 +311,20 @@ class AppSettingsStore(private val context: Context) {
 
     suspend fun setTongueClassificationMargin(margin: Float) {
         context.appSettingsDataStore.edit { prefs -> prefs[Keys.TONGUE_CLASSIFICATION_MARGIN] = margin }
+    }
+
+    /**
+     * Horodatage (epoch ms) de la dernière vérification de mise à jour réussie (point 14) -- `0L`
+     * par défaut (jamais vérifié). Sert uniquement de seuil de rafraîchissement
+     * (`MainViewModel.checkForUpdate`, throttle 24h) pour éviter un appel réseau à chaque
+     * lancement ; mis à jour seulement après un appel réussi, pas après un échec réseau, pour
+     * qu'un échec temporaire se retente au prochain lancement plutôt que d'attendre 24h.
+     */
+    val lastUpdateCheckTimestampMs: Flow<Long> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[Keys.LAST_UPDATE_CHECK_TIMESTAMP_MS] ?: 0L
+    }
+
+    suspend fun setLastUpdateCheckTimestampMs(timestampMs: Long) {
+        context.appSettingsDataStore.edit { prefs -> prefs[Keys.LAST_UPDATE_CHECK_TIMESTAMP_MS] = timestampMs }
     }
 }

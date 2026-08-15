@@ -23,10 +23,12 @@ import com.guyiome.androidmocap.capabilities.DeviceCapabilityDetector
 import com.guyiome.androidmocap.logging.AppLog
 import com.guyiome.androidmocap.logging.LogLevel
 import com.guyiome.androidmocap.network.IFacialMocapSender
+import com.guyiome.androidmocap.network.UpdateChecker
 import com.guyiome.androidmocap.network.VTubeStudioConnectionState
 import com.guyiome.androidmocap.network.VTubeStudioSender
 import com.guyiome.androidmocap.network.VmcOscSender
 import com.guyiome.androidmocap.network.getLocalIpAddress
+import com.guyiome.androidmocap.network.isNewerVersion
 import com.guyiome.androidmocap.sensors.DeviceOrientationTracker
 import com.guyiome.androidmocap.settings.AppLanguage
 import com.guyiome.androidmocap.settings.AppSettingsStore
@@ -114,6 +116,12 @@ data class MainUiState(
     // accordée (voir LaunchedEffect(hasCameraPermission) côté MainScreen), l'écran de permission
     // s'affiche avant, pas cet écran de chargement.
     val isInitializing: Boolean = true,
+    // Vérification de mise à jour semi-automatique (point 14) -- non-null = une version plus
+    // récente que BuildConfig.VERSION_NAME est disponible, valeur = lien direct vers la page de la
+    // Release GitHub (voir MainViewModel.checkForUpdate). Jamais réinitialisé à null une fois posé
+    // -- reste affiché tant que l'app n'est pas mise à jour (pas d'état "ignoré" par choix, voir
+    // revue technique point 14).
+    val updateAvailableUrl: String? = null,
     val tier: TrackingTier? = null,
     // Force un palier au lieu de la sélection automatique -- null = automatique (comportement par
     // défaut). Outil de diagnostic (voir AdvancedSettingsScreen), persisté mais appliqué seulement au
@@ -290,6 +298,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private companion object {
         private const val TAG = "MainViewModel"
+
+        // Point 14 : throttle de la vérification de mise à jour, voir checkForUpdate().
+        private const val UPDATE_CHECK_MIN_INTERVAL_MS = 24 * 60 * 60 * 1000L
 
         // Diagnostic du point 28 (fiabilisation eyeBlink) -- logue EAR + blendshape brut/corrigé à
         // chaque frame, lu via `adb logcat -s EarDiag`. A servi à diagnostiquer et confirmer trois
@@ -661,6 +672,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val savedNames = appSettingsStore.persistedBlendshapeSelectionNames.first()
                 _uiState.update { it.copy(selectedBlendshapeNames = savedNames) }
             }
+        }
+        // Indépendant de initializeTracking()/la permission caméra -- ne dépend que d'Internet, pas
+        // du tout de la caméra ni du pipeline de tracking, voir kdoc de checkForUpdate().
+        viewModelScope.launch(Dispatchers.IO) { checkForUpdate() }
+    }
+
+    /**
+     * Vérification de mise à jour semi-automatique (point 14) : compare [BuildConfig.VERSION_NAME]
+     * au dernier tag publié sur GitHub Releases (`GET /repos/guyiome/AndroidMoCap/releases/latest`,
+     * qui exclut déjà lui-même les prereleases -- un tag `-beta` ne déclenche donc jamais cette
+     * notification). Throttlé à une fois par [UPDATE_CHECK_MIN_INTERVAL_MS] (persisté,
+     * `AppSettingsStore.lastUpdateCheckTimestampMs`) plutôt qu'à chaque lancement -- l'horodatage
+     * n'est mis à jour qu'après un appel réseau réussi, jamais après un échec, pour qu'une panne
+     * réseau temporaire se retente au prochain lancement plutôt que de rester bloquée 24h. Best
+     * effort de bout en bout : [UpdateChecker.fetchLatestRelease] ne lève jamais d'exception (voir
+     * son kdoc), un échec silencieux ici laisse simplement [MainUiState.updateAvailableUrl] à
+     * `null`, sans jamais gêner le reste du lancement de l'app.
+     */
+    private suspend fun checkForUpdate() {
+        val lastCheckMs = appSettingsStore.lastUpdateCheckTimestampMs.first()
+        if (System.currentTimeMillis() - lastCheckMs < UPDATE_CHECK_MIN_INTERVAL_MS) return
+        val release = UpdateChecker().fetchLatestRelease() ?: return
+        appSettingsStore.setLastUpdateCheckTimestampMs(System.currentTimeMillis())
+        if (isNewerVersion(BuildConfig.VERSION_NAME, release.tagName)) {
+            AppLog.i(TAG, "Mise à jour disponible : ${release.tagName} (version actuelle ${BuildConfig.VERSION_NAME})")
+            _uiState.update { it.copy(updateAvailableUrl = release.htmlUrl) }
         }
     }
 
