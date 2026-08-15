@@ -7,6 +7,7 @@
     <string name="cd_back">Back</string>
     <string name="action_stop">Stop</string>
     <string name="action_reset">Reset</string>
+    <string name="action_cancel">Cancel</string>
     <string name="placeholder_unknown">…</string>
     <string name="bool_yes">yes</string>
     <string name="bool_no">no</string>

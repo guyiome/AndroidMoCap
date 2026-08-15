@@ -5,6 +5,7 @@
     <string name="cd_back">Retour</string>
     <string name="action_stop">Stop</string>
     <string name="action_reset">Réinitialiser</string>
+    <string name="action_cancel">Annuler</string>
     <string name="placeholder_unknown">…</string>
     <string name="bool_yes">oui</string>
     <string name="bool_no">non</string>
