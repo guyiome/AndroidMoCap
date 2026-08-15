@@ -126,7 +126,7 @@ fun BlendshapesScreen(
                 }
                 Spacer(Modifier.width(8.dp))
                 OutlinedButton(onClick = { showResetWeightsConfirmation = true }, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.blendshape_reset_weights_button))
+                    Text(stringResource(R.string.action_reset))
                 }
             }
             if (showResetWeightsConfirmation) {

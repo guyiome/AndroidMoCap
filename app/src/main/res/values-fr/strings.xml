@@ -121,7 +121,6 @@
     <string name="blendshape_selection_not_persisted_suffix"> -- non conservé au redémarrage</string>
     <string name="display_persist_selection_label">Mémoriser cette sélection au prochain lancement</string>
     <string name="blendshape_deselect_all_button">Tout désélectionner</string>
-    <string name="blendshape_reset_weights_button">Réinitialiser les pondérations</string>
     <string name="blendshape_reset_weights_confirm_title">Réinitialiser toutes les pondérations ?</string>
     <string name="blendshape_reset_weights_confirm_message">Chaque pondération de blendshape revient à sa valeur par défaut (1.0). Action irréversible.</string>
     <string name="display_mesh_overlay_title">Overlay du mesh de tracking</string>
