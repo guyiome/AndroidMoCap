@@ -57,7 +57,7 @@
     <string name="connection_udp_section_title">iFacialMocap — compatible protocol</string>
     <string name="connection_udp_ip_hint">Phone IP to enter in VBridger: %1$s</string>
     <string name="action_listen">Listen</string>
-    <string name="connection_udp_connected_to">connected to %1$s</string>
+    <string name="connection_udp_connected_to">sending to %1$s</string>
     <string name="connection_udp_waiting_handshake">waiting for VBridger handshake…</string>
     <string name="connection_udp_status">UDP connection: %1$s</string>
     <string name="connection_choose_type_hint">Choose a connection type above to see its settings.</string>
@@ -185,7 +185,7 @@
     <string name="logging_share_empty_hint">Nothing logged yet at this level.</string>
 
     <!-- Settings menu (subtitles) -->
-    <string name="settings_vmc_connected_subtitle">VMC connected to %1$s</string>
+    <string name="settings_vmc_connected_subtitle">Sending VMC data to %1$s</string>
     <string name="settings_vmc_not_connected_subtitle">VMC selected, not connected yet</string>
     <string name="settings_udp_listening_subtitle">UDP / VBridger listening</string>
     <string name="settings_udp_not_listening_subtitle">UDP / VBridger selected, not listening yet</string>
