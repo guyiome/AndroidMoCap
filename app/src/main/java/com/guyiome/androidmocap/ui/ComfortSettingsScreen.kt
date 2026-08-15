@@ -53,6 +53,7 @@ fun ComfortSettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.92f))
+            .blockClicksBehind()
     ) {
         Column(
             modifier = Modifier

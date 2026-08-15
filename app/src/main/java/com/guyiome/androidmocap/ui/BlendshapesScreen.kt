@@ -89,6 +89,7 @@ fun BlendshapesScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.95f))
+            .blockClicksBehind()
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
