@@ -143,7 +143,7 @@
     <!-- Écran Fonctionnalités expérimentales -->
     <string name="experimental_features_title">Fonctionnalités expérimentales</string>
     <string name="experimental_tongue_detection_title">Détection langue tirée</string>
-    <string name="experimental_tongue_detection_description">Désactivé par défaut. Fait tourner une cascade à 3 étages (porte d\'ouverture de bouche, heuristique couleur, embedding calibré personnellement) et affiche le résultat en direct dans le panneau de blendshapes si tongueOut est coché. Également envoyé sur le réseau une fois calibré -- expérimental, de rares faux positifs restent possibles.</string>
+    <string name="experimental_tongue_detection_description">Désactivé par défaut -- expérimental, de rares faux positifs restent possibles.</string>
     <string name="experimental_tongue_calibration_button">Calibrer la détection…</string>
 
     <!-- Écran de calibration langue tirée -->
