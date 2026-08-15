@@ -143,9 +143,12 @@ class VBridgerFormulasTest {
     }
 
     @Test
-    fun `EyeRightX et EyeLeftX lisent des blendshapes distincts (gauche vs droite)`() {
+    fun `EyeRightX et EyeLeftX lisent chacune leur propre cote, sans croisement -- coherence miroir`() {
+        // Lecture directe (EyeRightX <- _R, EyeLeftX <- _L), pas le croisement du référentiel
+        // d'origine -- voir kdoc de tête du fichier (cohérence avec EyeOpenLeft/Right, EyeSquintL/R
+        // etc., qui n'ont elles jamais eu de croisement).
         val onlyLeftEyeLooksIn = result(listOf(BlendshapeScore("eyeLookInLeft", 0.5f)))
-        assertTrue(valueFor("EyeRightX", onlyLeftEyeLooksIn) != 0f)
-        assertEquals(-0.1f, valueFor("EyeLeftX", onlyLeftEyeLooksIn), 0.0001f) // -0.1 offset, aucune entrée _R
+        assertEquals(-0.1f, valueFor("EyeRightX", onlyLeftEyeLooksIn), 0.0001f) // -0.1 offset, aucune entrée _R
+        assertTrue(valueFor("EyeLeftX", onlyLeftEyeLooksIn) != 0f)
     }
 }

@@ -60,12 +60,33 @@ import com.guyiome.androidmocap.tracking.FaceTrackingResult
  * (bon signe qu'il n'y a pas d'autre coquille du même genre, mais pas vérifié un par un contre un vrai
  * VBridger).
  *
+ * ⚠️ **Croisement `_L`/`_R` du référentiel retiré de `EyeRightX/Y`/`EyeLeftX/Y`** (correction du 15
+ * août 2026, retour utilisateur) : le référentiel `VBridgerFormulaReference.md` construit
+ * délibérément `EyeRightX/Y` depuis les blendshapes `_L` (et vice versa), un miroir intégré à la
+ * formule elle-même -- mais c'est la SEULE formule Eyes à le faire, `EyeOpenLeft/Right`,
+ * `EyeSquintL/R` etc. lisent toutes leur propre côté directement, sans croisement. Combiné au fait
+ * que ce fichier reçoit désormais toujours des données déjà mirrorées de façon uniforme par
+ * `MainViewModel` (voir plus bas), garder ce croisement aurait fait subir un miroir supplémentaire
+ * au seul regard, incohérent avec le reste des champs Eyes -- corrigé en lecture directe partout
+ * (`EyeRightX/Y` lit `_R`, `EyeLeftX/Y` lit `_L`), même convention que tout le reste du fichier.
+ *
+ * ⚠️ **Aucun miroir ne doit être intégré dans ces formules -- c'est le réglage `mirrorModeEnabled`
+ * de l'app, appliqué en amont par `MainViewModel`, qui décide, de façon uniforme pour tous les
+ * champs (tête, blendshapes gauche/droite, regard).** Une première tentative avait fait évaluer ces
+ * formules sur la donnée *avant* ce mode miroir, en pensant que les formules composites avaient
+ * besoin d'un flux brut/anatomique -- source d'une incohérence détectée par l'utilisateur (le regard,
+ * seul champ avec un miroir intégré à la formule d'origine, se retrouvait mirroré différemment du
+ * reste). `MainViewModel` envoie donc à nouveau `finalToSend` (déjà mirroré de façon uniforme, comme
+ * pour tous les autres envois réseau) à ce fichier, quel que soit le réglage de traduction -- voir son
+ * commentaire au site d'appel.
+ *
  * ⚠️ **`EyeLeftX`/`EyeLeftY` ne sont PAS transcrits depuis la capture d'écran source** -- seuls
- * `EyeRightX/Y` étaient visibles. Reconstruits par symétrie miroir (substituer `_L` par `_R` dans la
- * même forme de formule) en s'appuyant sur la convention de paires déjà cohérente partout ailleurs
- * dans le référentiel (`EyeOpenLeft`←`_L`/`EyeOpenRight`←`_R`, `BrowLeftY`←`_L`/`BrowRightY`←`_R`...).
- * Inclus quand même plutôt qu'omis (décision explicite : les omettre créerait aussi un écart de
- * parité, juste dans l'autre sens) -- à vérifier contre un vrai VBridger si l'exactitude devient
+ * `EyeRightX/Y` étaient visibles. Reconstruits par symétrie de paire (même forme de formule que
+ * `EyeRightX/Y`, substituant simplement le côté lu) en s'appuyant sur la convention de paires déjà
+ * cohérente partout ailleurs dans le référentiel (`EyeOpenLeft`/`EyeOpenRight`,
+ * `BrowLeftY`/`BrowRightY`...). Inclus quand même plutôt qu'omis (décision explicite : les omettre
+ * créerait aussi un écart de parité, juste dans l'autre sens) -- à vérifier contre un vrai VBridger si
+ * l'exactitude devient
  * critique, corrigible via le futur éditeur de formules.
  *
  * **Omissions délibérées, pas des oublis** :
@@ -114,11 +135,14 @@ object VBridgerFormulas {
         VtsParameterFormula("EyeOpenRight", requiresParameterCreation = true) { b, _ -> eyeOpen(b, "eyeBlinkRight", "eyeWideRight") },
         VtsParameterFormula("EyeSquintL", requiresParameterCreation = true) { b, _ -> b["eyeSquintLeft"] ?: 0f },
         VtsParameterFormula("EyeSquintR", requiresParameterCreation = true) { b, _ -> b["eyeSquintRight"] ?: 0f },
-        VtsParameterFormula("EyeRightX", requiresParameterCreation = true) { b, _ -> eyeGazeX(b, "eyeLookInLeft", "eyeLookOutLeft") },
-        VtsParameterFormula("EyeRightY", requiresParameterCreation = true) { b, _ -> eyeGazeY(b, "eyeLookUpLeft", "eyeLookDownLeft") },
-        // Reconstruits par symétrie miroir, pas transcrits depuis la capture source -- voir kdoc de tête du fichier.
-        VtsParameterFormula("EyeLeftX", requiresParameterCreation = true) { b, _ -> eyeGazeX(b, "eyeLookInRight", "eyeLookOutRight") },
-        VtsParameterFormula("EyeLeftY", requiresParameterCreation = true) { b, _ -> eyeGazeY(b, "eyeLookUpRight", "eyeLookDownRight") },
+        // Lecture directe (côté droit -> _R), pas le croisement _L du référentiel d'origine -- voir
+        // kdoc de tête du fichier (cohérence du miroir avec le reste des formules Eyes).
+        VtsParameterFormula("EyeRightX", requiresParameterCreation = true) { b, _ -> eyeGazeX(b, "eyeLookInRight", "eyeLookOutRight") },
+        VtsParameterFormula("EyeRightY", requiresParameterCreation = true) { b, _ -> eyeGazeY(b, "eyeLookUpRight", "eyeLookDownRight") },
+        // Reconstruits par symétrie de paire (pas transcrits depuis la capture source, voir kdoc de
+        // tête du fichier) -- lecture directe côté gauche -> _L, même raisonnement que ci-dessus.
+        VtsParameterFormula("EyeLeftX", requiresParameterCreation = true) { b, _ -> eyeGazeX(b, "eyeLookInLeft", "eyeLookOutLeft") },
+        VtsParameterFormula("EyeLeftY", requiresParameterCreation = true) { b, _ -> eyeGazeY(b, "eyeLookUpLeft", "eyeLookDownLeft") },
 
         // --- Mouth ---
         VtsParameterFormula("JawOpen", requiresParameterCreation = true) { b, _ -> b["jawOpen"] ?: 0f },

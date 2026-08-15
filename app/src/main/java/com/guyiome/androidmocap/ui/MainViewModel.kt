@@ -1322,21 +1322,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         vmcSender?.send(finalToSend)
         iFacialMocapSender?.send(finalToSend)
 
-        // Traduction VBridger (point 41) : les formules composites de VBridgerFormulas intègrent
-        // déjà leur propre inversion miroir (ex. FaceAngleX = -headRotY, EyeRightX construit depuis
-        // les blendshapes _L -- voir le kdoc de VBridgerFormulas), pensée pour un flux brut/anatomique
-        // en entrée (comme un vrai VBridger recevant un vrai iFacialMocap). Leur appliquer par-dessus
-        // "final" (déjà mirroré par ce fichier si mirrorModeEnabled) inverserait deux fois -- bug
-        // confirmé sur device (avatar plus du tout mirroré en mode traduction). "corrected" (avant le
-        // mode miroir de cette fonction) sert donc de base à la place, avec la même injection tongueOut
-        // que finalToSend, pour que le seul mode miroir appliqué soit celui, déjà correct, intégré aux
-        // formules VBridger elles-mêmes -- indépendant du réglage mirrorModeEnabled de cette app.
-        val correctedToSend = tongueOutValueForInjection?.let { value ->
-            corrected.copy(blendshapes = corrected.blendshapes + BlendshapeScore("tongueOut", value))
-        } ?: corrected
-        val useVBridgerTranslation = _uiState.value.vtsUseVBridgerTranslation
-        val vtsResult = if (useVBridgerTranslation) correctedToSend else finalToSend
-        vtubeStudioSender?.send(vtsResult, useVBridgerTranslation)
+        // Traduction VBridger (point 41) : "finalToSend" (déjà mirroré de façon uniforme par ce
+        // fichier si mirrorModeEnabled, tête + tous les blendshapes gauche/droite confondus) sert de
+        // base ici comme pour tous les autres envois -- un seul réglage, cohérent pour tous les
+        // champs, y compris les yeux (voir kdoc de VBridgerFormulas : la tentative précédente de
+        // court-circuiter ce miroir pour ce seul envoi produisait une incohérence -- le regard
+        // héritait d'un croisement propre à VBridger tandis que le reste (ouverture d'œil, sourcils...)
+        // restait anatomique, retour utilisateur explicite -- corrigée le même jour).
+        vtubeStudioSender?.send(finalToSend, _uiState.value.vtsUseVBridgerTranslation)
     }
 
     /**
