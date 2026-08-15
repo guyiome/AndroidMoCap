@@ -142,7 +142,7 @@
 
     <!-- Écran Fonctionnalités expérimentales -->
     <string name="experimental_features_title">Fonctionnalités expérimentales</string>
-    <string name="experimental_features_placeholder">La détection des joues gonflées n\'est pas encore implémentée (voir la revue technique).</string>
+    <string name="experimental_features_placeholder">La détection des joues gonflées n\'est pas encore implémentée.</string>
     <string name="experimental_tongue_detection_title">Détection langue tirée (diagnostic)</string>
     <string name="experimental_tongue_detection_description">Désactivé par défaut. Fait tourner une cascade à 3 étages (porte d\'ouverture de bouche, heuristique couleur, embedding calibré personnellement) et affiche le résultat en direct dans le panneau de blendshapes si tongueOut est coché. Également envoyé sur le réseau une fois calibré -- expérimental, de rares faux positifs restent possibles.</string>
     <string name="experimental_tongue_calibration_button">Calibrer la détection…</string>
@@ -184,7 +184,7 @@
     <string name="settings_no_connection_type_subtitle">Aucun type choisi</string>
     <string name="settings_display_subtitle">Overlay du mesh de tracking, mode miroir</string>
     <string name="settings_comfort_subtitle">Économie d\'énergie, batterie, langue</string>
-    <string name="settings_experimental_subtitle">Aucune pour l\'instant</string>
+    <string name="settings_experimental_subtitle">Détection de la langue tirée</string>
     <string name="settings_advanced_subtitle">Diagnostics, journalisation</string>
 
     <!-- Erreurs (MainViewModel, non-@Composable, résolues via Context/Application) -->
