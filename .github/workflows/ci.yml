@@ -23,10 +23,8 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Configurer Gradle (cache basique, gratuit sur repo prive)
+      - name: Configurer Gradle (cache "enhanced", gratuit sur repo public -- desormais le cas)
         uses: gradle/actions/setup-gradle@v6
-        with:
-          cache-provider: basic
 
       - name: Telecharger le modele MediaPipe (voir README, non versionne)
         run: |
