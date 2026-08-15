@@ -82,6 +82,16 @@ class VBridgerFormulasTest {
         assertEquals(15f, valueFor("BodyAngleX", turnedYaw), 0.0001f) // x1.5
     }
 
+    @Test
+    fun `FaceAngleZ et BodyAngleZ inversent le roulis -- convention d'axe VTS opposee`() {
+        // Corrige un retour utilisateur (15 août 2026) : l'inclinaison de tête bougeait bien avec le
+        // réglage miroir (donc la logique de miroir elle-même était déjà correcte) mais dans le
+        // mauvais sens -- convention d'axe VTS opposée à celle du référentiel pour cet axe.
+        val tiltedRoll = result(headEulerDegrees = floatArrayOf(0f, 0f, 10f))
+        assertEquals(-10f, valueFor("FaceAngleZ", tiltedRoll), 0.0001f)
+        assertEquals(-15f, valueFor("BodyAngleZ", tiltedRoll), 0.0001f) // x1.5
+    }
+
     // --- Visage neutre : valeurs de repos vérifiables à la main (voir revue technique, point 41) ---
 
     @Test
@@ -157,9 +167,10 @@ class VBridgerFormulasTest {
     fun `EyeRightX et EyeLeftX lisent chacune leur propre cote, sans croisement -- coherence miroir`() {
         // Lecture directe (EyeRightX <- _R, EyeLeftX <- _L), pas le croisement du référentiel
         // d'origine -- voir kdoc de tête du fichier (cohérence avec EyeOpenLeft/Right, EyeSquintL/R
-        // etc., qui n'ont elles jamais eu de croisement).
+        // etc., qui n'ont elles jamais eu de croisement). Signe inversé par rapport au référentiel
+        // d'origine (voir eyeGazeX) -- retour utilisateur, convention d'axe VTS opposée sur cet axe.
         val onlyLeftEyeLooksIn = result(listOf(BlendshapeScore("eyeLookInLeft", 0.5f)))
-        assertEquals(-0.1f, valueFor("EyeRightX", onlyLeftEyeLooksIn), 0.0001f) // -0.1 offset, aucune entrée _R
-        assertTrue(valueFor("EyeLeftX", onlyLeftEyeLooksIn) != 0f)
+        assertEquals(0.1f, valueFor("EyeRightX", onlyLeftEyeLooksIn), 0.0001f) // -(-0.1 offset), aucune entrée _R
+        assertEquals(-0.4f, valueFor("EyeLeftX", onlyLeftEyeLooksIn), 0.0001f) // -((0.5 - 0.1) - 0)
     }
 }

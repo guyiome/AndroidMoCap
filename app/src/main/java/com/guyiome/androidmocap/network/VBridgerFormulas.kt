@@ -201,8 +201,12 @@ object VBridgerFormulas {
         return (-head[0] + blink * FACE_ANGLE_EYE_BLINK_COEFFICIENT).coerceIn(FACE_ANGLE_RANGE_MIN, FACE_ANGLE_RANGE_MAX)
     }
 
+    // Signe inversé par rapport au référentiel d'origine (qui donnait `headRotZ * 1`) -- retour
+    // utilisateur sur device (15 août 2026) : l'inclinaison de tête (roulis) bougeait bien avec le
+    // miroir mais dans le mauvais sens. Convention d'axe VTS opposée à celle du référentiel pour cet
+    // axe, indépendante de la logique de miroir elle-même (déjà correcte -- confirmé "ça bouge").
     private fun faceAngleZ(head: FloatArray): Float =
-        head[2].coerceIn(FACE_ANGLE_RANGE_MIN, FACE_ANGLE_RANGE_MAX)
+        (-head[2]).coerceIn(FACE_ANGLE_RANGE_MIN, FACE_ANGLE_RANGE_MAX)
 
     private fun bodyAngleX(head: FloatArray): Float =
         (head[1] * BODY_ANGLE_COEFFICIENT).coerceIn(FACE_ANGLE_RANGE_MIN, FACE_ANGLE_RANGE_MAX)
@@ -214,7 +218,7 @@ object VBridgerFormulas {
     }
 
     private fun bodyAngleZ(head: FloatArray): Float =
-        (head[2] * BODY_ANGLE_COEFFICIENT).coerceIn(FACE_ANGLE_RANGE_MIN, FACE_ANGLE_RANGE_MAX)
+        (-head[2] * BODY_ANGLE_COEFFICIENT).coerceIn(FACE_ANGLE_RANGE_MIN, FACE_ANGLE_RANGE_MAX)
 
     // --- Eyes ---
     private const val EYE_OPEN_BASELINE = 0.5f
@@ -233,7 +237,12 @@ object VBridgerFormulas {
     private fun eyeGazeX(b: Map<String, Float>, lookInName: String, lookOutName: String): Float {
         val lookIn = b[lookInName] ?: 0f
         val lookOut = b[lookOutName] ?: 0f
-        return ((lookIn + EYE_GAZE_IN_OFFSET) - lookOut).coerceIn(EYE_GAZE_RANGE_MIN, EYE_GAZE_RANGE_MAX)
+        // Signe inversé par rapport au référentiel d'origine -- retour utilisateur sur device
+        // (15 août 2026) : le regard bougeait bien avec le miroir mais dans le mauvais sens
+        // horizontalement, même après le retrait du croisement _L/_R. Convention d'axe VTS opposée à
+        // celle du référentiel pour cet axe, indépendante de la logique de miroir elle-même (qui,
+        // elle, était déjà correcte -- confirmé par l'utilisateur : "ça bouge" avec le réglage).
+        return (-((lookIn + EYE_GAZE_IN_OFFSET) - lookOut)).coerceIn(EYE_GAZE_RANGE_MIN, EYE_GAZE_RANGE_MAX)
     }
 
     private fun eyeGazeY(b: Map<String, Float>, lookUpName: String, lookDownName: String): Float {
