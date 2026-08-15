@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -19,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,6 +57,8 @@ fun ConnectionSettingsScreen(
     onConnectVts: (String, Int) -> Unit,
     onDisconnectVts: () -> Unit,
     onForgetVtsToken: () -> Unit,
+    onSetUseVBridgerTranslation: (Boolean) -> Unit,
+    onOpenVtsFormulas: () -> Unit,
 ) {
     var vmcHostInput by remember { mutableStateOf(uiState.savedVmcHost.ifBlank { "192.168.1.100" }) }
     var vtsHostInput by remember { mutableStateOf(uiState.savedVtsHost.ifBlank { "192.168.1.100" }) }
@@ -235,6 +239,28 @@ fun ConnectionSettingsScreen(
                         TextButton(onClick = onForgetVtsToken, modifier = Modifier.padding(top = 4.dp)) {
                             Text(stringResource(R.string.connection_vts_forget_token))
                         }
+                    }
+
+                    // Traduction VBridger -> paramètres par défaut VTS (point 41) -- affiché en
+                    // permanence dans ce bloc, pas seulement une fois connecté, pour rester visible/
+                    // modifiable avant même de se connecter.
+                    Spacer(Modifier.height(16.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            stringResource(R.string.connection_vts_translation_label),
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Switch(checked = uiState.vtsUseVBridgerTranslation, onCheckedChange = onSetUseVBridgerTranslation)
+                    }
+                    Text(
+                        stringResource(R.string.connection_vts_translation_hint),
+                        color = Color.White.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    TextButton(onClick = onOpenVtsFormulas, modifier = Modifier.padding(top = 4.dp)) {
+                        Text(stringResource(R.string.connection_vts_view_formulas_button))
                     }
                 }
 

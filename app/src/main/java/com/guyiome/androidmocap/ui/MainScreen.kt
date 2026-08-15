@@ -85,6 +85,7 @@ fun MainScreen(
     var showExperimentalFeatures by remember { mutableStateOf(false) }
     var showAdvancedSettings by remember { mutableStateOf(false) }
     var showTongueCalibration by remember { mutableStateOf(false) }
+    var showVtsFormulas by remember { mutableStateOf(false) }
     var iconRotationDegrees by remember { mutableFloatStateOf(0f) }
     var batteryPercent by remember { mutableIntStateOf(100) }
     var isCharging by remember { mutableStateOf(true) }
@@ -338,6 +339,15 @@ fun MainScreen(
                     onConnectVts = { host, port -> viewModel.connectVtsTarget(host, port) },
                     onDisconnectVts = { viewModel.disconnectVtsTarget() },
                     onForgetVtsToken = { viewModel.forgetVtsAuthToken() },
+                    onSetUseVBridgerTranslation = { enabled -> viewModel.setVtsUseVBridgerTranslation(enabled) },
+                    onOpenVtsFormulas = { showVtsFormulas = true },
+                )
+            }
+
+            if (showVtsFormulas) {
+                VtsFormulasScreen(
+                    useVBridgerTranslation = uiState.vtsUseVBridgerTranslation,
+                    onClose = { showVtsFormulas = false },
                 )
             }
 

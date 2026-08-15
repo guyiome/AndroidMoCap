@@ -72,6 +72,15 @@
     <string name="connection_vts_status_connected">Connecté à %1$s</string>
     <string name="connection_vts_mapping_hint">Pense à mapper les nouveaux paramètres à ton modèle Live2D dans l\'éditeur de paramètres de VTube Studio -- sans ça, rien ne bougera.</string>
     <string name="connection_vts_forget_token">Oublier le jeton stocké</string>
+    <string name="connection_vts_translation_label">Envoyer les paramètres équivalents à VBridger</string>
+    <string name="connection_vts_translation_hint">Envoie en plus les paramètres par défaut de VTube Studio (FaceAngleX, MouthSmile…), calculés de la même façon que VBridger, pour qu\'un modèle déjà riggé pour VBridger/les paramètres par défaut de VTS réagisse sans faire tourner VBridger. La position de tête n\'est pas incluse (jamais calculée par cette app).</string>
+    <string name="connection_vts_view_formulas_button">Voir les paramètres envoyés</string>
+
+    <!-- Liste des paramètres VTube Studio (point 41) -->
+    <string name="vts_formulas_title">Paramètres VTube Studio</string>
+    <string name="vts_formulas_group_raw">Blendshapes ARKit bruts</string>
+    <string name="vts_formulas_group_vbridger">Formules VBridger</string>
+    <string name="cd_unverified_vts_formula">Formule non vérifiée contre un vrai VBridger</string>
 
     <!-- Écran Diagnostics -->
     <string name="diagnostics_title">Diagnostics</string>
