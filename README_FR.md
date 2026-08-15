@@ -139,6 +139,11 @@ Points principaux encore ouverts :
 - Adaptation des écrans de réglages à l'orientation système sur grand écran (tablette).
 - Ajustement de poids/gain par blendshape (+ lissage réglable).
 
+## Contact
+
+Questions, retours, signalement de bugs : Discord `guy_iome` (compte créé spécifiquement pour ce
+projet).
+
 ## Licence
 
 Distribué sous licence [PolyForm Shield 1.0.0](https://polyformproject.org/licenses/shield/1.0.0)

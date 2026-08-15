@@ -119,6 +119,10 @@ app/src/main/java/com/guyiome/androidmocap/
 - 设置界面在大屏幕（平板）上适配系统方向。
 - 按 blendshape 单独调整权重/增益（+ 可调平滑）。
 
+## 联系方式
+
+问题反馈、建议或漏洞报告：Discord `guy_iome`（专为本项目创建的账号）。
+
 ## 许可证
 
 基于 [PolyForm Shield 1.0.0](https://polyformproject.org/licenses/shield/1.0.0) 许可证发布（见

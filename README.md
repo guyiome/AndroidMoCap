@@ -131,6 +131,11 @@ Main items still open:
 - Settings screens' adaptation to system orientation on large screens (tablet).
 - Per-blendshape weight/gain adjustment (+ adjustable smoothing).
 
+## Contact
+
+Questions, feedback, bug reports: Discord `guy_iome` (account created specifically for this
+project).
+
 ## License
 
 Distributed under the [PolyForm Shield 1.0.0](https://polyformproject.org/licenses/shield/1.0.0)

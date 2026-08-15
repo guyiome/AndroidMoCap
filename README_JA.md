@@ -137,6 +137,10 @@ app/src/main/java/com/guyiome/androidmocap/
 - 大画面（タブレット）でのシステム画面回転への設定画面の対応。
 - ブレンドシェイプごとの重み/ゲイン調整（+ 調整可能なスムージング）。
 
+## お問い合わせ
+
+質問・フィードバック・バグ報告は Discord `guy_iome`（本プロジェクト専用に作成したアカウント）まで。
+
 ## ライセンス
 
 [PolyForm Shield 1.0.0](https://polyformproject.org/licenses/shield/1.0.0) ライセンスの下で配布
