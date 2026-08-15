@@ -115,7 +115,8 @@
     <string name="cd_thermal_throttling">Frame rate reduced due to heat</string>
 
     <!-- Display & comfort screen -->
-    <string name="display_settings_title">Display &amp; comfort</string>
+    <string name="display_settings_title">Display</string>
+    <string name="settings_comfort_title">Comfort</string>
     <string name="blendshape_selected_count">%1$d selected</string>
     <string name="blendshape_selection_persisted_suffix"> -- remembered</string>
     <string name="blendshape_selection_not_persisted_suffix"> -- not kept on restart</string>

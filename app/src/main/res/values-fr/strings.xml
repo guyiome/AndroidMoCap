@@ -113,7 +113,8 @@
     <string name="cd_thermal_throttling">Débit réduit pour cause de chauffe</string>
 
     <!-- Écran Affichage & confort -->
-    <string name="display_settings_title">Affichage &amp; confort</string>
+    <string name="display_settings_title">Affichage</string>
+    <string name="settings_comfort_title">Confort</string>
     <string name="blendshape_selected_count">%1$d sélectionnée(s)</string>
     <string name="blendshape_selection_persisted_suffix"> -- mémorisée</string>
     <string name="blendshape_selection_not_persisted_suffix"> -- non conservé au redémarrage</string>
