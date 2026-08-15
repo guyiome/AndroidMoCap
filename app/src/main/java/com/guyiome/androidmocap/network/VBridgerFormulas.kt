@@ -36,10 +36,12 @@ import com.guyiome.androidmocap.tracking.FaceTrackingResult
  * VTS, donc jamais besoin de création). Recherché sur la doc officielle et sur un plugin tiers
  * comparable (`VTube-IFacial-Link`, même pont ARKit -> VTS) : VTS a bien un jeu de paramètres natifs
  * (`FaceAngleX`, `MouthSmile`, `EyeOpenLeft`...), mais les sources disponibles se contredisent sur le
- * détail exact de ce jeu -- certaines formules composites d'ici (`Eye_Squint_L/R`, `MouthPucker`,
+ * détail exact de ce jeu -- certaines formules composites d'ici (`EyeSquintL/R`, `MouthPucker`,
  * `BrowInnerUp`, le groupe `Body*`...) sont très probablement des ajouts propres à VBridger, pas des
- * natifs VTS, et ont donc réellement besoin d'être créées. Plutôt que de deviner laquelle des 28 est
- * native et laquelle ne l'est pas depuis une doc tierce non fiable,
+ * natifs VTS, et ont donc réellement besoin d'être créées -- **confirmé sur device pour
+ * `EyeSquintL/R`** (voir capture d'écran de l'utilisateur, éditeur de paramètres VTS : deux entrées
+ * distinctes `EyeSquintL`/`EyeSquintR` marquées "VBridger", bien séparées des nôtres). Plutôt que de
+ * deviner laquelle des 28 est native et laquelle ne l'est pas depuis une doc tierce non fiable,
  * [VtsParameterFormula.requiresParameterCreation] vaut `true` pour les 80 formules (52 brutes + 28
  * composites) sans distinction. Pour les formules qui s'avèrent réellement déjà natives à VTS, une
  * tentative de création est sans conséquence -- déjà géré avec tolérance par le code existant
@@ -48,6 +50,15 @@ import com.guyiome.androidmocap.tracking.FaceTrackingResult
  * crée toutefois que le groupe **actuellement actif** (pas les deux systématiquement, essayé un temps
  * puis abandonné le même jour -- ça laissait des paramètres personnalisés inutilisés visibles côté VTS
  * pour le groupe inactif, gonflant le compte de paramètres constaté sur device), voir son kdoc.
+ *
+ * ⚠️ **Coquille de transcription trouvée et corrigée sur retour device (15 août 2026)** : le
+ * référentiel donnait `Eye_Squint_L`/`Eye_Squint_R` (avec underscores) -- seuls noms de tout le jeu de
+ * 28 formules à en avoir, alors que VBridger utilise en réalité `EyeSquintL`/`EyeSquintR` (confirmé
+ * par la capture d'écran ci-dessus : le nom sans underscore, pas le nôtre, apparaît étiqueté
+ * "VBridger"). Avec l'ancien nom, notre valeur partait dans un paramètre personnalisé distinct plutôt
+ * que de rejoindre celui de VBridger -- corrigé, plus aucun autre nom du jeu ne contient d'underscore
+ * (bon signe qu'il n'y a pas d'autre coquille du même genre, mais pas vérifié un par un contre un vrai
+ * VBridger).
  *
  * ⚠️ **`EyeLeftX`/`EyeLeftY` ne sont PAS transcrits depuis la capture d'écran source** -- seuls
  * `EyeRightX/Y` étaient visibles. Reconstruits par symétrie miroir (substituer `_L` par `_R` dans la
@@ -101,8 +112,8 @@ object VBridgerFormulas {
         // --- Eyes ---
         VtsParameterFormula("EyeOpenLeft", requiresParameterCreation = true) { b, _ -> eyeOpen(b, "eyeBlinkLeft", "eyeWideLeft") },
         VtsParameterFormula("EyeOpenRight", requiresParameterCreation = true) { b, _ -> eyeOpen(b, "eyeBlinkRight", "eyeWideRight") },
-        VtsParameterFormula("Eye_Squint_L", requiresParameterCreation = true) { b, _ -> b["eyeSquintLeft"] ?: 0f },
-        VtsParameterFormula("Eye_Squint_R", requiresParameterCreation = true) { b, _ -> b["eyeSquintRight"] ?: 0f },
+        VtsParameterFormula("EyeSquintL", requiresParameterCreation = true) { b, _ -> b["eyeSquintLeft"] ?: 0f },
+        VtsParameterFormula("EyeSquintR", requiresParameterCreation = true) { b, _ -> b["eyeSquintRight"] ?: 0f },
         VtsParameterFormula("EyeRightX", requiresParameterCreation = true) { b, _ -> eyeGazeX(b, "eyeLookInLeft", "eyeLookOutLeft") },
         VtsParameterFormula("EyeRightY", requiresParameterCreation = true) { b, _ -> eyeGazeY(b, "eyeLookUpLeft", "eyeLookDownLeft") },
         // Reconstruits par symétrie miroir, pas transcrits depuis la capture source -- voir kdoc de tête du fichier.
