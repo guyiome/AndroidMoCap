@@ -42,9 +42,10 @@ import java.util.concurrent.atomic.AtomicInteger
  * clic "Connecter" (même patron que [VmcOscSender]) plutôt que de réutiliser/reconnecter une
  * instance existante -- pas de reconnexion automatique en boucle à ce stade (v1).
  *
- * Les noms de paramètres créés côté VTube Studio ne sont connus qu'à la première frame reçue après
- * authentification (voir [send]) -- pas de liste ARKit codée en dur ici, pour rester indépendant de
- * ce que MediaPipe fournit réellement à l'exécution.
+ * Les noms de paramètres à créer côté VTube Studio viennent de [VBridgerFormulas.activeFormulas]
+ * (point 41) -- une liste statique, plus dérivée de la première frame reçue après authentification
+ * comme avant l'introduction de ce registre (voir kdoc de tête de [VBridgerFormulas], "effet de bord
+ * positif" : corrige au passage le cas `tongueOut` absent d'une première frame trop précoce).
  */
 class VTubeStudioSender(
     private val host: InetAddress,
@@ -142,11 +143,12 @@ class VTubeStudioSender(
      * -- **exclusif, pas additif** : en mode traduction, les bruts ne partent plus du tout, pour une
      * parité exacte avec ce que VBridger lui-même envoie à VTS (voir le kdoc de tête de
      * [VBridgerFormulas]). Lu à chaque appel plutôt que figé à la construction, pour que basculer le
-     * réglage prenne effet immédiatement sans reconnexion. [result] doit déjà correspondre au mode
-     * demandé -- côté appelant (`MainViewModel`), c'est la version *avant* mode miroir de cette app
-     * qui est passée en mode traduction (les formules composites intègrent leur propre inversion
-     * miroir, voir kdoc de [VBridgerFormulas] -- une seconde inversion en amont annulerait la
-     * première, bug confirmé sur device).
+     * réglage prenne effet immédiatement sans reconnexion. [result] est censé être `finalToSend` --
+     * la même donnée déjà mirrorée de façon uniforme (si `mirrorModeEnabled`) que celle envoyée à
+     * [VmcOscSender]/[IFacialMocapSender], quel que soit le mode de traduction : aucune formule de
+     * [VBridgerFormulas] n'intègre son propre miroir (voir kdoc de tête de [VBridgerFormulas] -- une
+     * tentative en ce sens avait produit une incohérence entre le regard et le reste des champs Eyes,
+     * corrigée le même jour).
      *
      * La phase de création de paramètres (`Authenticated`), elle, ne crée que le groupe **actuellement
      * actif** (`activeFormulas(useVBridgerTranslation).filter { requiresParameterCreation }`) -- pas
