@@ -141,14 +141,9 @@ class FaceLandmarkerHelper(
     private fun onLiveStreamResult(result: FaceLandmarkerResult, input: MPImage) {
         val blendshapesOptional = result.faceBlendshapes()
         val blendshapes = if (blendshapesOptional.isPresent && blendshapesOptional.get().isNotEmpty()) {
-            // correctMouthDimpleLeftRight : mouthDimpleLeft/Right mal étiquetés à la source côté
-            // MediaPipe, voir son kdoc (revue technique, point 41) -- appliqué ici, au plus tôt,
-            // pour que tout ce qui consomme "blendshapes" en aval reçoive la bonne valeur.
-            correctMouthDimpleLeftRight(
-                blendshapesOptional.get()[0].map { category ->
-                    BlendshapeScore(name = category.categoryName(), score = category.score())
-                }
-            )
+            blendshapesOptional.get()[0].map { category ->
+                BlendshapeScore(name = category.categoryName(), score = category.score())
+            }
         } else {
             emptyList()
         }
