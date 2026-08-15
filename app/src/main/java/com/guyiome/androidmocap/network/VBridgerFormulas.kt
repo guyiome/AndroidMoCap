@@ -39,13 +39,15 @@ import com.guyiome.androidmocap.tracking.FaceTrackingResult
  * détail exact de ce jeu -- certaines formules composites d'ici (`Eye_Squint_L/R`, `MouthPucker`,
  * `BrowInnerUp`, le groupe `Body*`...) sont très probablement des ajouts propres à VBridger, pas des
  * natifs VTS, et ont donc réellement besoin d'être créées. Plutôt que de deviner laquelle des 28 est
- * native et laquelle ne l'est pas depuis une doc tierce non fiable, [VtsParameterFormula.requiresParameterCreation]
- * vaut `true` pour les 80 formules (52 brutes + 28 composites) sans distinction : `VTubeStudioSender`
- * tente donc de créer les deux groupes en une fois, indépendamment du réglage courant (résilient à un
- * basculement en cours de connexion, voir son kdoc). Pour les formules qui s'avèrent réellement déjà
- * natives à VTS, cette tentative de création est sans conséquence -- déjà géré avec tolérance par le
- * code existant (`APIError` pendant `Authenticated` : le paramètre concerné est simplement journalisé
- * puis ignoré, sans faire échouer la connexion, voir `VTubeStudioSender.onTextMessage`).
+ * native et laquelle ne l'est pas depuis une doc tierce non fiable,
+ * [VtsParameterFormula.requiresParameterCreation] vaut `true` pour les 80 formules (52 brutes + 28
+ * composites) sans distinction. Pour les formules qui s'avèrent réellement déjà natives à VTS, une
+ * tentative de création est sans conséquence -- déjà géré avec tolérance par le code existant
+ * (`APIError` pendant `Authenticated` : le paramètre concerné est simplement journalisé puis ignoré,
+ * sans faire échouer la connexion, voir `VTubeStudioSender.onTextMessage`). `VTubeStudioSender` ne
+ * crée toutefois que le groupe **actuellement actif** (pas les deux systématiquement, essayé un temps
+ * puis abandonné le même jour -- ça laissait des paramètres personnalisés inutilisés visibles côté VTS
+ * pour le groupe inactif, gonflant le compte de paramètres constaté sur device), voir son kdoc.
  *
  * ⚠️ **`EyeLeftX`/`EyeLeftY` ne sont PAS transcrits depuis la capture d'écran source** -- seuls
  * `EyeRightX/Y` étaient visibles. Reconstruits par symétrie miroir (substituer `_L` par `_R` dans la

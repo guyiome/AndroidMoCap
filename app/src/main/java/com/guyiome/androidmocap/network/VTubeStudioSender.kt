@@ -142,22 +142,26 @@ class VTubeStudioSender(
      * -- **exclusif, pas additif** : en mode traduction, les bruts ne partent plus du tout, pour une
      * parité exacte avec ce que VBridger lui-même envoie à VTS (voir le kdoc de tête de
      * [VBridgerFormulas]). Lu à chaque appel plutôt que figé à la construction, pour que basculer le
-     * réglage prenne effet immédiatement sans reconnexion.
+     * réglage prenne effet immédiatement sans reconnexion. [result] doit déjà correspondre au mode
+     * demandé -- côté appelant (`MainViewModel`), c'est la version *avant* mode miroir de cette app
+     * qui est passée en mode traduction (les formules composites intègrent leur propre inversion
+     * miroir, voir kdoc de [VBridgerFormulas] -- une seconde inversion en amont annulerait la
+     * première, bug confirmé sur device).
      *
-     * La phase de création de paramètres (`Authenticated`), elle, crée **toujours** les deux groupes
-     * (52 noms bruts + 28 formules composites, voir [VBridgerFormulas] -- toutes demandent
-     * `ParameterCreationRequest`, y compris celles qui s'avèrent déjà natives à VTS, sans
-     * conséquence dans ce cas, voir le kdoc de tête de [VBridgerFormulas]) indépendamment de
-     * [useVBridgerTranslation] -- créer les deux par avance, même si le réglage démarre dans un seul
-     * des deux modes, évite qu'un basculement plus tard dans la même connexion tente d'injecter des
-     * noms jamais enregistrés.
+     * La phase de création de paramètres (`Authenticated`), elle, ne crée que le groupe **actuellement
+     * actif** (`activeFormulas(useVBridgerTranslation).filter { requiresParameterCreation }`) -- pas
+     * les deux systématiquement (essayé un temps, corrigé le même jour : ça laissait des paramètres
+     * personnalisés inutilisés visibles côté VTS même pour le groupe inactif, gonflant le compte de
+     * paramètres constaté sur device). Limite acceptée : un basculement du réglage en cours de
+     * connexion (rare) peut tenter d'injecter vers l'autre groupe avant qu'il ait été créé -- ce
+     * paramètre-là restera simplement inerte le temps de rétablir la connexion.
      */
     fun send(result: FaceTrackingResult, useVBridgerTranslation: Boolean = false) {
         val socket = webSocket ?: return
         when (connectionState) {
             VTubeStudioConnectionState.Authenticated -> {
                 if (parametersRequested.getAndSet(true)) return
-                val names = (VBridgerFormulas.rawArkitFormulas + VBridgerFormulas.vbridgerCompositeFormulas)
+                val names = VBridgerFormulas.activeFormulas(useVBridgerTranslation)
                     .filter { it.requiresParameterCreation }
                     .map { it.outputName }
                 pendingParameterCreationResponses.set(names.size)
