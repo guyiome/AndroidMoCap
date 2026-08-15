@@ -1,6 +1,7 @@
 package com.guyiome.androidmocap.settings
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -31,6 +32,11 @@ class ConnectionSettingsStore(private val context: Context) {
         // Jeton d'authentification VTube Studio (point 39) -- délivré une fois par popup
         // d'autorisation utilisateur, réutilisable tant qu'il n'est pas révoqué côté VTube Studio.
         val VTS_AUTH_TOKEN = stringPreferencesKey("vts_auth_token")
+
+        // Traduction VBridger -> paramètres par défaut VTS (point 41) -- voir VBridgerFormulas.kt.
+        // Défaut false : comportement actuel inchangé (seuls les 52 blendshapes ARKit bruts) tant
+        // que l'utilisateur n'active pas explicitement l'option.
+        val VTS_USE_VBRIDGER_TRANSLATION = booleanPreferencesKey("vts_use_vbridger_translation")
     }
 
     val connectionType: Flow<ConnectionType?> = context.connectionSettingsDataStore.data.map { prefs ->
@@ -43,6 +49,9 @@ class ConnectionSettingsStore(private val context: Context) {
 
     val vtsAuthToken: Flow<String?> =
         context.connectionSettingsDataStore.data.map { prefs -> prefs[Keys.VTS_AUTH_TOKEN] }
+
+    val vtsUseVBridgerTranslation: Flow<Boolean> = context.connectionSettingsDataStore.data
+        .map { prefs -> prefs[Keys.VTS_USE_VBRIDGER_TRANSLATION] ?: false }
 
     suspend fun setConnectionType(type: ConnectionType) {
         context.connectionSettingsDataStore.edit { prefs -> prefs[Keys.CONNECTION_TYPE] = type.name }
@@ -58,6 +67,10 @@ class ConnectionSettingsStore(private val context: Context) {
 
     suspend fun setVtsAuthToken(token: String) {
         context.connectionSettingsDataStore.edit { prefs -> prefs[Keys.VTS_AUTH_TOKEN] = token }
+    }
+
+    suspend fun setVtsUseVBridgerTranslation(enabled: Boolean) {
+        context.connectionSettingsDataStore.edit { prefs -> prefs[Keys.VTS_USE_VBRIDGER_TRANSLATION] = enabled }
     }
 
     /**
