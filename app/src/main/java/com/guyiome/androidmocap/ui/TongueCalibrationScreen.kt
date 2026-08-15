@@ -35,8 +35,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.guyiome.androidmocap.R
@@ -53,8 +54,11 @@ import com.guyiome.androidmocap.tracking.TongueCalibrationPhase
  * Aperçu caméra volontairement laissé visible (pas de fond opaque, contrairement aux autres écrans
  * de réglages) -- l'utilisateur doit pouvoir voir comment il est cadré pendant qu'il tire la
  * langue/ouvre la mâchoire, pas seulement lire des instructions sur fond noir. Le message de phase
- * et le compte à rebours pivotent avec [iconRotationDegrees], même principe que les icônes de
- * `MainHud`, pour rester lisibles quelle que soit l'orientation physique du téléphone.
+ * et le compte à rebours pivotent par pas de 90° selon [rotationDegrees] (verticale/horizontale
+ * seulement) -- **pas** de rotation continue comme les icônes de `MainHud` : un bloc de texte en
+ * rotation continue serait illisible pendant la transition, exactement le même choix déjà fait pour
+ * [BlendshapePanel] (voir son kdoc) et la même valeur pré-calculée dans `MainScreen.kt`
+ * (`panelRotationDegrees`, via `snapToRotationBucket()`), réutilisée telle quelle ici.
  */
 @Composable
 fun TongueCalibrationScreen(
@@ -63,7 +67,7 @@ fun TongueCalibrationScreen(
     isCalibrated: Boolean,
     recordingDurationMs: Long,
     classificationMargin: Float,
-    iconRotationDegrees: Float,
+    rotationDegrees: Float,
     onStartCalibration: () -> Unit,
     onCancel: () -> Unit,
     onSetRecordingDurationMs: (Long) -> Unit,
@@ -112,15 +116,17 @@ fun TongueCalibrationScreen(
 
         // Message de phase -- pastille semi-transparente (même style que le bandeau d'icônes de
         // MainHud) plutôt qu'un plein écran noir, pour laisser l'aperçu caméra visible en dessous.
-        // Pivote comme un seul bloc (pas juste le texte à l'intérieur d'un cadre fixe, contrairement
-        // aux icônes de MainHud) : plus cohérent visuellement pour un pavé de texte multi-lignes.
+        // Pivote comme un seul bloc (graphicsLayer, pas juste le texte dans un cadre fixe) par pas
+        // de 90° -- même pattern que BlendshapePanel, pivot au bas du bloc (TransformOrigin(0.5f, 1f)
+        // plutôt que le centre par défaut) pour que la rotation déborde vers l'intérieur de l'écran,
+        // pas au-dessus du bord physique (voir kdoc de BlendshapePanel pour le raisonnement complet).
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(top = 16.dp)
-                .rotate(-iconRotationDegrees)
+                .graphicsLayer(rotationZ = rotationDegrees, transformOrigin = TransformOrigin(0.5f, 1f))
                 .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
                 .padding(horizontal = 20.dp, vertical = 14.dp)
                 .widthIn(max = 320.dp),

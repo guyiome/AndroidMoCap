@@ -274,7 +274,10 @@ fun MainScreen(
                 onOpenExperimental = { showExperimentalFeatures = true },
             )
 
-            if (showSettings) {
+            // Masqué pendant la calibration langue tirée, même raison que showExperimentalFeatures
+            // plus bas -- sinon ce menu (encore plus "sous" dans la pile de navigation) bleedait lui
+            // aussi à travers l'écran de calibration désormais transparent.
+            if (showSettings && !showTongueCalibration) {
                 SettingsScreen(
                     uiState = uiState,
                     faceDetected = trackingFrame.faceDetected,
@@ -354,7 +357,13 @@ fun MainScreen(
                 )
             }
 
-            if (showExperimentalFeatures) {
+            // Masqué pendant la calibration langue tirée (!showTongueCalibration) -- cet écran
+            // n'a plus de fond opaque (refonte cosmétique, caméra visible), donc ExperimentalFeaturesScreen
+            // resterait visible en transparence dessous sinon (bug réel constaté sur device, menu et
+            // calibration superposés de façon illisible). showExperimentalFeatures reste vrai tel
+            // quel pendant ce temps -- réapparaît automatiquement une fois la calibration fermée,
+            // c'est le mécanisme de "retour au menu" voulu.
+            if (showExperimentalFeatures && !showTongueCalibration) {
                 ExperimentalFeaturesScreen(
                     uiState = uiState,
                     onClose = { showExperimentalFeatures = false },
@@ -370,7 +379,7 @@ fun MainScreen(
                     isCalibrated = uiState.tongueReferencesCalibrated,
                     recordingDurationMs = uiState.tongueCalibrationRecordingDurationMs,
                     classificationMargin = uiState.tongueClassificationMargin,
-                    iconRotationDegrees = iconRotationDegrees,
+                    rotationDegrees = panelRotationDegrees,
                     onStartCalibration = { viewModel.startTongueCalibration() },
                     onCancel = { viewModel.cancelTongueCalibration() },
                     onSetRecordingDurationMs = { durationMs -> viewModel.setTongueCalibrationRecordingDurationMs(durationMs) },
