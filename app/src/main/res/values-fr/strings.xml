@@ -148,7 +148,7 @@
 
     <!-- Écran de calibration langue tirée -->
     <string name="tongue_calibration_title">Calibration langue tirée</string>
-    <string name="tongue_calibration_explanation">Enregistre deux échantillons courts -- langue dehors, puis langue rentrée -- pour calibrer personnellement l\'étage 3 de la cascade de détection. Également envoyé sur le réseau une fois calibré -- expérimental, quelques faux positifs restent possibles.</string>
+    <string name="tongue_calibration_steps_overview">Deux étapes : langue dehors, puis langue rentrée.</string>
     <string name="tongue_calibration_status_never">Jamais calibré pour l\'instant.</string>
     <string name="tongue_calibration_status_calibrated">Calibré ✓</string>
     <string name="tongue_calibration_status_prepare_out">Prépare-toi à tirer la langue…</string>

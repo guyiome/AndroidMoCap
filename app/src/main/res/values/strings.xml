@@ -150,7 +150,7 @@
 
     <!-- Tongue calibration screen -->
     <string name="tongue_calibration_title">Tongue-out calibration</string>
-    <string name="tongue_calibration_explanation">Records two short samples -- tongue out, then tongue in -- used to personally calibrate stage 3 of the detection cascade. Also sent over the network once calibrated -- experimental, occasional false positives are still possible.</string>
+    <string name="tongue_calibration_steps_overview">Two steps: tongue out, then tongue in.</string>
     <string name="tongue_calibration_status_never">Never calibrated yet.</string>
     <string name="tongue_calibration_status_calibrated">Calibrated ✓</string>
     <string name="tongue_calibration_status_prepare_out">Get ready to stick your tongue out…</string>

@@ -264,15 +264,20 @@ fun MainScreen(
                 )
             }
 
-            MainHud(
-                uiState = uiState,
-                faceDetected = trackingFrame.faceDetected,
-                iconRotationDegrees = iconRotationDegrees,
-                onCalibrate = { viewModel.startCalibrationCountdown() },
-                onToggleConnection = { viewModel.toggleActiveConnection() },
-                onOpenSettings = { showSettings = true },
-                onOpenExperimental = { showExperimentalFeatures = true },
-            )
+            // Masqué pendant la calibration langue tirée : sinon son bandeau d'icônes (ancré
+            // bottom-center comme le bouton d'action de TongueCalibrationScreen) entre en collision
+            // visuelle avec lui, surtout à l'horizontale -- constaté sur device.
+            if (!showTongueCalibration) {
+                MainHud(
+                    uiState = uiState,
+                    faceDetected = trackingFrame.faceDetected,
+                    iconRotationDegrees = iconRotationDegrees,
+                    onCalibrate = { viewModel.startCalibrationCountdown() },
+                    onToggleConnection = { viewModel.toggleActiveConnection() },
+                    onOpenSettings = { showSettings = true },
+                    onOpenExperimental = { showExperimentalFeatures = true },
+                )
+            }
 
             // Masqué pendant la calibration langue tirée, même raison que showExperimentalFeatures
             // plus bas -- sinon ce menu (encore plus "sous" dans la pile de navigation) bleedait lui
