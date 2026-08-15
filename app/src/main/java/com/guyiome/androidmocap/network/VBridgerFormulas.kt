@@ -194,7 +194,7 @@ object VBridgerFormulas {
     private const val BODY_ANGLE_COEFFICIENT = 1.5f
 
     private fun faceAngleX(head: FloatArray): Float =
-        (-head[1]).coerceIn(FACE_ANGLE_RANGE_MIN, FACE_ANGLE_RANGE_MAX)
+        head[1].coerceIn(FACE_ANGLE_RANGE_MIN, FACE_ANGLE_RANGE_MAX)
 
     private fun faceAngleY(b: Map<String, Float>, head: FloatArray): Float {
         val blink = (b["eyeBlinkLeft"] ?: 0f) + (b["eyeBlinkRight"] ?: 0f)
@@ -205,7 +205,7 @@ object VBridgerFormulas {
         head[2].coerceIn(FACE_ANGLE_RANGE_MIN, FACE_ANGLE_RANGE_MAX)
 
     private fun bodyAngleX(head: FloatArray): Float =
-        (-head[1] * BODY_ANGLE_COEFFICIENT).coerceIn(FACE_ANGLE_RANGE_MIN, FACE_ANGLE_RANGE_MAX)
+        (head[1] * BODY_ANGLE_COEFFICIENT).coerceIn(FACE_ANGLE_RANGE_MIN, FACE_ANGLE_RANGE_MAX)
 
     private fun bodyAngleY(b: Map<String, Float>, head: FloatArray): Float {
         val blink = (b["eyeBlinkLeft"] ?: 0f) + (b["eyeBlinkRight"] ?: 0f)

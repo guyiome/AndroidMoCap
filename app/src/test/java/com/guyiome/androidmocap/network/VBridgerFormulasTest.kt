@@ -71,6 +71,17 @@ class VBridgerFormulasTest {
         assertEquals(listOf(BlendshapeScore("JawOpen", 0.5f), BlendshapeScore("MouthFunnel", 0.25f)), scores)
     }
 
+    @Test
+    fun `FaceAngleX et BodyAngleX suivent directement le lacet, sans inversion redondante`() {
+        // headEulerDegrees = (pitch, yaw, roll) -- voir kdoc du fichier. mirrorEulerDegrees (en amont
+        // dans MainViewModel) inverse déjà le lacet quand le mode miroir est actif ; une inversion
+        // supplémentaire ici annulerait ce miroir -- bug réel corrigé le 15 août 2026 (retour
+        // utilisateur : orientation de tête non mirrorée), voir revue technique point 41.
+        val turnedYaw = result(headEulerDegrees = floatArrayOf(0f, 10f, 0f))
+        assertEquals(10f, valueFor("FaceAngleX", turnedYaw), 0.0001f)
+        assertEquals(15f, valueFor("BodyAngleX", turnedYaw), 0.0001f) // x1.5
+    }
+
     // --- Visage neutre : valeurs de repos vérifiables à la main (voir revue technique, point 41) ---
 
     @Test
