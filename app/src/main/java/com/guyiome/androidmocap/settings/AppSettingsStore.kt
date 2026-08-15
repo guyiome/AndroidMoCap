@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.guyiome.androidmocap.logging.LogLevel
+import com.guyiome.androidmocap.tracking.BlendshapeCatalog
 import com.guyiome.androidmocap.tracking.DEFAULT_CALIBRATION_RECORDING_DURATION_MS
 import com.guyiome.androidmocap.tracking.DEFAULT_CLASSIFICATION_MARGIN
 import com.guyiome.androidmocap.tracking.TrackingTier
@@ -125,6 +126,31 @@ class AppSettingsStore(private val context: Context) {
     suspend fun setPersistedBlendshapeSelectionNames(names: Set<String>) {
         context.appSettingsDataStore.edit { prefs -> prefs[Keys.PERSISTED_BLENDSHAPE_SELECTION] = names }
     }
+
+    /**
+     * Poids par blendshape -- une [floatPreferencesKey] par entrée du catalogue plutôt qu'un blob
+     * unique (JSON ou autre) : cohérent avec le reste de ce fichier (aucune dépendance de
+     * sérialisation ici), et une réinitialisation devient une simple suppression de clés plutôt
+     * qu'une réécriture de structure. Défaut 1.0 (poids neutre) pour toute entrée absente -- couvre
+     * aussi bien "jamais réglé" que "juste réinitialisé". Non branché sur le pipeline de tracking
+     * pour l'instant (pas d'UI de réglage fine) -- voir `MainViewModel.handleTrackingResult`.
+     */
+    val blendshapeWeights: Flow<Map<String, Float>> = context.appSettingsDataStore.data.map { prefs ->
+        BlendshapeCatalog.all.associate { (_, name) -> name to (prefs[weightKey(name)] ?: 1f) }
+    }
+
+    suspend fun setBlendshapeWeight(name: String, weight: Float) {
+        context.appSettingsDataStore.edit { prefs -> prefs[weightKey(name)] = weight }
+    }
+
+    /** Remet tous les poids au défaut neutre (1.0) en supprimant leurs clés plutôt qu'en les réécrivant. */
+    suspend fun resetBlendshapeWeights() {
+        context.appSettingsDataStore.edit { prefs ->
+            BlendshapeCatalog.all.forEach { (_, name) -> prefs.remove(weightKey(name)) }
+        }
+    }
+
+    private fun weightKey(name: String) = floatPreferencesKey("blendshape_weight_$name")
 
     /**
      * Force un palier de tracking spécifique au lieu de la sélection automatique -- `null` =
