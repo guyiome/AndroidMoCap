@@ -124,6 +124,7 @@
     <string name="diagnostics_debug_reset_all">Reset all debug mocks</string>
     <string name="diagnostics_debug_override_active_warning">A debug mock is active -- may not reflect real device behavior</string>
     <string name="cd_thermal_throttling">Frame rate reduced due to heat</string>
+    <string name="cd_update_available">Update available -- tap to open the release page</string>
 
     <!-- Display & comfort screen -->
     <string name="display_settings_title">Display</string>

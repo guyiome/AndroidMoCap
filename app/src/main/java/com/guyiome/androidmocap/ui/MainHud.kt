@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -55,6 +56,7 @@ fun MainHud(
     onToggleConnection: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenExperimental: () -> Unit,
+    onOpenUpdate: () -> Unit,
 ) {
     // "En cours" par type (revue technique, point 40) :
     // - VMC : résolution DNS/construction du socket (connectVmcTarget) -- généralement bref, mais
@@ -170,6 +172,21 @@ fun MainHud(
                             stringResource(R.string.cd_calibrate)
                         },
                         tint = if (calibrationAnomalyActive) Color(0xFFFF8080) else Color.White,
+                        modifier = Modifier.rotate(-iconRotationDegrees),
+                    )
+                }
+            }
+            // Mise à jour disponible (point 14) -- purement informatif jusqu'au tap, qui ouvre la
+            // page de la Release GitHub dans le navigateur (pas d'install silencieuse possible hors
+            // store, voir UpdateChecker/MainViewModel.checkForUpdate). Reste affichée tant que l'app
+            // n'est pas mise à jour, décision explicite (pas d'état "ignorer cette version").
+            if (uiState.updateAvailableUrl != null) {
+                Spacer(Modifier.width(18.dp))
+                IconButton(onClick = onOpenUpdate, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        imageVector = Icons.Filled.SystemUpdate,
+                        contentDescription = stringResource(R.string.cd_update_available),
+                        tint = Color(0xFF9FE7B0),
                         modifier = Modifier.rotate(-iconRotationDegrees),
                     )
                 }
