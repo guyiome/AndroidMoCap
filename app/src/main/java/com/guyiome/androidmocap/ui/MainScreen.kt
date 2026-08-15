@@ -381,9 +381,16 @@ fun MainScreen(
             }
 
             if (showBlendshapeSelection) {
-                BlendshapeSelectionScreen(
+                // Câblage minimal pour rester compilable pendant la refonte des menus -- la
+                // promotion complète en catégorie de premier niveau (renommage du booléen, entrée
+                // dans SettingsScreen) arrive dans un commit séparé de ce chantier.
+                BlendshapesScreen(
                     selectedNames = uiState.selectedBlendshapeNames,
                     onToggle = { name -> viewModel.toggleBlendshapeSelection(name) },
+                    persistSelectionEnabled = uiState.persistBlendshapeSelectionEnabled,
+                    onSetPersistSelection = { enabled -> viewModel.setPersistBlendshapeSelectionEnabled(enabled) },
+                    onDeselectAll = { viewModel.deselectAllBlendshapes() },
+                    onResetWeights = { viewModel.resetBlendshapeWeights() },
                     onClose = { showBlendshapeSelection = false },
                 )
             }

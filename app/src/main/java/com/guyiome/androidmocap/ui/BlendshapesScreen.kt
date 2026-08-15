@@ -24,8 +24,11 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,20 +60,29 @@ private fun BlendshapeCategory.displayLabel(): String = when (this) {
 }
 
 /**
- * Écran de sélection des blendshapes à afficher sur la page principale -- catalogue complet des
- * 52 blendshapes ARKit, groupés par catégorie repliable, avec recherche. Par défaut, la sélection
- * n'est PAS persistée (remise à zéro à chaque lancement de l'app, comportement historique) -- un
- * réglage dédié (Affichage & confort, voir `persistBlendshapeSelectionEnabled`) permet de la
- * conserver d'une session à l'autre, voir revue technique point 18.
+ * Catégorie de premier niveau dédiée aux blendshapes -- promue depuis un sous-écran de
+ * "Affichage & confort" (ex-`BlendshapeSelectionScreen`) parce qu'elle est appelée à grossir : la
+ * pondération par blendshape (réglage fin à venir, pas encore construit) trouvera sa place ici.
+ * Catalogue complet des 52 blendshapes ARKit, groupés par catégorie repliable, avec recherche. Par
+ * défaut, la sélection n'est PAS persistée (remise à zéro à chaque lancement de l'app, comportement
+ * historique) -- [persistSelectionEnabled] permet de la conserver d'une session à l'autre, voir
+ * revue technique point 18. [onDeselectAll] vide la sélection sans confirmation (bon marché à
+ * refaire) ; [onResetWeights] passe par [ConfirmationDialog] avant d'agir (les pondérations, une
+ * fois le réglage fin construit, seront coûteuses à reperdre).
  */
 @Composable
-fun BlendshapeSelectionScreen(
+fun BlendshapesScreen(
     selectedNames: Set<String>,
     onToggle: (String) -> Unit,
+    persistSelectionEnabled: Boolean,
+    onSetPersistSelection: (Boolean) -> Unit,
+    onDeselectAll: () -> Unit,
+    onResetWeights: () -> Unit,
     onClose: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
     var expandedCategories by remember { mutableStateOf(setOf<BlendshapeCategory>()) }
+    var showResetWeightsConfirmation by remember { mutableStateOf(false) }
 
     BackHandler(onBack = onClose)
     Box(
@@ -96,7 +108,41 @@ fun BlendshapeSelectionScreen(
                 }
             }
 
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    stringResource(R.string.display_persist_selection_label),
+                    color = Color.White.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(checked = persistSelectionEnabled, onCheckedChange = onSetPersistSelection)
+            }
+
             Spacer(Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = onDeselectAll, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.blendshape_deselect_all_button))
+                }
+                Spacer(Modifier.width(8.dp))
+                OutlinedButton(onClick = { showResetWeightsConfirmation = true }, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.blendshape_reset_weights_button))
+                }
+            }
+            if (showResetWeightsConfirmation) {
+                ConfirmationDialog(
+                    title = stringResource(R.string.blendshape_reset_weights_confirm_title),
+                    message = stringResource(R.string.blendshape_reset_weights_confirm_message),
+                    confirmLabel = stringResource(R.string.action_reset),
+                    onConfirm = {
+                        onResetWeights()
+                        showResetWeightsConfirmation = false
+                    },
+                    onDismiss = { showResetWeightsConfirmation = false },
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
 
             OutlinedTextField(
                 value = query,
