@@ -118,6 +118,10 @@ data class MainUiState(
     // Choix fait dans l'écran de sélection dédié -- volontairement NON persisté (remis à zéro à
     // chaque lancement de l'app, comme demandé).
     val selectedBlendshapeNames: Set<String> = emptySet(),
+    // Poids par blendshape (défaut implicite 1.0 pour toute entrée absente, voir
+    // AppSettingsStore.blendshapeWeights) -- pas encore branché sur le pipeline de tracking, voir
+    // handleTrackingResult().
+    val blendshapeWeights: Map<String, Float> = emptyMap(),
     // VMC (connexion directe : on saisit l'IP du PC cible -- Blender / Unity, pas VTube Studio,
     // voir revue technique point 39)
     val vmcEnabled: Boolean = false,
@@ -546,6 +550,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             appSettingsStore.persistBlendshapeSelectionEnabled.collect { enabled ->
                 _uiState.update { it.copy(persistBlendshapeSelectionEnabled = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            appSettingsStore.blendshapeWeights.collect { weights ->
+                _uiState.update { it.copy(blendshapeWeights = weights) }
             }
         }
         viewModelScope.launch {
@@ -1424,6 +1433,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 appSettingsStore.setPersistedBlendshapeSelectionNames(_uiState.value.selectedBlendshapeNames)
             }
         }
+    }
+
+    /** Vide la sélection en un coup -- même règle de persistance que [toggleBlendshapeSelection]. */
+    fun deselectAllBlendshapes() {
+        _uiState.update { it.copy(selectedBlendshapeNames = emptySet()) }
+        if (_uiState.value.persistBlendshapeSelectionEnabled) {
+            viewModelScope.launch(Dispatchers.IO) {
+                appSettingsStore.setPersistedBlendshapeSelectionNames(emptySet())
+            }
+        }
+    }
+
+    /**
+     * Remet tous les poids par blendshape au défaut neutre (1.0) -- pas de branchement sur le
+     * pipeline de tracking pour l'instant (voir `AppSettingsStore.blendshapeWeights`), mais le
+     * bouton associé dans l'UI passe par une confirmation avant d'appeler cette fonction, la perte
+     * de réglage étant coûteuse une fois l'UI de réglage fine construite.
+     */
+    fun resetBlendshapeWeights() {
+        viewModelScope.launch(Dispatchers.IO) {
+            appSettingsStore.resetBlendshapeWeights()
+        }
+        _uiState.update { it.copy(blendshapeWeights = emptyMap()) }
     }
 
     // --- Réglages généraux (persistés) ---
