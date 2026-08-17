@@ -30,6 +30,10 @@ Personal project, developed and maintained by a single person, in active develop
 - **Power-save mode**: dims the screen and cuts the camera preview after inactivity without
   interrupting tracking or sending -- designed for long streaming sessions with the phone sitting
   away from the user.
+- **Semi-automatic update check**: compares against the latest GitHub Releases tag and links
+  directly to it -- no silent install, just a heads-up.
+- **Per-blendshape weight adjustment**: fine-tune individual blendshapes (e.g. an over- or
+  under-reactive one) from Settings > Blendshapes.
 
 ## Requirements
 
@@ -126,10 +130,8 @@ Main items still open:
 
 - Experimental puffed-cheek detection (`cheekPuff`) -- same family as the already-implemented
   tongue-out detection, still at the design stage.
-- Semi-automatic update check (comparison against the latest GitHub Releases tag, a direct link
-  rather than a silent install -- impossible outside a store).
 - Settings screens' adaptation to system orientation on large screens (tablet).
-- Per-blendshape weight/gain adjustment (+ adjustable smoothing).
+- Adjustable smoothing on top of the existing per-blendshape weight adjustment.
 
 ## Contact
 
