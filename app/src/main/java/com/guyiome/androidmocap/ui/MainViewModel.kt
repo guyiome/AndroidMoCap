@@ -40,6 +40,7 @@ import com.guyiome.androidmocap.settings.DEFAULT_POWER_SAVE_DELAY_SECONDS
 import com.guyiome.androidmocap.settings.TongueCalibrationStore
 import com.guyiome.androidmocap.tracking.ArCoreHeadPoseTracker
 import com.guyiome.androidmocap.tracking.BlendshapeScore
+import com.guyiome.androidmocap.tracking.applyBlendshapeWeights
 import com.guyiome.androidmocap.tracking.BrowLandmarkIndices
 import com.guyiome.androidmocap.tracking.CalibrationAnomalyState
 import com.guyiome.androidmocap.tracking.EyeBlinkCorrectionState
@@ -134,8 +135,8 @@ data class MainUiState(
     // chaque lancement de l'app, comme demandé).
     val selectedBlendshapeNames: Set<String> = emptySet(),
     // Poids par blendshape (défaut implicite 1.0 pour toute entrée absente, voir
-    // AppSettingsStore.blendshapeWeights) -- pas encore branché sur le pipeline de tracking, voir
-    // handleTrackingResult().
+    // AppSettingsStore.blendshapeWeights) -- appliqué dans handleTrackingResult() juste après le
+    // mode miroir, voir tracking/BlendshapeWeighting.kt.
     val blendshapeWeights: Map<String, Float> = emptyMap(),
     // VMC (connexion directe : on saisit l'IP du PC cible -- Blender / Unity, pas VTube Studio,
     // voir revue technique point 39)
@@ -1017,11 +1018,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         previousBlendshapesForAnomaly = result.blendshapes
 
         // Mode miroir (point 51) : mirrore ensemble tête + blendshapes gauche/droite + regard par
-        // œil, appliqué en tout dernier -- après la correction EAR, jamais avant (EAR travaille sur
-        // l'identité anatomique réelle des landmarks, indépendante de ce réglage). Activé par
-        // défaut (voir AppSettingsStore.mirrorModeEnabled) -- désactiver ce réglage envoie
-        // "corrected" tel quel, sortie native/anatomique.
-        val final = if (_uiState.value.mirrorModeEnabled) mirrorFaceTrackingResult(corrected) else corrected
+        // œil, appliqué après la correction EAR, jamais avant (EAR travaille sur l'identité
+        // anatomique réelle des landmarks, indépendante de ce réglage). Activé par défaut (voir
+        // AppSettingsStore.mirrorModeEnabled) -- désactiver ce réglage envoie "corrected" tel quel,
+        // sortie native/anatomique.
+        val mirrored = if (_uiState.value.mirrorModeEnabled) mirrorFaceTrackingResult(corrected) else corrected
+
+        // Poids par blendshape (point 18) : appliqué en tout dernier, après le mode miroir --
+        // c'est un réglage sur ce qui est effectivement affiché/envoyé (les noms tels que
+        // BlendshapesScreen les présente), pas une correction d'un signal anatomique comme EAR
+        // ci-dessus. "final" porte donc déjà le résultat pondéré pour tout le reste de cette
+        // fonction (panneau de debug, formules VBridger, envoi réseau) -- voir
+        // tracking/BlendshapeWeighting.kt.
+        val final = mirrored.copy(blendshapes = applyBlendshapeWeights(mirrored.blendshapes, _uiState.value.blendshapeWeights))
 
         // Charge d'inférence live (point 15) -- budget suit le débit courant, potentiellement déjà
         // réduit par le throttling thermique (thermalThrottleState.currentFps), pour ne pas signaler
@@ -1513,16 +1522,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Remet tous les poids par blendshape au défaut neutre (1.0) -- pas de branchement sur le
-     * pipeline de tracking pour l'instant (voir `AppSettingsStore.blendshapeWeights`), mais le
-     * bouton associé dans l'UI passe par une confirmation avant d'appeler cette fonction, la perte
-     * de réglage étant coûteuse une fois l'UI de réglage fine construite.
+     * Remet tous les poids par blendshape au défaut neutre (1.0) -- affecte immédiatement ce qui
+     * est envoyé/affiché (voir `handleTrackingResult()`), le bouton associé dans l'UI passe donc
+     * par une confirmation avant d'appeler cette fonction.
      */
     fun resetBlendshapeWeights() {
         viewModelScope.launch(Dispatchers.IO) {
             appSettingsStore.resetBlendshapeWeights()
         }
         _uiState.update { it.copy(blendshapeWeights = emptyMap()) }
+    }
+
+    /**
+     * Poids appliqué à ce blendshape avant tout affichage/envoi (point 18, voir
+     * `tracking/BlendshapeWeighting.kt` et son appel dans `handleTrackingResult()`). Amplitude
+     * bornée [BLENDSHAPE_WEIGHT_MIN, BLENDSHAPE_WEIGHT_MAX] côté UI (le `Slider` de
+     * `BlendshapesScreen` ne peut pas produire d'autre valeur) -- pas revérifiée ici, même
+     * confiance que les autres réglages pilotés par `Slider` dans ce fichier.
+     */
+    fun setBlendshapeWeight(name: String, weight: Float) {
+        viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setBlendshapeWeight(name, weight) }
     }
 
     // --- Réglages généraux (persistés) ---

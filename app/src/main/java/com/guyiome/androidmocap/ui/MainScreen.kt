@@ -423,6 +423,8 @@ fun MainScreen(
                     persistSelectionEnabled = uiState.persistBlendshapeSelectionEnabled,
                     onSetPersistSelection = { enabled -> viewModel.setPersistBlendshapeSelectionEnabled(enabled) },
                     onDeselectAll = { viewModel.deselectAllBlendshapes() },
+                    weights = uiState.blendshapeWeights,
+                    onSetWeight = { name, weight -> viewModel.setBlendshapeWeight(name, weight) },
                     onResetWeights = { viewModel.resetBlendshapeWeights() },
                     onClose = { showBlendshapes = false },
                 )

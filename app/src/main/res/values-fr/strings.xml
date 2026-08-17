@@ -134,6 +134,7 @@
     <string name="blendshape_deselect_all_button">Tout désélectionner</string>
     <string name="blendshape_reset_weights_confirm_title">Réinitialiser toutes les pondérations ?</string>
     <string name="blendshape_reset_weights_confirm_message">Chaque pondération de blendshape revient à sa valeur par défaut (1.0). Action irréversible.</string>
+    <string name="blendshape_weight_label">×%.1f</string>
     <string name="display_mesh_overlay_title">Overlay du mesh de tracking</string>
     <string name="display_mesh_overlay_description">Superpose les points détectés par MediaPipe sur l\'aperçu caméra -- pratique pour vérifier la qualité du tracking sans dépendre de VTube Studio/Blender.</string>
     <string name="display_keep_mesh_overlay_in_power_save_label">Garder l\'overlay du mesh visible en mode économie d\'énergie</string>

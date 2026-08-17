@@ -26,6 +26,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,6 +41,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.guyiome.androidmocap.R
+import com.guyiome.androidmocap.tracking.BLENDSHAPE_WEIGHT_DEFAULT
+import com.guyiome.androidmocap.tracking.BLENDSHAPE_WEIGHT_MAX
+import com.guyiome.androidmocap.tracking.BLENDSHAPE_WEIGHT_MIN
 import com.guyiome.androidmocap.tracking.BlendshapeCatalog
 import com.guyiome.androidmocap.tracking.BlendshapeCategory
 
@@ -62,13 +66,19 @@ private fun BlendshapeCategory.displayLabel(): String = when (this) {
 /**
  * Catégorie de premier niveau dédiée aux blendshapes -- promue depuis un sous-écran de
  * "Affichage & confort" (ex-`BlendshapeSelectionScreen`) parce qu'elle est appelée à grossir : la
- * pondération par blendshape (réglage fin à venir, pas encore construit) trouvera sa place ici.
- * Catalogue complet des 52 blendshapes ARKit, groupés par catégorie repliable, avec recherche. Par
- * défaut, la sélection n'est PAS persistée (remise à zéro à chaque lancement de l'app, comportement
- * historique) -- [persistSelectionEnabled] permet de la conserver d'une session à l'autre, voir
- * revue technique point 18. [onDeselectAll] vide la sélection sans confirmation (bon marché à
- * refaire) ; [onResetWeights] passe par [ConfirmationDialog] avant d'agir (les pondérations, une
- * fois le réglage fin construit, seront coûteuses à reperdre).
+ * pondération par blendshape (point 18) y trouve sa place. Catalogue complet des 52 blendshapes
+ * ARKit, groupés par catégorie repliable, avec recherche. Par défaut, la sélection n'est PAS
+ * persistée (remise à zéro à chaque lancement de l'app, comportement historique) --
+ * [persistSelectionEnabled] permet de la conserver d'une session à l'autre. [onDeselectAll] vide
+ * la sélection sans confirmation (bon marché à refaire) ; [onResetWeights] passe par
+ * [ConfirmationDialog] avant d'agir (perdre un réglage fin par blendshape est plus coûteux à
+ * refaire qu'une sélection d'affichage).
+ *
+ * Chaque ligne porte aussi son propre `Slider` de poids ([BLENDSHAPE_WEIGHT_MIN]..
+ * [BLENDSHAPE_WEIGHT_MAX], [BLENDSHAPE_WEIGHT_DEFAULT] = neutre) -- indépendant de la case à
+ * cocher : la pondération s'applique à ce qui est réellement affiché/envoyé, que ce blendshape
+ * soit ou non affiché dans le panneau de debug local. Toucher l'étiquette `×…` remet ce
+ * blendshape précis à neutre.
  */
 @Composable
 fun BlendshapesScreen(
@@ -77,6 +87,8 @@ fun BlendshapesScreen(
     persistSelectionEnabled: Boolean,
     onSetPersistSelection: (Boolean) -> Unit,
     onDeselectAll: () -> Unit,
+    weights: Map<String, Float>,
+    onSetWeight: (String, Float) -> Unit,
     onResetWeights: () -> Unit,
     onClose: () -> Unit,
 ) {
@@ -194,6 +206,8 @@ fun BlendshapesScreen(
                                     name = name,
                                     checked = name in selectedNames,
                                     onToggle = { onToggle(name) },
+                                    weight = weights[name] ?: BLENDSHAPE_WEIGHT_DEFAULT,
+                                    onWeightChange = { weight -> onSetWeight(name, weight) },
                                 )
                             }
                         }
@@ -207,6 +221,8 @@ fun BlendshapesScreen(
                             name = name,
                             checked = name in selectedNames,
                             onToggle = { onToggle(name) },
+                            weight = weights[name] ?: BLENDSHAPE_WEIGHT_DEFAULT,
+                            onWeightChange = { weight -> onSetWeight(name, weight) },
                         )
                     }
                 }
@@ -215,28 +231,56 @@ fun BlendshapesScreen(
     }
 }
 
+/**
+ * Case à cocher (sélection d'affichage) sur la première ligne, `Slider` de poids (point 18) sur la
+ * seconde -- deux réglages indépendants sur le même blendshape, voir kdoc de [BlendshapesScreen].
+ * Le `Slider` a besoin de toute la largeur pour rester précis au doigt sur la plage 0.5..2.0, d'où
+ * la seconde ligne plutôt qu'un contrôle compact à côté du nom.
+ */
 @Composable
-private fun BlendshapeSelectionRow(name: String, checked: Boolean, onToggle: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onToggle() }
-            .padding(vertical = 2.dp),
-    ) {
-        Checkbox(checked = checked, onCheckedChange = { onToggle() })
-        Spacer(Modifier.width(4.dp))
-        Text(name, color = Color.White)
-        // Avertissement discret, compact (petite icône, pas de texte) pour les blendshapes connus
-        // pour être peu fiables chez MediaPipe -- voir BlendshapeCatalog.unreliable et le rapport
-        // technique, point 17. Purement informatif : n'empêche pas la sélection.
-        if (name in BlendshapeCatalog.unreliable) {
+private fun BlendshapeSelectionRow(
+    name: String,
+    checked: Boolean,
+    onToggle: () -> Unit,
+    weight: Float,
+    onWeightChange: (Float) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().clickable { onToggle() },
+        ) {
+            Checkbox(checked = checked, onCheckedChange = { onToggle() })
             Spacer(Modifier.width(4.dp))
-            Icon(
-                imageVector = Icons.Filled.WarningAmber,
-                contentDescription = stringResource(R.string.cd_unreliable_blendshape),
-                tint = Color(0xFFFFB74D),
-                modifier = Modifier.size(14.dp),
+            Text(name, color = Color.White)
+            // Avertissement discret, compact (petite icône, pas de texte) pour les blendshapes
+            // connus pour être peu fiables chez MediaPipe -- voir BlendshapeCatalog.unreliable et
+            // le rapport technique, point 17. Purement informatif : n'empêche pas la sélection.
+            if (name in BlendshapeCatalog.unreliable) {
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Filled.WarningAmber,
+                    contentDescription = stringResource(R.string.cd_unreliable_blendshape),
+                    tint = Color(0xFFFFB74D),
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(start = 36.dp)) {
+            Slider(
+                value = weight,
+                onValueChange = onWeightChange,
+                valueRange = BLENDSHAPE_WEIGHT_MIN..BLENDSHAPE_WEIGHT_MAX,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                stringResource(R.string.blendshape_weight_label, weight),
+                color = Color.White.copy(alpha = if (weight == BLENDSHAPE_WEIGHT_DEFAULT) 0.5f else 1f),
+                style = MaterialTheme.typography.bodySmall,
+                // Toucher l'étiquette remet ce blendshape précis à neutre -- raccourci pour ne pas
+                // devoir ramener le curseur pile sur 1.0 au doigt.
+                modifier = Modifier.width(44.dp).clickable { onWeightChange(BLENDSHAPE_WEIGHT_DEFAULT) },
             )
         }
     }

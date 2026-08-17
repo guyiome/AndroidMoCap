@@ -136,6 +136,7 @@
     <string name="blendshape_deselect_all_button">Deselect all</string>
     <string name="blendshape_reset_weights_confirm_title">Reset all weights?</string>
     <string name="blendshape_reset_weights_confirm_message">This sets every blendshape\'s weight back to its default (1.0). This can\'t be undone.</string>
+    <string name="blendshape_weight_label">×%.1f</string>
     <string name="display_mesh_overlay_title">Tracking mesh overlay</string>
     <string name="display_mesh_overlay_description">Overlays the points detected by MediaPipe on the camera preview -- handy to check tracking quality without depending on VTube Studio/Blender.</string>
     <string name="display_keep_mesh_overlay_in_power_save_label">Keep mesh overlay visible in power save mode</string>
