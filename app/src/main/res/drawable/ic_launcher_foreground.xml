@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-     Placeholder (9 août 2026), en attendant un logo dessiné par un.e artiste : image fournie par
-     l'utilisateur (drawable-nodpi/ic_launcher_foreground_source.png), remplace le simple visage
-     vectoriel dessiné à la main précédent. Marge de 12% sur chaque bord (inset) pour rester dans la
-     zone sûre des icônes adaptatives (~66% du canevas garantis visibles quel que soit le masque de
-     découpe (cercle, squircle...) appliqué par le launcher), évite que les oreilles/cheveux se
-     retrouvent coupés sur certains lanceurs.
+     Placeholder (mis à jour le 16 août 2026, en attendant un logo dessiné par un.e artiste engagé.e
+     — voir revue technique/todo, point 53, toujours ouvert malgré ce remplacement). Chiot husky,
+     par Nyacchii — image fournie par l'utilisateur (drawable-nodpi/ic_launcher_foreground_source.png),
+     remplace le précédent placeholder (visage mi-mesh de tracking). Fond transparent confirmé (canal
+     alpha réellement à 0 sur les bords, pas du blanc opaque) — se détache proprement sur
+     ic_launcher_background.xml. Marge de 12% sur chaque bord (inset) pour rester dans la zone sûre
+     des icônes adaptatives (~66% du canevas garantis visibles quel que soit le masque de découpe
+     (cercle, squircle...) appliqué par le launcher), évite que les oreilles se retrouvent coupées
+     sur certains lanceurs.
 -->
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
     android:drawable="@drawable/ic_launcher_foreground_source"

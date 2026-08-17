@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LinearProgressIndicator
@@ -31,7 +32,10 @@ import com.guyiome.androidmocap.R
  *
  * Réutilise l'illustration de l'icône de lancement ([R.drawable.ic_launcher_foreground_source],
  * déjà versionnée pour générer l'icône adaptative) comme logo -- pas de doublon d'asset à
- * maintenir, cohérent avec ce que l'utilisateur voit déjà sur son écran d'accueil.
+ * maintenir, cohérent avec ce que l'utilisateur voit déjà sur son écran d'accueil. Toujours un
+ * placeholder (point 53 de la todo/revue technique, en attente d'un logo d'artiste) -- crédit en
+ * bas à gauche par discrétion/honnêteté envers l'auteurice de l'image actuelle, sans revendiquer un
+ * logo final.
  */
 @Composable
 fun LoadingScreen() {
@@ -62,15 +66,26 @@ fun LoadingScreen() {
             LinearProgressIndicator(
                 // Indéterminée (pas de progress: Float passé) -- voir kdoc de tête.
                 modifier = Modifier.width(200.dp),
-                // Même cyan que le maillage de tracking (FaceMeshOverlay) et la moitié "mesh" du
-                // logo ci-dessus -- cohérence visuelle plutôt que la couleur primaire par défaut de
-                // Material (l'app n'utilise nulle part ailleurs MaterialTheme.colorScheme). Piste
-                // atténuée pour la même teinte plutôt que la couleur de fond -- sinon la piste se
-                // fondrait entièrement dans l'écran, ne laissant voir qu'un segment flottant sans
-                // repère de bornes.
+                // Même cyan que le maillage de tracking (FaceMeshOverlay) -- cohérence visuelle
+                // plutôt que la couleur primaire par défaut de Material (l'app n'utilise nulle part
+                // ailleurs MaterialTheme.colorScheme). Piste atténuée pour la même teinte plutôt que
+                // la couleur de fond -- sinon la piste se fondrait entièrement dans l'écran, ne
+                // laissant voir qu'un segment flottant sans repère de bornes.
                 color = Color(0xFF7CE0FF),
                 trackColor = Color(0xFF7CE0FF).copy(alpha = 0.2f),
             )
         }
+
+        // Crédit du placeholder actuel (point 53) -- discret, coin bas-gauche, jamais confondu
+        // avec le contenu central (message/progression). Pas un habillage permanent : à retirer
+        // quand un vrai logo d'artiste remplace ce placeholder.
+        Text(
+            stringResource(R.string.loading_logo_credit),
+            color = Color.White.copy(alpha = 0.4f),
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(16.dp),
+        )
     }
 }
