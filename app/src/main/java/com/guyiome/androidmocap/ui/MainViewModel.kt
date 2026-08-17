@@ -283,7 +283,14 @@ data class TrackingFrame(
     // restitué en pratique -- voir BlendshapeCatalog). MainScreen part de
     // [MainUiState.selectedBlendshapeNames], pas de cette liste, pour construire l'affichage --
     // un blendshape coché mais absent d'ici reste affiché figé à 0 plutôt que de disparaître.
+    // Valeur déjà pondérée (point 18) -- c'est ce qui est réellement envoyé, voir kdoc de
+    // handleTrackingResult().
     val allBlendshapes: List<BlendshapeScore> = emptyList(),
+    // Même liste que [allBlendshapes], mais AVANT la pondération par blendshape (point 18) --
+    // sert uniquement au panneau de debug pour afficher "brute -> corrigée" quand un poids
+    // non-neutre est réglé (BlendshapePanel). Après calibrage/EAR/miroir comme allBlendshapes,
+    // seule la pondération diffère entre les deux.
+    val rawBlendshapes: List<BlendshapeScore> = emptyList(),
     val inferenceTimeMs: Long = 0,
     // Points du mesh facial (478, coordonnées normalisées) -- toujours peuplé (coût négligeable),
     // affiché uniquement si [MainUiState.faceMeshOverlayEnabled] est actif (voir MainScreen).
@@ -1046,6 +1053,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(
                 faceDetected = final.faceDetected,
                 allBlendshapes = final.blendshapes,
+                rawBlendshapes = mirrored.blendshapes,
                 inferenceTimeMs = final.inferenceTimeMs,
                 faceLandmarks = final.faceLandmarks,
                 imageWidthPx = final.imageWidthPx,

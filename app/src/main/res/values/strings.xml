@@ -23,6 +23,7 @@
 
     <!-- Blendshape value panel (main screen) -->
     <string name="blendshape_value_format">%1$s: %2$s</string>
+    <string name="blendshape_value_format_weighted">%1$s: %2$s → %3$s</string>
 
     <!-- Blendshape selection screen -->
     <string name="blendshape_selection_title">Displayed blendshapes</string>
