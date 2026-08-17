@@ -29,6 +29,10 @@ Projet personnel, développé et maintenu par une seule personne, en évolution 
 - HUD minimal et lisible quelle que soit l'orientation du téléphone, réglages détaillés (sélection
   des blendshapes affichés, seuil de batterie faible, mode économie d'énergie, overlay de debug du
   mesh de tracking à 478 points).
+- **Vérification de mise à jour semi-automatique** : compare au dernier tag GitHub Releases et
+  pointe directement dessus -- pas d'installation silencieuse, juste une alerte.
+- **Ajustement de poids par blendshape** : affine chaque blendshape individuellement (ex. un trop
+  ou pas assez réactif) depuis Réglages > Blendshapes.
 - **Mode économie d'énergie** : assombrit l'écran et coupe l'aperçu caméra après inactivité sans
   interrompre le tracking ni l'envoi -- pensé pour les sessions de stream longues, téléphone posé
   loin de l'utilisateur.
@@ -134,10 +138,8 @@ Points principaux encore ouverts :
 
 - Détection expérimentale des joues gonflées (`cheekPuff`) -- même famille que la détection de
   langue tirée déjà implémentée, encore au stade de conception.
-- Vérification de mise à jour semi-automatique (comparaison au dernier tag GitHub Releases, lien
-  direct plutôt qu'installation silencieuse -- impossible hors store).
 - Adaptation des écrans de réglages à l'orientation système sur grand écran (tablette).
-- Ajustement de poids/gain par blendshape (+ lissage réglable).
+- Lissage réglable, en complément de l'ajustement de poids par blendshape déjà en place.
 
 ## Contact
 
