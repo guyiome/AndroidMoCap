@@ -53,7 +53,7 @@ class CameraController(
 
         // Résolution demandée pour l'analyse ImageAnalysis (donc CameraX/MediaPipe -- n'affecte pas
         // l'aperçu affiché à l'écran, un usage caméra séparé) -- palier STANDARD/COMPATIBLE
-        // uniquement, revue technique issue #7 (OPTIMAL utilise sa propre capture caméra ARCore,
+        // uniquement (OPTIMAL utilise sa propre capture caméra ARCore,
         // hors de ce fichier). MediaPipe recadre et redimensionne l'image en interne quelle que soit
         // sa résolution d'entrée (doc officielle Face Landmarker) -- au-delà d'un certain point, plus
         // de pixels ne rapporte donc aucune précision de détection en plus, seulement du coût pur
@@ -179,7 +179,7 @@ class CameraController(
             imageAnalysis = analysis
             // Résolution réellement retenue par CameraX (peut différer de la cible demandée selon
             // ce que l'appareil supporte, voir FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER ci-dessus) --
-            // logué pour vérifier sur device sans deviner (revue technique, issue #7).
+            // logué pour vérifier sur device sans deviner.
             AppLog.i(TAG, "ImageAnalysis lié, résolution retenue : ${analysis.resolutionInfo?.resolution}")
         } catch (e: Exception) {
             AppLog.e(TAG, "Échec de bind CameraX (analyse)", e)
@@ -270,7 +270,7 @@ class CameraController(
     /**
      * Lecture seule d'un bitmap encore "en vol" dans le pool, SANS le retirer (contrairement à
      * [releaseFrame]) -- destiné à un accès pixel synchrone et de courte durée (cascade de
-     * détection de la langue tirée, étage 2, revue technique point 15) pendant la fenêtre garantie
+     * détection de la langue tirée, étage 2) pendant la fenêtre garantie
      * où ce frame n'a pas encore été recyclé : `FaceLandmarkerHelper.onLiveStreamResult()` appelle
      * `onResult(...)` (= `MainViewModel.handleTrackingResult()`) *avant* `onFrameProcessed(...)` (=
      * `releaseFrame()`), de façon synchrone sur le même thread -- appeler exclusivement depuis
@@ -296,7 +296,7 @@ class CameraController(
     fun stop() {
         cameraProvider?.unbindAll()
         cameraExecutor.shutdown()
-        // Remis à null (relecture globale du 7 août 2026, point 17) : sans ça, bindImageAnalysis()/
+        // Remis à null (relecture globale du 7 août 2026) : sans ça, bindImageAnalysis()/
         // bindPreview() no-opaient silencieusement sur ces références encore non-null si start()
         // était un jour rappelé sur cette même instance après stop() -- dormant aujourd'hui (seul
         // appelant : MainViewModel.onCleared(), jamais suivi d'un nouveau start()), mais un piège

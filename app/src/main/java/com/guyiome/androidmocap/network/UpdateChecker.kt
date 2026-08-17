@@ -7,7 +7,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Partie impure de la vérification de mise à jour semi-automatique (point 14) -- un unique appel
+ * Partie impure de la vérification de mise à jour semi-automatique -- un unique appel
  * réseau, pas testable en JVM pur (même catégorie que [VmcOscSender.send]/[IFacialMocapSender]),
  * voir `GitHubReleaseCheck.kt` pour le parsing/la comparaison de version, tous deux purs et testés.
  *

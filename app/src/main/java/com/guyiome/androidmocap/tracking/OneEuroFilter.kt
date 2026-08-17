@@ -8,8 +8,8 @@ import kotlin.math.abs
  * Noisy Input in Interactive Systems", CHI 2012) -- filtre passe-bas à fréquence de coupure
  * *adaptative* : à vitesse de variation faible, coupure basse (lisse fort, tue le bruit/tremblement
  * au repos) ; à vitesse élevée, la coupure remonte (lisse moins, réduit le retard sur un mouvement
- * rapide). Généralisation du bricolage ponctuel [EyeOpennessSmoother] (revue technique, point
- * 28/45) -- outil réutilisable pour n'importe quel signal continu bruité (blendshapes, futures
+ * rapide). Généralisation du bricolage ponctuel [EyeOpennessSmoother] -- outil réutilisable
+ * pour n'importe quel signal continu bruité (blendshapes, futures
  * cascades géométriques...), pas spécifique aux yeux.
  *
  * Deux paramètres à régler par usage :

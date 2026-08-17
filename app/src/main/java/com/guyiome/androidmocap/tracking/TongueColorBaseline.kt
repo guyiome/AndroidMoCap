@@ -2,7 +2,7 @@ package com.guyiome.androidmocap.tracking
 
 /**
  * Référence "sans langue" du ratio couleur ([tonguePixelRatio]) suivie dynamiquement, remplaçant un
- * seuil absolu fixe -- même principe que [AdaptiveEarFloor] (point 48) : une constante mesurée une
+ * seuil absolu fixe -- même principe que [AdaptiveEarFloor] : une constante mesurée une
  * fois dérive trop d'une session à l'autre (mesuré sur device le 11 août 2026 -- même geste "bouche
  * ouverte, langue rentrée", deux essais à quelques minutes d'écart : ratio 0,81-0,93 puis 0,95-0,99,
  * plages qui se chevauchent avec celles "langue tirée" mesurées séparément -- un seuil fixe ne

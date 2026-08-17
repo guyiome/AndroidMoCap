@@ -31,7 +31,7 @@ import com.guyiome.androidmocap.R
 import com.guyiome.androidmocap.network.VBridgerFormulas
 
 /**
- * Consultation en lecture seule des paramètres actuellement envoyés à VTube Studio (point 41) --
+ * Consultation en lecture seule des paramètres actuellement envoyés à VTube Studio --
  * exclusif, pas additif : les 52 blendshapes ARKit bruts si [useVBridgerTranslation] est désactivé,
  * les formules composites VBridger seules s'il est activé (jamais les deux à la fois, voir le kdoc
  * de tête de [VBridgerFormulas]). Première brique visible d'un futur écran d'édition (activer/

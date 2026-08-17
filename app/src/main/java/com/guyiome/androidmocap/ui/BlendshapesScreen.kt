@@ -66,7 +66,7 @@ private fun BlendshapeCategory.displayLabel(): String = when (this) {
 /**
  * Catégorie de premier niveau dédiée aux blendshapes -- promue depuis un sous-écran de
  * "Affichage & confort" (ex-`BlendshapeSelectionScreen`) parce qu'elle est appelée à grossir : la
- * pondération par blendshape (point 18) y trouve sa place. Catalogue complet des 52 blendshapes
+ * pondération par blendshape y trouve sa place. Catalogue complet des 52 blendshapes
  * ARKit, groupés par catégorie repliable, avec recherche. Par défaut, la sélection n'est PAS
  * persistée (remise à zéro à chaque lancement de l'app, comportement historique) --
  * [persistSelectionEnabled] permet de la conserver d'une session à l'autre. [onDeselectAll] vide
@@ -232,7 +232,7 @@ fun BlendshapesScreen(
 }
 
 /**
- * Case à cocher (sélection d'affichage) sur la première ligne, `Slider` de poids (point 18) sur la
+ * Case à cocher (sélection d'affichage) sur la première ligne, `Slider` de poids sur la
  * seconde -- deux réglages indépendants sur le même blendshape, voir kdoc de [BlendshapesScreen].
  * Le `Slider` a besoin de toute la largeur pour rester précis au doigt sur la plage 0.5..2.0, d'où
  * la seconde ligne plutôt qu'un contrôle compact à côté du nom.
@@ -254,8 +254,8 @@ private fun BlendshapeSelectionRow(
             Spacer(Modifier.width(4.dp))
             Text(name, color = Color.White)
             // Avertissement discret, compact (petite icône, pas de texte) pour les blendshapes
-            // connus pour être peu fiables chez MediaPipe -- voir BlendshapeCatalog.unreliable et
-            // le rapport technique, point 17. Purement informatif : n'empêche pas la sélection.
+            // connus pour être peu fiables chez MediaPipe -- voir BlendshapeCatalog.unreliable.
+            // Purement informatif : n'empêche pas la sélection.
             if (name in BlendshapeCatalog.unreliable) {
                 Spacer(Modifier.width(4.dp))
                 Icon(

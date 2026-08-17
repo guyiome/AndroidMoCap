@@ -136,7 +136,7 @@ class VmcOscSender(
      * Reflète si le socket UDP local a bien pu être ouvert (voir [connect]) -- à vérifier par
      * l'appelant juste après construction plutôt que de supposer la connexion établie : le
      * constructeur ne propage jamais d'exception (voir [connect]), un échec silencieux passerait
-     * sinon inaperçu. Relecture globale du 7 août 2026, point 2 : jusqu'ici `MainViewModel`
+     * sinon inaperçu. Relecture globale du 7 août 2026 : jusqu'ici `MainViewModel`
      * affichait "connecté" inconditionnellement après construction, y compris en cas d'échec.
      *
      * Ne couvre que l'ouverture locale, pas la joignabilité de la cible -- voir [onConnectionLost]

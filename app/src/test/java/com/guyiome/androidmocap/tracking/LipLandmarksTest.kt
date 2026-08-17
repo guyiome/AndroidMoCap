@@ -98,8 +98,8 @@ class LipLandmarksTest {
 
     @Test
     fun `mouthCropRegion renvoie null si le rectangle est plus petit que MIN_CROP_DIMENSION_PX -- bouche pressee-mordue`() {
-        // Reproduit la géométrie mesurée sur device le 11 août 2026 (revue technique, point
-        // 15quater) : bouche fermée, coins de bouche très proches horizontalement (lèvre pressée/
+        // Reproduit la géométrie mesurée sur device le 11 août 2026 : bouche fermée, coins de
+        // bouche très proches horizontalement (lèvre pressée/
         // mordue), qui donnait un recadrage de 7-14px de large avant ce garde-fou.
         val landmarks = landmarksWith(
             LipLandmarkIndices.MOUTH_CORNER_LEFT to (0.478f to 0.5f),

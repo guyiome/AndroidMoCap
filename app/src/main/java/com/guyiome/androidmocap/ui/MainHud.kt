@@ -38,7 +38,7 @@ import com.guyiome.androidmocap.settings.ConnectionType
  * ou VTube Studio) et se teinte en ambre pendant qu'une connexion progresse, quel que soit le type
  * (résolution DNS pour VMC, en écoute mais VBridger pas encore connecté pour iFacialMocap, cycle
  * d'authentification/création de paramètres pour VTube Studio) -- plutôt que de rester indiscernable
- * d'un simple "non connecté" comme avant le point 40 de la revue technique. Chaque icône pivote sur
+ * d'un simple "non connecté" comme avant. Chaque icône pivote sur
  * elle-même selon [iconRotationDegrees] pour rester lisible quel que soit l'angle auquel le
  * téléphone est tenu/posé.
  *
@@ -58,7 +58,7 @@ fun MainHud(
     onOpenExperimental: () -> Unit,
     onOpenUpdate: () -> Unit,
 ) {
-    // "En cours" par type (revue technique, point 40) :
+    // "En cours" par type :
     // - VMC : résolution DNS/construction du socket (connectVmcTarget) -- généralement bref, mais
     //   affiché pour rester cohérent avec les deux autres types.
     // - iFacialMocap : en écoute mais VBridger pas encore connecté (l'app attend passivement le
@@ -96,7 +96,7 @@ fun MainHud(
             )
 
             // Débit réduit pour cause de chauffe (voir MainViewModel.startThermalPolling) et/ou
-            // appareil qui peine sur la détection de langue tirée (point 15, revue technique) --
+            // appareil qui peine sur la détection de langue tirée --
             // même icône pour les deux causes (souvent corrélées), couplée sur ce petit indicateur
             // déjà existant plutôt que sur un avertissement séparé plein écran (ancien
             // TonguePerformanceWarning, jugé trop imposant par l'utilisateur, retiré). Cliquable
@@ -147,8 +147,8 @@ fun MainHud(
             Spacer(Modifier.width(18.dp))
 
             // Mise à zéro, avec l'anneau de compte à rebours autour. Teinte rouge si une anomalie
-            // de calibrage a été détectée (voir tracking/CalibrationAnomaly.kt, revue technique
-            // point 19) -- suspendue pendant le compte à rebours (recalibrage imminent, rouge +
+            // de calibrage a été détectée (voir tracking/CalibrationAnomaly.kt) -- suspendue
+            // pendant le compte à rebours (recalibrage imminent, rouge +
             // anneau simultanés serait confus) ; se résout uniquement par un nouveau calibrage.
             Box(contentAlignment = Alignment.Center) {
                 if (countdown != null) {
@@ -176,7 +176,7 @@ fun MainHud(
                     )
                 }
             }
-            // Mise à jour disponible (point 14) -- purement informatif jusqu'au tap, qui ouvre la
+            // Mise à jour disponible -- purement informatif jusqu'au tap, qui ouvre la
             // page de la Release GitHub dans le navigateur (pas d'install silencieuse possible hors
             // store, voir UpdateChecker/MainViewModel.checkForUpdate). Reste affichée tant que l'app
             // n'est pas mise à jour, décision explicite (pas d'état "ignorer cette version").

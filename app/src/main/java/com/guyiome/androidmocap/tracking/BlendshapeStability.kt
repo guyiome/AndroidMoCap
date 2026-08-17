@@ -13,7 +13,7 @@ internal const val UNKNOWN_BLENDSHAPE_VARIANCE = Float.MAX_VALUE
  * Delta absolu moyen frame-à-frame entre deux jeux de blendshapes, appariés par [BlendshapeScore.name]
  * (l'ordre/la composition de la liste MediaPipe n'est pas garanti stable d'une frame à l'autre --
  * voir [BlendshapeCatalog]). Métrique volontairement simple (pas d'écart-type/variance statistique
- * au sens strict) : le point 19 de la revue technique demande juste de distinguer "visage qui
+ * au sens strict) : il suffit de distinguer "visage qui
  * bouge" de "visage immobile", une moyenne de deltas suffit et reste bon marché à calculer à 60 fps.
  */
 internal fun meanAbsoluteBlendshapeDelta(

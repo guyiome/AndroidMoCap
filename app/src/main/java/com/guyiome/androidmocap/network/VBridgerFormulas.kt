@@ -5,8 +5,8 @@ import com.guyiome.androidmocap.tracking.BlendshapeScore
 import com.guyiome.androidmocap.tracking.FaceTrackingResult
 
 /**
- * Traduction des blendshapes ARKit vers les paramètres par défaut de VTube Studio (point 41 de la
- * revue technique), en reprenant telles quelles les formules du panneau `AdvancedARKitSettings` de
+ * Traduction des blendshapes ARKit vers les paramètres par défaut de VTube Studio, en reprenant
+ * telles quelles les formules du panneau `AdvancedARKitSettings` de
  * VBridger -- capturées et vérifiées (calcul à zéro conforme à VBridger) dans
  * `E:\WorkSpaces\VTuberApp\Docs\VBridgerFormulaReference.md` (projet "VTuberApp", même traduction
  * déjà testée côté réception PC). But : qu'un streamer déjà riggé pour VBridger/VTS puisse se passer

@@ -12,7 +12,7 @@ import com.guyiome.androidmocap.logging.AppLog
 
 /**
  * Enrobe MediaPipe Image Embedder pour l'étage 3 de la cascade de détection de la langue tirée
- * (revue technique, point 15) -- même mécanique de repli GPU->CPU que [FaceLandmarkerHelper], mais
+ * -- même mécanique de repli GPU->CPU que [FaceLandmarkerHelper], mais
  * en [RunningMode.IMAGE] (appel synchrone [embed]) plutôt que `LIVE_STREAM` : l'embedding ne tourne
  * que sur de rares frames déjà filtrées par les étages 1+2 (quelques Hz au plus, jamais le flux
  * 20-60Hz du tracking), pas besoin de la machinerie asynchrone (`detectAsync`/`ResultListener`)

@@ -14,7 +14,7 @@ package com.guyiome.androidmocap.ui
  * ratio de l'image analysée ([imageWidthPx]/[imageHeightPx]) diffère de celui du canvas
  * ([canvasWidthPx]/[canvasHeightPx]) : l'image est mise à l'échelle pour remplir tout le canvas en
  * conservant son ratio, l'excédent étant rogné de façon centrée sur l'axe qui déborde. Avant ce
- * correctif (point 27, voir `AndroidMoCap_revue_technique.md`), un étirement naïf par axe donnait
+ * correctif, un étirement naïf par axe donnait
  * un mesh écrasé et décalé par rapport au visage sur les appareils dont l'écran a un ratio
  * sensiblement différent de celui de l'image caméra (constaté sur ASUS ROG Phone II ; invisible sur
  * tablette où les deux ratios sont proches).

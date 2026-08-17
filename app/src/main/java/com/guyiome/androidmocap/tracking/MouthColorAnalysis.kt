@@ -1,7 +1,7 @@
 package com.guyiome.androidmocap.tracking
 
 /**
- * Étage 2 de la cascade de détection de la langue tirée (revue technique, point 15) : analyse
+ * Étage 2 de la cascade de détection de la langue tirée : analyse
  * couleur pure du recadrage buccal produit par [mouthCropRegion], à la recherche d'une teinte
  * rose/rouge saturée dépassant la ligne des lèvres inférieures. Toujours aucun réseau de neurones
  * à ce stade -- juste de la géométrie couleur.

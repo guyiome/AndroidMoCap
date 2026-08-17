@@ -5,10 +5,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * Partie pure de la vérification de mise à jour semi-automatique (point 14) -- parsing de la
+ * Partie pure de la vérification de mise à jour semi-automatique -- parsing de la
  * réponse `GET /repos/guyiome/AndroidMoCap/releases/latest` et comparaison de version, sans aucun
  * appel réseau (voir [UpdateChecker] pour la partie impure). Ce point d'entrée de l'API GitHub
- * exclut déjà lui-même les prereleases/drafts -- un tag `-beta` (voir revue technique, point 49)
+ * exclut déjà lui-même les prereleases/drafts -- un tag `-beta`
  * n'est donc jamais vu ici, cohérent avec le but recherché dès la mise en place du canal beta :
  * ne jamais notifier un utilisateur "stable" d'un build de test.
  */

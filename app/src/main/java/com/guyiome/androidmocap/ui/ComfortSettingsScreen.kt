@@ -118,7 +118,7 @@ fun ComfortSettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            // Sélecteur de langue en-app (point 30) : fonctionne sur toutes les versions d'Android,
+            // Sélecteur de langue en-app : fonctionne sur toutes les versions d'Android,
             // contrairement au sélecteur système natif (réglages système > langues de l'app,
             // Android 13+ seulement, voir res/xml/locales_config.xml).
             Spacer(Modifier.height(24.dp))

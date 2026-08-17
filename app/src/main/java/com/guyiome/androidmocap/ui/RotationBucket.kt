@@ -6,10 +6,10 @@ package com.guyiome.androidmocap.ui
  * sa logique ad hoc précédente (le cas 135-225° tombait à tort sur 0° au lieu de 180°) -- utilisé
  * pour la rotation du panneau de blendshapes (cosmétique, Compose).
  *
- * **Historique** (déplacé/renommé le 12 août 2026, revue technique points 1/15/20/53) : vivait à
+ * **Historique** (déplacé/renommé le 12 août 2026) : vivait à
  * l'origine dans `tracking/CameraOrientation.kt`, aux côtés de deux fonctions supplémentaires pour
  * corriger dynamiquement la rotation de l'image caméra selon la tenue physique du téléphone --
- * hypothèse testée sur device puis infirmée (voir revue technique, points 20/52/53), fonctions
+ * hypothèse testée sur device puis infirmée, fonctions
  * retirées. Seule cette fonction a survécu, purement cosmétique/UI (rotation d'un panneau Compose,
  * aucun rapport avec l'orientation de l'image caméra) -- déplacée dans `ui/` sous un nom qui reflète
  * son rôle réel plutôt que de garder un nom et un emplacement hérités d'une hypothèse abandonnée.

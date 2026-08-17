@@ -5,8 +5,8 @@
          pendant l'écran de démarrage et le temps de chargement de MediaPipe. Fond sombre pour
          éviter le flash blanc agressif au lancement, cohérent avec AndroidMoCapTheme (Theme.kt).
 
-         Parent Theme.AppCompat (plus android:Theme.Material) depuis le point 30 (sélecteur de
-         langue en-app) : AppCompatActivity.onCreate() exige un thème descendant de Theme.AppCompat,
+         Parent Theme.AppCompat (plus android:Theme.Material) depuis l'ajout du sélecteur de
+         langue en-app : AppCompatActivity.onCreate() exige un thème descendant de Theme.AppCompat,
          requis pour que AppCompatDelegate.setApplicationLocales() fonctionne avec Compose (doc
          officielle Android, voir MainActivity.kt), sans ce changement l'app crasherait au
          lancement dès que MainActivity est passée à AppCompatActivity.

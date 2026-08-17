@@ -34,7 +34,7 @@ internal const val SUSTAINED_DRIFT_FRAMES = 90
 internal const val MIN_FACE_LOSS_FRAMES_FOR_REACQUISITION = 3
 
 /**
- * État de la détection d'anomalie de calibrage (voir revue technique, point 19) : purement
+ * État de la détection d'anomalie de calibrage : purement
  * informatif, jamais d'action automatique -- pilote uniquement la teinte du bouton de calibrage
  * existant dans `MainHud`.
  *
@@ -43,7 +43,7 @@ internal const val MIN_FACE_LOSS_FRAMES_FOR_REACQUISITION = 3
  * vrai il ne redevient jamais faux tout seul, seul un appel explicite à
  * `MainViewModel.performCalibration()` (bouton ou premier calibrage automatique) le remet à zéro
  * via [CalibrationAnomalyState.INITIAL] -- cohérent avec "se résout de lui-même dès que
- * l'utilisateur appuie pour recalibrer" (revue technique, point 19).
+ * l'utilisateur appuie pour recalibrer".
  */
 data class CalibrationAnomalyState(
     val flagged: Boolean = false,
@@ -64,8 +64,8 @@ data class CalibrationAnomalyState(
 internal fun maxAbsEulerDegrees(euler: FloatArray): Float = euler.maxOf { kotlin.math.abs(it) }
 
 /**
- * Transition par frame. [isAtRest] et [poseMagnitudeDegrees] correspondent au critère principal du
- * point 19 ("visage au repos mais pose qui ne revient pas près de zéro") ; [faceDetected] au signal
+ * Transition par frame. [isAtRest] et [poseMagnitudeDegrees] correspondent au critère principal
+ * ("visage au repos mais pose qui ne revient pas près de zéro") ; [faceDetected] au signal
  * complémentaire (perte puis redétection). Ne rien appeler tant que
  * `MainUiState.isCalibrated` est faux -- avant le tout premier calibrage, "proche de zéro" n'a pas
  * de sens et ferait remonter de faux positifs.

@@ -33,7 +33,7 @@ data class FaceTrackingResult(
      * Dimensions en pixels de l'image effectivement analysée par MediaPipe (espace dans lequel
      * [faceLandmarks] est normalisé). Nécessaires à [com.guyiome.androidmocap.ui.LandmarkProjection]
      * pour reproduire le recadrage centré de `PreviewView` quand le ratio de l'image diffère de
-     * celui de l'écran -- voir point 27 de `AndroidMoCap_revue_technique.md`. 0 si inconnu (aucune
+     * celui de l'écran. 0 si inconnu (aucune
      * frame traitée pour l'instant).
      */
     val imageWidthPx: Int = 0,

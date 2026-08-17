@@ -7,7 +7,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Fonctions pures utilisées par [AppLog] (voir revue technique, point 50) -- formatage d'une ligne
+ * Fonctions pures utilisées par [AppLog] -- formatage d'une ligne
  * de log auto-suffisante (le fichier exporté n'a pas le formatage de `logcat` pour se rattraper),
  * masquage des adresses IP et politique de rotation par taille. Testées en JVM, sans dépendance
  * Android (pas de `android.util.Log` ici -- `Log.getStackTraceString()` est réimplémenté avec

@@ -163,7 +163,7 @@ class TongueCalibrationRecordingStateTest {
 
     @Test
     fun `PREPARE_TONGUE_OUT et PREPARE_TONGUE_IN partagent le meme parametre prepareDurationMs`() {
-        // Ajoutée le 13 août 2026 (revue technique, point 56) : les deux pauses utilisent le même
+        // Ajoutée le 13 août 2026 : les deux pauses utilisent le même
         // paramètre plutôt que deux durées indépendantes -- vérifie que prepareDurationMs contrôle
         // bien les deux frontières, pas seulement celle entre les deux enregistrements.
         val stillPreparingOut = newTongueCalibrationRecording().tick(

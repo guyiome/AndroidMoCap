@@ -6,7 +6,7 @@
      ici. Justifié par le modèle de l'app : uniquement du trafic réseau local (même Wi-Fi), jamais
      de serveur distant, jamais de donnée sensible, voir "Vie privée et réseau" dans le README.
      Nécessaire pour VTubeStudioSender (client WebSocket, nv-websocket-client aujourd'hui,
-     initialement essayé avec OkHttp, voir revue technique point 39, qui respecte
+     initialement essayé avec OkHttp, qui respecte
      NetworkSecurityPolicy) ; VmcOscSender/IFacialMocapSender n'en avaient pas besoin, un
      DatagramSocket brut n'étant pas soumis à cette vérification.
 -->

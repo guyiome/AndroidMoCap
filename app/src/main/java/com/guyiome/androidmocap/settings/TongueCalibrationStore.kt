@@ -6,14 +6,14 @@ import java.io.File
 import java.util.Locale
 
 /**
- * Stockage des deux vecteurs de référence de l'étage 3 de la cascade langue tirée (revue technique,
- * point 15) -- `filesDir` plutôt que DataStore (pensé pour des préférences scalaires, pas des
+ * Stockage des deux vecteurs de référence de l'étage 3 de la cascade langue tirée -- `filesDir`
+ * plutôt que DataStore (pensé pour des préférences scalaires, pas des
  * tableaux de floats). Encodage CSV texte (une ligne par vecteur, valeurs séparées par des
  * virgules, `"%.8f"`) plutôt que binaire : un embedding MobileNetV3 fait au plus quelques Ko en
  * texte, largement en dessous de tout souci de taille -- le texte reste inspectable à l'œil (ouvrir
  * le fichier suffit à vérifier que la calibration n'est pas vide/corrompue), même arbitrage
  * simplicité > compacité que le reste du stockage `filesDir` de ce projet (`AppLog`, texte plat).
- * Pas de JSON malgré kotlinx.serialization déjà présent (point 39) : deux tableaux de floats nommés
+ * Pas de JSON malgré kotlinx.serialization déjà présent ailleurs dans le projet : deux tableaux de floats nommés
  * ne justifient pas cet overhead ici, le CSV est strictement plus simple pour ce cas précis. Suit
  * exactement le patron `AppLog.init(filesDir)` : `File` brut, `runCatching`, aucune exception ne
  * doit remonter jusqu'à l'appelant.

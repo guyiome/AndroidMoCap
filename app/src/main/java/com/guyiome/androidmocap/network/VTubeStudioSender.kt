@@ -12,13 +12,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Émetteur pour l'API Plugin de VTube Studio (point 39) -- alternative directe à [VmcOscSender],
- * que VTube Studio ne reçoit vraisemblablement pas nativement (voir revue technique). Protocole
+ * Émetteur pour l'API Plugin de VTube Studio -- alternative directe à [VmcOscSender],
+ * que VTube Studio ne reçoit vraisemblablement pas nativement en entrée. Protocole
  * encodé/décodé par [VTubeStudioProtocol] (pur, testé), cycle de connexion piloté par
  * [nextVTubeStudioConnectionState] (pur, testé) -- cette classe est la seule pièce non testable en
  * JVM : elle enveloppe un vrai [WebSocket] et traduit ses événements en appels à `next()`.
  *
- * **Client WebSocket : nv-websocket-client, pas OkHttp** (revue technique, point 39 -- essai/erreur
+ * **Client WebSocket : nv-websocket-client, pas OkHttp** (essai/erreur
  * sur device le 8 août 2026, pas une préférence a priori). OkHttp propose systématiquement
  * l'extension `permessage-deflate` sur ses WebSocket, sans réglage public pour la désactiver -- même
  * un intercepteur réseau retirant l'en-tête `Sec-WebSocket-Extensions` de la requête ne change rien,
@@ -43,7 +43,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * instance existante -- pas de reconnexion automatique en boucle à ce stade (v1).
  *
  * Les noms de paramètres à créer côté VTube Studio viennent de [VBridgerFormulas.activeFormulas]
- * (point 41) -- une liste statique, plus dérivée de la première frame reçue après authentification
+ * -- une liste statique, plus dérivée de la première frame reçue après authentification
  * comme avant l'introduction de ce registre (voir kdoc de tête de [VBridgerFormulas], "effet de bord
  * positif" : corrige au passage le cas `tongueOut` absent d'une première frame trop précoce).
  */
@@ -139,7 +139,7 @@ class VTubeStudioSender(
      * de forcer un keep-alive avec les dernières valeurs connues.
      *
      * [useVBridgerTranslation] bascule entre les 52 blendshapes ARKit bruts (`false`, comportement
-     * historique) et les formules composites VBridger seules (`true`, point 41, [VBridgerFormulas])
+     * historique) et les formules composites VBridger seules (`true`, [VBridgerFormulas])
      * -- **exclusif, pas additif** : en mode traduction, les bruts ne partent plus du tout, pour une
      * parité exacte avec ce que VBridger lui-même envoie à VTS (voir le kdoc de tête de
      * [VBridgerFormulas]). Lu à chaque appel plutôt que figé à la construction, pour que basculer le

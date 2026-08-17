@@ -19,7 +19,7 @@
          doc officielle ARCore pour fiabiliser ArCoreApk.checkAvailability()/Session() sous les
          restrictions de visibilité de packages. Sans impact aujourd'hui : le repli sur CameraX est
          déjà silencieux dans tous les cas (voir ArCoreHeadPoseTracker.onUnavailable), c'est un
-         correctif défensif. Voir revue technique, point 13 (risque 3) et point 33.
+         correctif défensif.
     -->
     <queries>
         <package android:name="com.google.ar.core" />
@@ -52,7 +52,7 @@
         </activity>
 
         <!--
-             Sélecteur de langue en-app (point 30) : persiste automatiquement la langue choisie via
+             Sélecteur de langue en-app : persiste automatiquement la langue choisie via
              AppCompatDelegate.setApplicationLocales() sur TOUTES les versions d'Android (stockage
              propre à AppCompat sous API 33, délégué à LocaleManager au-delà), sans ce service, il
              faudrait réappliquer la langue nous-mêmes à chaque lancement (DataStore + appel manuel
@@ -70,7 +70,7 @@
         </service>
 
         <!--
-             Partage du fichier de logs (LoggingSettingsScreen, revue technique point 50) : un
+             Partage du fichier de logs (voir LoggingSettingsScreen) : un
              FileProvider permet de partager un fichier de stockage privé via une URI content://
              sans l'exposer directement (l'app en lecture destinataire du partage reçoit une
              permission ponctuelle, pas un accès large). Portée limitée à filesDir/logs/, voir

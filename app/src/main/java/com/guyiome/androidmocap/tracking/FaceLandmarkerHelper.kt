@@ -22,8 +22,8 @@ class FaceLandmarkerHelper(
     private val context: Context,
     private val tierConfig: TierConfig,
     /**
-     * Mock de debug (panneau caché de `AdvancedSettingsScreen`, voir `AppSettingsStore.debugForceGpuUnavailable`
-     * et revue technique point 35) : force le repli CPU même si [TierConfig.preferGpuDelegate] est
+     * Mock de debug (panneau caché de `AdvancedSettingsScreen`, voir `AppSettingsStore.debugForceGpuUnavailable`)
+     * : force le repli CPU même si [TierConfig.preferGpuDelegate] est
      * vrai -- réutilise le chemin de repli CPU déjà existant dans [setup] sans le modifier.
      */
     private val forceGpuUnavailable: Boolean = false,
@@ -59,7 +59,7 @@ class FaceLandmarkerHelper(
          * Angle max arbitraire (30°) à ajuster selon le rendu observé.
          *
          * Les 8 scores nécessaires sont cherchés une fois via une `Map` construite en tête de
-         * fonction (relecture globale du 7 août 2026, point 18) plutôt que par 8 scans linéaires
+         * fonction (relecture globale du 7 août 2026) plutôt que par 8 scans linéaires
          * successifs de [blendshapes] (`firstOrNull`, jusqu'à ~52 entrées chacun) -- même valeurs
          * lues, coût O(1) par lookup au lieu de O(n).
          */
@@ -159,7 +159,7 @@ class FaceLandmarkerHelper(
         val (leftEyeEuler, rightEyeEuler) = computeEyeGazeDegrees(blendshapes)
 
         // Mesh complet (478 points -- surface + iris), coordonnées déjà normalisées [0,1] par
-        // MediaPipe -- toujours extrait (voir revue technique, point 28) : au départ réservé à
+        // MediaPipe -- toujours extrait : au départ réservé à
         // l'overlay optionnel (com.guyiome.androidmocap.ui.FaceMeshOverlay, désactivé par défaut),
         // maintenant aussi consommé par la correction eyeBlink par EAR
         // (tracking/EyeBlinkCorrection.kt), active en permanence. MediaPipe calcule ces points en
@@ -185,7 +185,7 @@ class FaceLandmarkerHelper(
                 faceLandmarks = landmarks,
                 // Dimensions de l'image réellement analysée (espace de normalisation de
                 // faceLandmarks) -- permet à LandmarkProjection de reproduire le recadrage centré
-                // de PreviewView plutôt qu'un étirement naïf. Voir point 27 de la revue technique.
+                // de PreviewView plutôt qu'un étirement naïf.
                 imageWidthPx = input.width,
                 imageHeightPx = input.height,
             )

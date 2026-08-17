@@ -92,7 +92,7 @@ class RotationMathTest {
 
     @Test
     fun `une rotation pure autour de Y ne donne que du yaw, formule brute non inversee`() {
-        // Point 53 (revue technique) : le yaw n'est plus inversé ici -- valeur native/anatomique,
+        // Le yaw n'est plus inversé ici -- valeur native/anatomique,
         // pas mirrorée. L'ancienne version de ce test figeait -15° (inversé) ; l'inversion vivait en
         // réalité un comportement mirroré jamais nommé comme tel, découvert en croisant tête/regard/
         // clignement sur device le 10 août 2026 -- voir mirrorEulerDegrees() pour le mode miroir
@@ -170,8 +170,8 @@ class RotationMathTest {
 
     @Test
     fun `rotation3x3FromQuaternion pour 90 degres autour de Z correspond a la rotation Z equivalente`() {
-        // Prépare le terrain pour la fusion ARCore (phase 2, voir AndroidMoCap_revue_technique.md
-        // point 3) : ARCore expose la pose de tête sous forme de quaternion, pas de matrice --
+        // Prépare le terrain pour la fusion ARCore (phase 2) : ARCore expose la pose de tête
+        // sous forme de quaternion, pas de matrice --
         // cette conversion doit rejoindre le même format 3x3 row-major que toEulerDegrees/
         // composeCalibratedEuler pour pouvoir réutiliser le pipeline de calibration existant tel quel.
         val half = Math.toRadians(45.0) // theta/2 pour theta = 90°

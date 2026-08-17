@@ -15,7 +15,7 @@ import com.guyiome.androidmocap.ui.MainScreen
 import com.guyiome.androidmocap.ui.theme.AndroidMoCapTheme
 
 // AppCompatActivity (pas ComponentActivity) : requis par AppCompatDelegate.setApplicationLocales()
-// sous Compose pour que le sélecteur de langue en-app fonctionne (point 30, doc officielle Android
+// sous Compose pour que le sélecteur de langue en-app fonctionne (doc officielle Android
 // -- "If you're using Compose with setApplicationLocales, you must extend your activity from
 // AppCompatActivity"), voir aussi le thème Theme.AppCompat.DayNight requis (themes.xml) et
 // AppLocalesMetadataHolderService (AndroidManifest.xml) pour la persistance sur toutes versions.

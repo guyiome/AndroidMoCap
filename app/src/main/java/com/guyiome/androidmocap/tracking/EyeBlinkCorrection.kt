@@ -2,7 +2,7 @@ package com.guyiome.androidmocap.tracking
 
 /**
  * Correction du blendshape `eyeBlinkLeft`/`eyeBlinkRight` par l'Eye Aspect Ratio (EAR, voir
- * `EyeAspectRatio.kt`) -- revue technique, point 28.
+ * `EyeAspectRatio.kt`).
  *
  * Problème mesuré sur device (9 août 2026), pas supposé : le blendshape `eyeBlink` de MediaPipe
  * **fuit d'un œil vers l'autre** -- pendant un clin d'œil volontaire d'un seul côté, le score de
@@ -22,7 +22,7 @@ package com.guyiome.androidmocap.tracking
  * faisant remonter l'EAR calculé même œil toujours fermé. Une correction frame-à-frame sans
  * mémoire confondait cette dérive lente avec une vraie réouverture. D'abord corrigé par un
  * lissage asymétrique bricolé sur mesure (`EyeOpennessSmoother`, retiré le 9 août 2026), puis
- * remplacé par [OneEuroFilter] (revue technique, point 46) : sa coupure adaptative fait
+ * remplacé par [OneEuroFilter] : sa coupure adaptative fait
  * naturellement la même chose -- une dérive lente (vitesse faible) reçoit une forte coupure basse
  * donc beaucoup de lissage, un vrai clignement (vitesse élevée) reçoit une coupure plus haute donc
  * peu de retard -- avec un mécanisme général réutilisable plutôt qu'un hack spécifique aux yeux.
@@ -79,7 +79,7 @@ internal const val EAR_DAMPING_THRESHOLD = 0.7f
  * - [EAR_OPENNESS_BETA] assez élevé pour qu'un vrai clignement (mesuré à une vitesse bien plus
  *   grande, l'ouverture variant sur ~100-400 ms) fasse rapidement remonter la coupure adaptative et
  *   traverse sans retard perceptible.
- * À réévaluer avec le même protocole de mesure device (log `EarDiag`) que le reste du point 28 si
+ * À réévaluer avec le même protocole de mesure device (log `EarDiag`) que le reste de ce fichier si
  * un comportement encore trop mou ou trop nerveux est observé.
  */
 internal const val EAR_OPENNESS_MIN_CUTOFF = 0.5f
@@ -88,8 +88,8 @@ internal const val EAR_OPENNESS_BETA = 5f
 /**
  * Score brut `eyeBlinkLeft`/`eyeBlinkRight` au-delà duquel [AdaptiveEarFloor] considère qu'un
  * clignement (réel ou fuite -- peu importe pour la calibration, voir plus bas) est probablement en
- * cours sur cet œil. Calé au-dessus du gros de la plage de fuite mesurée (~0,26-0,49, revue
- * technique point 28/45) pour limiter les épisodes déclenchés par une pure fuite, sans exiger une
+ * cours sur cet œil. Calé au-dessus du gros de la plage de fuite mesurée (~0,26-0,49)
+ * pour limiter les épisodes déclenchés par une pure fuite, sans exiger une
  * fermeture aussi franche que le maximum mesuré (~0,55-0,8) -- pas besoin de capter chaque
  * clignement, seulement d'en échantillonner assez régulièrement pour calibrer.
  */

@@ -7,8 +7,8 @@ internal const val DEBUG_PANEL_UNLOCK_TAP_COUNT = 7
 internal const val DEBUG_PANEL_UNLOCK_TAP_WINDOW_MS = 1000L
 
 /**
- * État pur du geste de déverrouillage du panneau de mocks de debug (voir revue technique, point
- * 35) -- même principe que le menu développeur Android ("taper 7 fois sur le numéro de build"),
+ * État pur du geste de déverrouillage du panneau de mocks de debug -- même principe que le menu
+ * développeur Android ("taper 7 fois sur le numéro de build"),
  * appliqué ici à la ligne "Version de l'app" de [AdvancedSettingsScreen]. Volontairement non persisté
  * (état Compose local, `remember`) : le geste ne coûte que quelques secondes à refaire, contrairement
  * aux mocks eux-mêmes (voir `AppSettingsStore.debugForceArCoreUnavailable`/`debugForceGpuUnavailable`,

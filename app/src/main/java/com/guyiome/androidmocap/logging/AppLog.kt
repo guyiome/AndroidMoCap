@@ -5,7 +5,7 @@ import com.guyiome.androidmocap.BuildConfig
 import java.io.File
 
 /**
- * Point d'entrée unique de journalisation de l'app (revue technique, point 50) -- remplace les
+ * Point d'entrée unique de journalisation de l'app -- remplace les
  * appels directs à `android.util.Log` dans le reste du code, pour deux raisons : un format
  * cohérent d'un appel à l'autre, et un chemin secondaire vers un fichier exportable par
  * l'utilisateur (voir `ui/AdvancedSettingsScreen.kt`), en plus de `logcat`.
@@ -13,12 +13,12 @@ import java.io.File
  * - [v]/[d] (verbose/debug) sont des no-op hors build debug ([BuildConfig.DEBUG]) -- ni `logcat`,
  *   ni fichier -- convention Android officielle (voir kdoc de [LogLevel]), et garantie explicite en
  *   code plutôt que déléguée à une règle R8 (`-assumenosideeffects`) dont l'effet serait incertain
- *   ici vu `-dontoptimize` (revue technique, point 8).
+ *   ici vu `-dontoptimize`.
  * - [i]/[w]/[e] partent toujours vers `logcat`, et vers le fichier persistant si [minimumPersistedLevel]
  *   l'autorise ([shouldPersist]) -- ERROR par défaut, réglable jusqu'à INFO (`AppSettingsStore.logLevel`).
  * - Les adresses IP du message sont masquées ([maskIpAddresses]) avant écriture fichier, sauf en
  *   build debug -- IP en clair uniquement sur la machine de dev, jamais dans un fichier qu'un
- *   utilisateur pourrait exporter et partager (revue technique, point 50, risque RGPD discuté).
+ *   utilisateur pourrait exporter et partager (risque RGPD discuté).
  *
  * Le fichier est réécrit en entier à chaque appel persisté (lecture + [appendWithRotation] +
  * écriture) plutôt qu'un simple append -- plus simple à raisonner/tester, et largement suffisant vu

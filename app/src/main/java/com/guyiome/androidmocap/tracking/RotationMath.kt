@@ -53,7 +53,7 @@ object RotationMath {
      * formule brute, SANS inversion de signe : yaw/roll anatomiquement natifs (pas mirrorés), voir
      * [mirrorEulerDegrees] pour le mode miroir explicite.
      *
-     * Historique (revue technique, point 51) : le yaw était auparavant inversé ici même
+     * Historique : le yaw était auparavant inversé ici même
      * (`-atan2(...)`) suite à une validation empirique sur device qui, avec le recul, validait en
      * réalité un comportement mirroré (tête vue "comme dans un miroir") sans que ce soit nommé ni
      * choisi comme tel -- découvert le 10 août 2026 en croisant tête/regard/clignement : la tête
@@ -74,8 +74,7 @@ object RotationMath {
      * (plan vertical) inverse le yaw (tourner la tête) et le roll (l'incliner d'une épaule à
      * l'autre), mais préserve le pitch (hocher la tête) : conséquence géométrique standard d'une
      * réflexion, pas un choix arbitraire. À appliquer uniquement en même temps que
-     * [mirrorBlendshapes] sur les blendshapes -- jamais l'un sans l'autre, voir revue technique
-     * point 51.
+     * [mirrorBlendshapes] sur les blendshapes -- jamais l'un sans l'autre.
      */
     fun mirrorEulerDegrees(pitchYawRoll: FloatArray): FloatArray =
         floatArrayOf(pitchYawRoll[0], -pitchYawRoll[1], -pitchYawRoll[2])
@@ -83,8 +82,8 @@ object RotationMath {
     /**
      * Convertit un quaternion (x, y, z, w) en matrice de rotation 3x3 row-major -- même format que
      * [rotation3x3FromColumnMajor4x4], pour rejoindre le pipeline de calibration existant
-     * ([composeCalibratedEuler]) sans le dupliquer. Préparé pour la fusion ARCore (phase 2, voir
-     * `AndroidMoCap_revue_technique.md` point 3) : `com.google.ar.core.Pose#getRotationQuaternion()`
+     * ([composeCalibratedEuler]) sans le dupliquer. Préparé pour la fusion ARCore (phase 2) :
+     * `com.google.ar.core.Pose#getRotationQuaternion()`
      * expose la pose de tête sous cette forme, contrairement à MediaPipe qui fournit directement une
      * matrice 4x4. Suppose un quaternion déjà normalisé (c'est le cas de celui renvoyé par ARCore).
      */

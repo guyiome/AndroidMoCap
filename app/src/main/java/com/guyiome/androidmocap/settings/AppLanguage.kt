@@ -1,8 +1,8 @@
 package com.guyiome.androidmocap.settings
 
 /**
- * Langue forcée de l'app, indépendante de la langue système -- sélecteur en-app (point 30),
- * fonctionne sur toutes les versions d'Android (contrairement au sélecteur système natif, réglages
+ * Langue forcée de l'app, indépendante de la langue système -- sélecteur en-app, fonctionne sur
+ * toutes les versions d'Android (contrairement au sélecteur système natif, réglages
  * système > langues de l'app, qui n'existe que depuis Android 13, voir res/xml/locales_config.xml)
  * via `AppCompatDelegate.setApplicationLocales()`. La persistance de la langue choisie est gérée
  * automatiquement par AppCompat lui-même (voir `AppLocalesMetadataHolderService` dans

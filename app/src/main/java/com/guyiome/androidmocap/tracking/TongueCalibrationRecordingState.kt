@@ -5,8 +5,8 @@ package com.guyiome.androidmocap.tracking
 enum class TongueCalibrationPhase { IDLE, PREPARE_TONGUE_OUT, RECORDING_TONGUE_OUT, PREPARE_TONGUE_IN, RECORDING_TONGUE_IN, DONE }
 
 /**
- * Machine à état pure pilotant l'enregistrement d'une calibration de l'étage 3 (revue technique,
- * point 15) : "langue dehors" puis "langue rentrée", quelques secondes chacune -- même famille que
+ * Machine à état pure pilotant l'enregistrement d'une calibration de l'étage 3 : "langue dehors"
+ * puis "langue rentrée", quelques secondes chacune -- même famille que
  * `CalibrationAnomalyState`/`ThermalThrottleState`, aucune dépendance Android, pilotée tick par tick
  * (temps écoulé + embedding optionnel de la frame) depuis `MainViewModel` plutôt que d'implémenter
  * cette logique de comptage directement dans le ViewModel.
@@ -30,7 +30,7 @@ internal data class TongueCalibrationRecordingState(
 /** Unité de base pour les durées d'enregistrement de calibration -- provisoire, réglable en
  *  pratique via `AppSettingsStore.tongueCalibrationRecordingDurationMs` (panneau debug) plutôt que
  *  codée en dur, vu le nombre de sessions de réglage qu'ont demandé les étages 1/2. Ne pilote plus
- *  directement la durée d'une phase depuis le 13 août 2026 (point 56) : les deux phases en dérivent
+ *  directement la durée d'une phase depuis le 13 août 2026 : les deux phases en dérivent
  *  désormais par multiplicateur, voir [DEFAULT_TONGUE_OUT_RECORDING_DURATION_MS] et
  *  [DEFAULT_TONGUE_IN_RECORDING_DURATION_MS]. */
 internal const val DEFAULT_CALIBRATION_RECORDING_DURATION_MS = 3000L
@@ -48,7 +48,7 @@ internal const val DEFAULT_CALIBRATION_PREPARE_DURATION_MS = 3000L
  * source unique de vérité, utilisée à la fois pour [DEFAULT_TONGUE_OUT_RECORDING_DURATION_MS] et
  * par `MainViewModel` pour dériver la durée réelle (réglable) de cette phase.
  *
- * Doublé le 13 août 2026 (revue technique, point 56), en symétrie avec
+ * Doublé le 13 août 2026, en symétrie avec
  * [TONGUE_IN_RECORDING_MULTIPLIER] : jusque-là seule la phase "langue rentrée" avait été allongée
  * (voir son kdoc) pour couvrir une variation pendant l'enregistrement plutôt qu'une pose statique.
  * Une fois les étages 1/2 retirés du filtre dur (voir kdoc de `mouthGeometricGateOpen`,
@@ -75,7 +75,7 @@ internal const val TONGUE_IN_RECORDING_MULTIPLIER = 2L
 
 /**
  * Durée par défaut de la phase "langue rentrée" -- volontairement le double de l'unité de base
- * (revue technique, point 15 -- session de diagnostic du 13 août 2026, confirmée sur device) : la
+ * (session de diagnostic du 13 août 2026, confirmée sur device) : la
  * référence "langue rentrée" enregistrée jusqu'ici était une pose statique, bouche fermée -- jamais
  * avec mouvement de mâchoire. Or une bouche ouverte par un mouvement de mâchoire (langue toujours
  * rentrée) s'est révélée visuellement confondue avec "langue dehors" par le classifieur, avec un

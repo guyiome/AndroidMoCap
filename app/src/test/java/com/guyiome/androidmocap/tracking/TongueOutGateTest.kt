@@ -35,7 +35,7 @@ class TongueOutGateTest {
     @Test
     fun `porte geometrique fermee sous le seuil -- reproduit le cas bouche pressee-mordue`() {
         // Valeurs reproduisant la plage mesurée sur device le 11 août 2026 (bouche pressée/mordue,
-        // jawOpen ML trompé mais mouthGeo restant bas) -- voir revue technique, point 15quinquies.
+        // jawOpen ML trompé mais mouthGeo restant bas).
         assertFalse(mouthGeometricGateOpen(0.02f, threshold = 0.2f))
         assertFalse(mouthGeometricGateOpen(0.113f, threshold = 0.2f))
     }

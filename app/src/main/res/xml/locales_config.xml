@@ -2,7 +2,7 @@
 <!-- Langues disponibles pour le sélecteur de langue par app (Android 13+, réglages système ->
      Langues de l'app). Référencé depuis AndroidManifest.xml via android:localeConfig. Anglais en
      premier : c'est la langue par défaut/de repli (res/values/), le français est l'alternative
-     explicite (res/values-fr/), voir revue technique, point 23. -->
+     explicite (res/values-fr/). -->
 <locale-config xmlns:android="http://schemas.android.com/apk/res/android">
     <locale android:name="en" />
     <locale android:name="fr" />

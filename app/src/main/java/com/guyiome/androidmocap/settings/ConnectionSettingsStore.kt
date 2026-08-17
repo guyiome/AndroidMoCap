@@ -29,11 +29,11 @@ class ConnectionSettingsStore(private val context: Context) {
         val VMC_HOST = stringPreferencesKey("vmc_host")
         val VTS_HOST = stringPreferencesKey("vts_host")
 
-        // Jeton d'authentification VTube Studio (point 39) -- délivré une fois par popup
+        // Jeton d'authentification VTube Studio -- délivré une fois par popup
         // d'autorisation utilisateur, réutilisable tant qu'il n'est pas révoqué côté VTube Studio.
         val VTS_AUTH_TOKEN = stringPreferencesKey("vts_auth_token")
 
-        // Traduction VBridger -> paramètres par défaut VTS (point 41) -- voir VBridgerFormulas.kt.
+        // Traduction VBridger -> paramètres par défaut VTS -- voir VBridgerFormulas.kt.
         // Défaut false : comportement actuel inchangé (seuls les 52 blendshapes ARKit bruts) tant
         // que l'utilisateur n'active pas explicitement l'option.
         val VTS_USE_VBRIDGER_TRANSLATION = booleanPreferencesKey("vts_use_vbridger_translation")

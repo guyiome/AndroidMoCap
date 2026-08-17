@@ -11,7 +11,7 @@ import kotlinx.serialization.json.encodeToJsonElement
 
 /**
  * Encodage/décodage JSON pur pour l'API Plugin de VTube Studio (WebSocket, voir [VTubeStudioSender]
- * pour la partie socket réelle) -- point 39 de la revue technique : VTube Studio ne reçoit
+ * pour la partie socket réelle) -- VTube Studio ne reçoit
  * vraisemblablement pas le protocole VMC/OSC en entrée, sa seule intégration tierce documentée est
  * cette API (`ws://<host>:8001` par défaut).
  *

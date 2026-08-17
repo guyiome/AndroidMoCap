@@ -43,8 +43,7 @@ import javax.microedition.khronos.opengles.GL10
 
 /**
  * Source caméra + pose de tête alternative pour le palier [TrackingTier.OPTIMAL], basée sur ARCore
- * Augmented Faces plutôt que CameraX -- voir `AndroidMoCap_revue_technique.md` point 13 pour le
- * contexte complet et l'historique détaillé des correctifs qui ont mené à l'état actuel (format
+ * Augmented Faces plutôt que CameraX. Historique détaillé des correctifs qui ont mené à l'état actuel (format
  * d'image ARCore/crash `MediaImageBuilder`, déport de la conversion YUV->RGB sur
  * [imageProcessingExecutor], fuite de ressource dans [tryCreateSession], rotation caméra) --
  * volontairement pas reproduit ici en détail (revue de code du 12 août 2026 : ce kdoc avait
@@ -74,8 +73,7 @@ import javax.microedition.khronos.opengles.GL10
  * [GLSurfaceView] hébergé côté Compose via [attachTo]. Ce contexte GL sert aussi à afficher un fond
  * caméra live (quad plein écran texturé, [drawCameraBackground]) -- réutilise directement la
  * texture OES qu'ARCore alimente déjà via `Session#setCameraTextureName` pour piloter le tracking,
- * jamais échantillonnée par notre propre code avant ce correctif (voir
- * `AndroidMoCap_revue_technique.md` point 13, discussion sur l'aperçu caméra live de ce palier).
+ * jamais échantillonnée par notre propre code avant ce correctif.
  * Orientation de ce fond : voir kdoc de [backgroundQuadCoords].
  */
 class ArCoreHeadPoseTracker(
@@ -110,7 +108,7 @@ class ArCoreHeadPoseTracker(
         // dédié est pire pour la latence perçue qu'une frame simplement sautée.
         private const val MAX_PENDING_CONVERSIONS = 1
 
-        // Nombre de bitmaps convertis conservés en mémoire (voir lastBitmaps ci-dessous, point 15)
+        // Nombre de bitmaps convertis conservés en mémoire (voir lastBitmaps ci-dessous)
         // avant de purger le plus ancien jamais réclamé -- même valeur et même garde-fou que
         // CameraController.MAX_TRACKED_BITMAPS, pour la même raison : éviter une fuite si un frame
         // n'obtient jamais de résultat MediaPipe (releaseFrame() jamais appelé pour lui).
@@ -126,7 +124,7 @@ class ArCoreHeadPoseTracker(
     private val imageProcessingExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val pendingConversions = AtomicInteger(0)
 
-    // Cache du dernier bitmap converti par frame (point 15, cascade de détection de la langue
+    // Cache du dernier bitmap converti par frame (cascade de détection de la langue
     // tirée, étage 2) -- PAS un pool comme CameraController.inFlightBitmaps : ARCore alloue déjà un
     // Bitmap neuf à chaque frame sans réutilisation (voir emitCameraImage/yuv420ToBitmap), donc rien
     // à recycler ici, juste à conserver un instant de plus au lieu de le laisser sortir de portée
@@ -175,9 +173,7 @@ class ArCoreHeadPoseTracker(
     // via setCameraTextureName (voir cameraTextureId/maybeBindCameraTexture ci-dessus) -- jusqu'ici
     // jamais échantillonnée par notre propre code. Aucun pattern GL existant ailleurs dans ce repo
     // (ni shader, ni VBO) : implémentation reprise du pattern de référence Google
-    // (`BackgroundRenderer.java`, sample ARCore), adaptée au style de ce fichier. Voir revue
-    // technique, point 13 (discussion initiale sur l'aperçu caméra live de ce palier, reportée) et
-    // point 52 pour l'historique complet de la recherche d'orientation ci-dessous. ---
+    // (`BackgroundRenderer.java`, sample ARCore), adaptée au style de ce fichier. ---
 
     private var backgroundProgram: Int = 0
     private var backgroundPositionAttrib: Int = 0
@@ -186,8 +182,8 @@ class ArCoreHeadPoseTracker(
 
     /**
      * Positions du quad (a_Position), en NDC (-1..1) -- **fixe, hold-independent, jamais modifiée
-     * après création**, exactement comme [cameraRotationDegrees] côté CPU (revue technique point
-     * 52 : le fond n'a en fait jamais eu besoin de suivre la tenue physique, une hypothèse testée et
+     * après création**, exactement comme [cameraRotationDegrees] côté CPU (le fond n'a en fait
+     * jamais eu besoin de suivre la tenue physique, une hypothèse testée et
      * infirmée sur device le 12 août 2026 -- voir historique git pour le détail complet de cette
      * recherche, y compris un balayage empirique des 8 symétries du carré, piloté par adb, qui a
      * permis d'identifier directement cette valeur après plusieurs échecs de dérivation manuelle).
@@ -287,7 +283,7 @@ class ArCoreHeadPoseTracker(
             // Seul log INFO du chemin ARCore (palier OPTIMAL) -- pendant longtemps CameraController
             // (palier STANDARD/COMPATIBLE) était le seul fichier avec un log INFO inconditionnel,
             // laissant le fichier de logs exportable vide sur un device qui tourne sur ARCore même
-            // au niveau INFO (constaté sur device, revue technique point 50).
+            // au niveau INFO (constaté sur device).
             AppLog.i(TAG, "Session ARCore/Augmented Faces démarrée")
             maybeBindCameraTexture()
             maybeSetDisplayGeometry()
@@ -334,7 +330,7 @@ class ArCoreHeadPoseTracker(
     /**
      * L'`Image` ARCore source elle-même est fermée de façon synchrone dans [emitCameraImage] juste
      * après la conversion en `Bitmap`, plus besoin de la garder ouverte jusqu'à ce que MediaPipe ait
-     * fini de traiter le frame -- mais depuis le point 15 (cascade langue tirée, étage 2), le
+     * fini de traiter le frame -- mais depuis l'ajout de la cascade langue tirée (étage 2), le
      * `Bitmap` converti, lui, est retenu dans [lastBitmaps] pour permettre [peekLastBitmap] ; cet
      * appel (routé depuis `MainViewModel.onFrameProcessed`, mutuellement exclusif avec
      * `CameraController.releaseFrame`) le retire de la table une fois que MediaPipe a fini avec ce
@@ -357,7 +353,7 @@ class ArCoreHeadPoseTracker(
     private fun tryCreateSession(): Session? {
         // Hissé hors du try (au lieu d'un val local) pour pouvoir le fermer depuis le catch
         // générique ci-dessous si une étape après Session(context) échoue (relecture du 7 août
-        // 2026, point 2) -- jusqu'ici seul le chemin "pas de config caméra frontale" fermait
+        // 2026) -- jusqu'ici seul le chemin "pas de config caméra frontale" fermait
         // explicitement la session en cas d'échec, les autres fuyaient la Session ARCore native.
         var newSession: Session? = null
         return try {
@@ -445,7 +441,7 @@ class ArCoreHeadPoseTracker(
      * geometry has an invalid width: 0". Rotation fixée à [Surface.ROTATION_0] : l'app est
      * verrouillée portrait (voir `AndroidManifest.xml`), pas besoin de lire la rotation
      * d'affichage réelle -- même hypothèse déjà faite ailleurs dans l'app pour la matrice de
-     * rotation caméra de `CameraController` (voir revue technique, point 20, si ce verrouillage
+     * rotation caméra de `CameraController` (si ce verrouillage
      * change un jour sur tablette).
      */
     private fun maybeSetDisplayGeometry() {
@@ -637,7 +633,7 @@ class ArCoreHeadPoseTracker(
 
                 val mpImage = BitmapImageBuilder(bitmap).build()
                 val frameTimeMs = SystemClock.uptimeMillis()
-                // Conservé pour peekLastBitmap() (étage 2, point 15) -- AVANT onFrame() pour que le
+                // Conservé pour peekLastBitmap() (étage 2 de la cascade langue tirée) -- AVANT onFrame() pour que le
                 // bitmap soit déjà disponible si MediaPipe répond très vite (peu probable vu le
                 // callback asynchrone, mais pas d'hypothèse d'ordonnancement à faire ici).
                 synchronized(bitmapCacheLock) {
