@@ -249,14 +249,23 @@ fun MainScreen(
                 // 7 août 2026 : "elle devrait quand même apparaître à l'écran de debug, sans
                 // bouger si on la coche").
                 val blendshapeScoresByName = trackingFrame.allBlendshapes.associate { it.name to it.score }
+                // Valeur avant pondération par blendshape (point 18) -- sert uniquement à
+                // l'affichage "brute -> corrigée" de BlendshapePanel quand les deux diffèrent.
+                val rawBlendshapeScoresByName = trackingFrame.rawBlendshapes.associate { it.name to it.score }
                 // Trié une fois par changement de sélection (vitesse humaine), pas à chaque frame
                 // (relecture globale du 7 août 2026, point 22) -- uiState.selectedBlendshapeNames
                 // ne change qu'à l'interaction utilisateur, contrairement à trackingFrame ci-dessus.
                 val sortedSelectedNames = remember(uiState.selectedBlendshapeNames) {
                     uiState.selectedBlendshapeNames.sorted()
                 }
-                val selectedBlendshapeValues = sortedSelectedNames
-                    .map { name -> name to (blendshapeScoresByName[name] ?: 0f) }
+                val selectedBlendshapeValues = sortedSelectedNames.map { name ->
+                    val corrected = blendshapeScoresByName[name] ?: 0f
+                    BlendshapePanelEntry(
+                        name = name,
+                        rawScore = rawBlendshapeScoresByName[name] ?: corrected,
+                        correctedScore = corrected,
+                    )
+                }
                 BlendshapePanel(
                     values = selectedBlendshapeValues,
                     panelRotationDegrees = panelRotationDegrees,

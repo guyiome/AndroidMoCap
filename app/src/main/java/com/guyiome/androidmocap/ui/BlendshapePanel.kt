@@ -16,6 +16,14 @@ import androidx.compose.ui.unit.dp
 import com.guyiome.androidmocap.R
 
 /**
+ * Une ligne du panneau -- [rawScore] est la valeur avant pondération par blendshape (point 18,
+ * `AppSettingsStore.blendshapeWeights`), [correctedScore] après. Égales pour tout blendshape
+ * réglé à son poids neutre (l'immense majorité) -- voir kdoc de [BlendshapePanel] pour l'affichage
+ * conditionnel qui en découle.
+ */
+data class BlendshapePanelEntry(val name: String, val rawScore: Float, val correctedScore: Float)
+
+/**
  * Valeurs en direct des blendshapes cochées dans [BlendshapesScreen]. Pivote par pas de
  * 90° selon que le téléphone est tenu à la verticale ou à l'horizontale ([panelRotationDegrees] --
  * calculé dans [MainScreen] à partir de l'orientation physique) : pas de rotation continue ici
@@ -34,10 +42,17 @@ import com.guyiome.androidmocap.R
  * l'écran plutôt que vers son bord -- combiné à `windowInsetsPadding(WindowInsets.safeDrawing)`
  * côté [MainScreen] (marge de sécurité pour ce qui reste), pas revérifié visuellement sur device
  * (aucun device dans ce sandbox).
+ *
+ * **Brute -> corrigée** (point 18, 16 août 2026) : affichée seulement quand un poids non-neutre
+ * fait réellement diverger les deux valeurs d'une [BlendshapePanelEntry] -- pour la grande majorité
+ * des blendshapes (poids resté à 1.0, jamais touché), une seule valeur reste affichée comme avant.
+ * Décision délibérée pour ne pas doubler l'affichage des ~52 lignes possibles alors que seuls
+ * quelques blendshapes ont en pratique un poids réglé -- le format à deux valeurs sert justement à
+ * faire ressortir ceux-là.
  */
 @Composable
 fun BlendshapePanel(
-    values: List<Pair<String, Float>>,
+    values: List<BlendshapePanelEntry>,
     panelRotationDegrees: Float,
     modifier: Modifier = Modifier,
 ) {
@@ -49,12 +64,18 @@ fun BlendshapePanel(
             .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
             .padding(10.dp),
     ) {
-        values.forEach { (name, score) ->
-            Text(
-                stringResource(R.string.blendshape_value_format, name, "%.2f".format(score)),
-                color = Color.White,
-                style = MaterialTheme.typography.bodySmall,
-            )
+        values.forEach { entry ->
+            val text = if (entry.rawScore == entry.correctedScore) {
+                stringResource(R.string.blendshape_value_format, entry.name, "%.2f".format(entry.correctedScore))
+            } else {
+                stringResource(
+                    R.string.blendshape_value_format_weighted,
+                    entry.name,
+                    "%.2f".format(entry.rawScore),
+                    "%.2f".format(entry.correctedScore),
+                )
+            }
+            Text(text, color = Color.White, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
