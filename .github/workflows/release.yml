@@ -44,10 +44,21 @@ jobs:
         if: always()
         run: rm -f "${{ runner.temp }}/release.keystore"
 
+      # Ex. AndroidMoCap_V0.3.0.apk pour le tag v0.3.0, AndroidMoCap_V0.3.0_beta-1.apk pour
+      # v0.3.0-beta.1 -- nom de fichier lisible pour un utilisateur téléchargeant depuis GitHub
+      # Releases, plutôt que le "app-release.apk" générique produit par Gradle.
+      - name: Renommer l'APK selon le tag
+        run: |
+          NAME_VERSION=$(echo "${{ github.ref_name }}" | sed -E 's/^v/V/; s/-beta\.([0-9]+)/_beta-\1/')
+          APK_SRC=$(find app/build/outputs/apk/release -maxdepth 1 -name "*.apk" | head -n1)
+          APK_DEST="app/build/outputs/apk/release/AndroidMoCap_${NAME_VERSION}.apk"
+          mv "$APK_SRC" "$APK_DEST"
+          echo "APK_PATH=$APK_DEST" >> "$GITHUB_ENV"
+
       - name: Publier la Release GitHub avec l'APK
         uses: softprops/action-gh-release@v3
         with:
-          files: app/build/outputs/apk/release/*.apk
+          files: ${{ env.APK_PATH }}
           generate_release_notes: true
           # Canal beta : un tag contenant "-beta" (ex. v0.3.0-beta.1) publie une prerelease --
           # ignorée par défaut par les outils de suivi de release (Obtainium et similaires) sauf
