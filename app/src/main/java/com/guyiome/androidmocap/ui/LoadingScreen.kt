@@ -33,9 +33,8 @@ import com.guyiome.androidmocap.R
  * Réutilise l'illustration de l'icône de lancement ([R.drawable.ic_launcher_foreground_source],
  * déjà versionnée pour générer l'icône adaptative) comme logo -- pas de doublon d'asset à
  * maintenir, cohérent avec ce que l'utilisateur voit déjà sur son écran d'accueil. Toujours un
- * placeholder (point 53 de la todo/revue technique, en attente d'un logo d'artiste) -- crédit en
- * bas à gauche par discrétion/honnêteté envers l'auteurice de l'image actuelle, sans revendiquer un
- * logo final.
+ * placeholder (en attente d'un logo dessiné par un.e artiste) -- crédit en bas à gauche par
+ * discrétion/honnêteté envers l'auteurice de l'image actuelle, sans revendiquer un logo final.
  */
 @Composable
 fun LoadingScreen() {
@@ -76,7 +75,7 @@ fun LoadingScreen() {
             )
         }
 
-        // Crédit du placeholder actuel (point 53) -- discret, coin bas-gauche, jamais confondu
+        // Crédit du placeholder actuel -- discret, coin bas-gauche, jamais confondu
         // avec le contenu central (message/progression). Pas un habillage permanent : à retirer
         // quand un vrai logo d'artiste remplace ce placeholder.
         Text(

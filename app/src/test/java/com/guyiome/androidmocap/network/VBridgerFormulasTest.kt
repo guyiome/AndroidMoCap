@@ -9,8 +9,8 @@ import org.junit.Test
 
 /**
  * Couvre [VBridgerFormulas] : visage neutre (toutes les entrées à 0f) donne les mêmes valeurs de
- * repos que VBridger affiche pour ses formules composites (vérifié à la main dans la revue
- * technique, point 41 -- ex. `MouthSmile` = 0.50), plus quelques cas non-neutres pour les formules
+ * repos que VBridger affiche pour ses formules composites (vérifié à la main -- ex. `MouthSmile`
+ * = 0.50), plus quelques cas non-neutres pour les formules
  * les plus verbeuses et le registre de formules lui-même ([rawArkitFormulas]/[activeFormulas]/
  * [evaluate]).
  */
@@ -76,7 +76,7 @@ class VBridgerFormulasTest {
         // headEulerDegrees = (pitch, yaw, roll) -- voir kdoc du fichier. mirrorEulerDegrees (en amont
         // dans MainViewModel) inverse déjà le lacet quand le mode miroir est actif ; une inversion
         // supplémentaire ici annulerait ce miroir -- bug réel corrigé le 15 août 2026 (retour
-        // utilisateur : orientation de tête non mirrorée), voir revue technique point 41.
+        // utilisateur : orientation de tête non mirrorée).
         val turnedYaw = result(headEulerDegrees = floatArrayOf(0f, 10f, 0f))
         assertEquals(10f, valueFor("FaceAngleX", turnedYaw), 0.0001f)
         assertEquals(15f, valueFor("BodyAngleX", turnedYaw), 0.0001f) // x1.5
@@ -92,7 +92,7 @@ class VBridgerFormulasTest {
         assertEquals(-15f, valueFor("BodyAngleZ", tiltedRoll), 0.0001f) // x1.5
     }
 
-    // --- Visage neutre : valeurs de repos vérifiables à la main (voir revue technique, point 41) ---
+    // --- Visage neutre : valeurs de repos vérifiables à la main ---
 
     @Test
     fun `visage neutre -- angles de tête et bouche a zero`() {
@@ -138,7 +138,7 @@ class VBridgerFormulasTest {
     @Test
     fun `mouthDimple pese moins que mouthSmile dans MouthSmile -- signal MediaPipe peu fiable`() {
         // mouthDimpleLeft/Right sont répertoriés peu fiables chez MediaPipe (BlendshapeCatalog.unreliable)
-        // -- retour utilisateur (15 août 2026, point 41) : plafonnent vers 0.5 même en forçant
+        // -- retour utilisateur (15 août 2026) : plafonnent vers 0.5 même en forçant
         // l'expression. Poids réduit (MOUTH_DIMPLE_COEFFICIENT) plutôt que retiré, voir kdoc du fichier.
         // mouthSmileLeft=1 seul : smile=1, MouthSmile=(2+1)/4=0.75.
         assertEquals(0.75f, valueFor("MouthSmile", result(listOf(BlendshapeScore("mouthSmileLeft", 1f)))), 0.0001f)

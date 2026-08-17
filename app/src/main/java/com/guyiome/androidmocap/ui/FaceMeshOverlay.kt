@@ -16,7 +16,7 @@ import androidx.compose.ui.graphics.Color
  * La projection écran ([LandmarkProjection.toScreenPoint]) reproduit le recadrage centré
  * ("FILL_CENTER") appliqué par `PreviewView` à partir des dimensions réelles de l'image analysée
  * ([imageWidthPx]/[imageHeightPx]) -- nécessaire pour un alignement correct dès que le ratio de
- * l'image caméra diffère de celui de l'écran (point 27, corrigé suite à un décalage constaté sur
+ * l'image caméra diffère de celui de l'écran (corrigé suite à un décalage constaté sur
  * ASUS ROG Phone II).
  */
 @Composable

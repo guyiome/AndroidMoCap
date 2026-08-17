@@ -54,7 +54,7 @@ import com.guyiome.androidmocap.tracking.TrackingTierSelector
  * diagnostic de fiabilisation du clignement) est désormais rangée **dans** le panneau de mocks caché
  * plutôt que toujours visible -- elle n'a de sens que pour du diagnostic dev.
  *
- * **Panneau de mocks de debug** (voir revue technique, point 35) : révélé en tapant
+ * **Panneau de mocks de debug** : révélé en tapant
  * [DEBUG_PANEL_UNLOCK_TAP_COUNT] fois sur la ligne "Version de l'app" en bas de la section
  * Diagnostics, même principe que le menu développeur Android. Le bandeau d'avertissement piloté par
  * [onResetDebugOverrides] reste volontairement visible même sans déverrouiller le panneau : un mock
@@ -303,7 +303,7 @@ fun AdvancedSettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                 )
 
-                // Diagnostic EAR (revue technique, point 28) -- affiché à côté du blendshape
+                // Diagnostic EAR -- affiché à côté du blendshape
                 // eyeBlink brut (à sélectionner dans le panneau de blendshapes de l'écran principal
                 // pour comparer). A servi à diagnostiquer les correctifs de fiabilisation du
                 // clignement (EyeBlinkCorrection.kt) ; conservé comme outil de diagnostic permanent,

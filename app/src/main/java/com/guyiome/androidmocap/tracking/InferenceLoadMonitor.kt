@@ -3,7 +3,7 @@ package com.guyiome.androidmocap.tracking
 /**
  * Moyenne mobile exponentielle (EMA) de `FaceTrackingResult.inferenceTimeMs` -- alimente
  * l'avertissement "l'appareil peine" combiné au throttling thermique pour la détection de la
- * langue tirée (revue technique, point 15). Volontairement pas basé sur [OneEuroFilter] : ce
+ * langue tirée. Volontairement pas basé sur [OneEuroFilter] : ce
  * dernier est calé pour des signaux angle/ouverture avec des paramètres `minCutoff`/`beta` qui ne
  * correspondent à rien pour lisser une simple durée en millisecondes -- une EMA classique reste
  * plus simple et tout aussi adéquate ici, et garde ce module trivial à tester à la main.

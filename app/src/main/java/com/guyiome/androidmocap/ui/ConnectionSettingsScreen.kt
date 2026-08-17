@@ -40,7 +40,7 @@ import com.guyiome.androidmocap.settings.ConnectionType
 
 /**
  * Type de connexion + réglages du type actif -- une des quatre catégories de [SettingsScreen]
- * (voir rapport technique, point 21). Contrairement à l'ancien écran unique, seul le sous-bloc du
+ * Contrairement à l'ancien écran unique, seul le sous-bloc du
  * type choisi est affiché (affichage conditionnel plutôt que VMC et iFacialMocap systématiquement
  * visibles tous les deux) -- décision actée en discussion, moins de contenu à parcourir pour
  * arriver à ce qui est effectivement utilisé.
@@ -241,7 +241,7 @@ fun ConnectionSettingsScreen(
                         }
                     }
 
-                    // Traduction VBridger -> paramètres par défaut VTS (point 41) -- affiché en
+                    // Traduction VBridger -> paramètres par défaut VTS -- affiché en
                     // permanence dans ce bloc, pas seulement une fois connecté, pour rester visible/
                     // modifiable avant même de se connecter.
                     Spacer(Modifier.height(16.dp))

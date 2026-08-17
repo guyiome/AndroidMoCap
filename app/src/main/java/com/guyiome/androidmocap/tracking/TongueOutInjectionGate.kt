@@ -1,8 +1,8 @@
 package com.guyiome.androidmocap.tracking
 
 /**
- * Anti-rebond avant d'injecter réellement `tongueOut` dans les données envoyées au réseau (revue
- * technique, point 15 -- activé le 13 août 2026 après deux sessions de test device avec la
+ * Anti-rebond avant d'injecter réellement `tongueOut` dans les données envoyées au réseau
+ * (activé le 13 août 2026 après deux sessions de test device avec la
  * calibration élargie au mouvement de mâchoire, voir `TongueCalibrationRecordingState.kt`).
  *
  * Ces deux sessions ont confirmé une nette amélioration (5/8 faux `TONGUE_OUT` sur l'ancienne
@@ -41,7 +41,7 @@ internal fun TongueOutInjectionState.confirmed(
  * l'appelant doit appeler [next] ; `false` si l'appelant doit laisser l'état inchangé plutôt que
  * de le réinitialiser à tort.
  *
- * ⚠️ **Ajouté le 13 août 2026** (revue technique, point 15/56, revue de code) : avant cette
+ * ⚠️ **Ajouté le 13 août 2026** (revue de code) : avant cette
  * fonction, `next()` était appelé à *chaque frame caméra traitée*, y compris celles où aucune
  * classification n'avait été tentée -- une frame où l'étage 1 (`jawOpenGateOpen`) est ouvert mais
  * où `embed()` a été sauté par la contre-pression anti-ANR

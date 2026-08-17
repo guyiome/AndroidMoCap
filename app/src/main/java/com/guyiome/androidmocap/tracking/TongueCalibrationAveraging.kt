@@ -1,7 +1,7 @@
 package com.guyiome.androidmocap.tracking
 
 /**
- * Accumulateur pur pour la calibration de l'étage 3 (revue technique, point 15) : moyenne un flux
+ * Accumulateur pur pour la calibration de l'étage 3 : moyenne un flux
  * d'embeddings capturés pendant une fenêtre de plusieurs secondes, plutôt qu'un seul instantané
  * comme le fait `performCalibration()`/`isCalibrated` (MainViewModel) pour la pose de tête -- une
  * moyenne lisse le bruit inter-frame (angle, exposition, micro-mouvement de langue) qu'un seul

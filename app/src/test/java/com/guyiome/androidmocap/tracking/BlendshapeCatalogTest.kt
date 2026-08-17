@@ -39,8 +39,8 @@ class BlendshapeCatalogTest {
 
     @Test
     fun `tous les blendshapes marques peu fiables existent bien dans le catalogue`() {
-        // Filet contre une faute de frappe dans BlendshapeCatalog.unreliable (voir rapport
-        // technique, point 17) -- un nom mal orthographié n'afficherait simplement jamais
+        // Filet contre une faute de frappe dans BlendshapeCatalog.unreliable -- un nom mal
+        // orthographié n'afficherait simplement jamais
         // l'avertissement dans BlendshapeSelectionScreen, silencieusement.
         val allNames = BlendshapeCatalog.all.map { it.second }.toSet()
         for (name in BlendshapeCatalog.unreliable) {

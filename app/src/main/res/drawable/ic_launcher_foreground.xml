@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-     Placeholder (mis à jour le 16 août 2026, en attendant un logo dessiné par un.e artiste engagé.e
-     — voir revue technique/todo, point 53, toujours ouvert malgré ce remplacement). Chiot husky,
+     Placeholder (mis à jour le 16 août 2026, en attendant un logo dessiné par un.e artiste engagé.e,
+     toujours en attente malgré ce remplacement). Chiot husky,
      par Nyacchii — image fournie par l'utilisateur (drawable-nodpi/ic_launcher_foreground_source.png),
      remplace le précédent placeholder (visage mi-mesh de tracking). Fond transparent confirmé (canal
      alpha réellement à 0 sur les bords, pas du blanc opaque) — se détache proprement sur

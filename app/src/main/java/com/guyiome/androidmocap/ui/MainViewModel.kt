@@ -117,11 +117,10 @@ data class MainUiState(
     // accordée (voir LaunchedEffect(hasCameraPermission) côté MainScreen), l'écran de permission
     // s'affiche avant, pas cet écran de chargement.
     val isInitializing: Boolean = true,
-    // Vérification de mise à jour semi-automatique (point 14) -- non-null = une version plus
+    // Vérification de mise à jour semi-automatique -- non-null = une version plus
     // récente que BuildConfig.VERSION_NAME est disponible, valeur = lien direct vers la page de la
     // Release GitHub (voir MainViewModel.checkForUpdate). Jamais réinitialisé à null une fois posé
-    // -- reste affiché tant que l'app n'est pas mise à jour (pas d'état "ignoré" par choix, voir
-    // revue technique point 14).
+    // -- reste affiché tant que l'app n'est pas mise à jour (pas d'état "ignoré" par choix).
     val updateAvailableUrl: String? = null,
     val tier: TrackingTier? = null,
     // Force un palier au lieu de la sélection automatique -- null = automatique (comportement par
@@ -138,13 +137,12 @@ data class MainUiState(
     // AppSettingsStore.blendshapeWeights) -- appliqué dans handleTrackingResult() juste après le
     // mode miroir, voir tracking/BlendshapeWeighting.kt.
     val blendshapeWeights: Map<String, Float> = emptyMap(),
-    // VMC (connexion directe : on saisit l'IP du PC cible -- Blender / Unity, pas VTube Studio,
-    // voir revue technique point 39)
+    // VMC (connexion directe : on saisit l'IP du PC cible -- Blender / Unity, pas VTube Studio)
     val vmcEnabled: Boolean = false,
     val vmcTargetLabel: String = "",
     // Vrai pendant la résolution DNS/construction du socket (voir connectVmcTarget) -- généralement
     // très bref (IP déjà résolue, pas de vrai lookup réseau) mais affiché quand même pour rester
-    // cohérent avec les deux autres types de connexion (revue technique, point 40).
+    // cohérent avec les deux autres types de connexion.
     val vmcConnecting: Boolean = false,
     // iFacialMocap / MeowFace (le PC initie -- pratique pour VBridger, pas besoin de saisir d'IP ici)
     val localIpAddress: String = "",
@@ -154,23 +152,23 @@ data class MainUiState(
     // l'écran principal (et l'IP VMC mémorisée, utilisée quand ce type est VMC).
     val connectionType: ConnectionType? = null,
     val savedVmcHost: String = "",
-    // VTube Studio (API Plugin, point 39) : intégration directe alternative à VMC, que VTube
-    // Studio ne reçoit vraisemblablement pas nativement en entrée (voir revue technique).
+    // VTube Studio (API Plugin) : intégration directe alternative à VMC, que VTube
+    // Studio ne reçoit vraisemblablement pas nativement en entrée.
     // Contrairement à VMC (UDP, immédiat), la connexion passe par plusieurs étapes asynchrones
     // (socket, popup d'autorisation utilisateur, création des paramètres) avant d'être utilisable
     // -- voir VTubeStudioConnectionState pour le détail de ces étapes.
     val vtsTargetLabel: String = "",
     val vtsConnectionState: VTubeStudioConnectionState = VTubeStudioConnectionState.Disconnected,
     val savedVtsHost: String = "",
-    // Traduction VBridger -> paramètres par défaut VTS (point 41) -- voir VBridgerFormulas.kt.
+    // Traduction VBridger -> paramètres par défaut VTS -- voir VBridgerFormulas.kt.
     val vtsUseVBridgerTranslation: Boolean = false,
     // Calibration : pose de tête courante prise comme "zéro" pour compenser un téléphone
     // légèrement décalé/tourné par rapport au visage (contrainte physique de positionnement).
     val isCalibrated: Boolean = false,
     // Compte à rebours en cours avant capture de la calibration (secondes restantes), null si aucun.
     val calibrationCountdownSeconds: Int? = null,
-    // Anomalie de calibrage détectée (voir tracking/CalibrationAnomaly.kt, revue technique point
-    // 19) : sticky, remis à faux uniquement par performCalibration(). Purement informatif --
+    // Anomalie de calibrage détectée (voir tracking/CalibrationAnomaly.kt) : sticky, remis à faux
+    // uniquement par performCalibration(). Purement informatif --
     // pilote seulement la teinte du bouton de calibrage dans MainHud, aucune action automatique.
     val calibrationAnomalyFlagged: Boolean = false,
     // Seuil (%) en dessous duquel l'alerte batterie faible s'affiche -- persisté, réglable dans les réglages.
@@ -197,15 +195,15 @@ data class MainUiState(
     val keepMeshOverlayInPowerSave: Boolean = false,
     // true si le palier OPTIMAL pilote la caméra via ARCore (voir ArCoreHeadPoseTracker) plutôt
     // que CameraX -- dans ce cas MainScreen affiche l'overlay du mesh sur fond neutre à la place
-    // de l'aperçu caméra live (voir revue technique, point 13 : ARCore et CameraX ne peuvent pas
-    // se partager la caméra). Décidé dans initializeTracking() selon TierConfig.useArCorePose,
+    // de l'aperçu caméra live (ARCore et CameraX ne peuvent pas se partager la caméra). Décidé
+    // dans initializeTracking() selon TierConfig.useArCorePose,
     // peut repasser à false en cours de route si ARCore s'avère indisponible sur l'appareil malgré
     // le palier choisi (voir ArCoreHeadPoseTracker.onUnavailable) -- l'app replie alors
     // silencieusement sur CameraX. Non persisté, dérivé à l'exécution.
     val usingArCoreCameraSource: Boolean = false,
     // Mémorise (ou non) la sélection de blendshapes affichés d'une session à l'autre -- désactivé
     // par défaut, comportement historique inchangé tant que l'utilisateur ne l'active pas
-    // lui-même. Voir rapport technique, point 18.
+    // lui-même.
     val persistBlendshapeSelectionEnabled: Boolean = false,
     // Débit réduit en réponse à une chauffe détectée (voir ThermalThrottleState, startThermalPolling)
     // -- non persisté, dérivé à l'exécution, remonte tout seul dès que la chauffe retombe.
@@ -214,12 +212,12 @@ data class MainUiState(
     // purement informatif affiché en diagnostic, à côté du sélecteur de palier manuel : jamais
     // appliqué automatiquement, rétrograder le palier reste un choix explicite de l'utilisateur.
     val thermalDowngradeSuggested: Boolean = false,
-    // Charge d'inférence live (voir InferenceLoadMonitor.kt, point 15) -- moyenne mobile de
+    // Charge d'inférence live (voir InferenceLoadMonitor.kt) -- moyenne mobile de
     // inferenceTimeMs mesurablement au-dessus du budget frame du débit courant. Signal live (pas
     // sticky comme thermalDowngradeSuggested) : redevient faux dès que la charge redescend, pensé
     // pour un avertissement à l'écran qui doit disparaître quand la situation redevient normale.
     val inferenceRunningHigh: Boolean = false,
-    // Mocks de debug (panneau caché de AdvancedSettingsScreen, voir revue technique point 35) --
+    // Mocks de debug (panneau caché de AdvancedSettingsScreen) --
     // permettent d'exercer des chemins de code qu'un appareil de test donné (ex. haut de gamme,
     // thermiquement irréprochable) ne peut pas naturellement déclencher.
     //
@@ -233,28 +231,28 @@ data class MainUiState(
     // Volontairement NON persisté (absent d'AppSettingsStore) : bascule de session active, pas un
     // réglage de lancement -- repart toujours à null (automatique) au prochain démarrage de l'app.
     val debugThermalOverride: Boolean? = null,
-    // Langue forcée de l'app (point 30) -- reflète AppCompatDelegate.getApplicationLocales(), pas
+    // Langue forcée de l'app -- reflète AppCompatDelegate.getApplicationLocales(), pas
     // persisté par ce projet (AppCompat s'en charge lui-même, voir AppLocalesMetadataHolderService
     // dans AndroidManifest.xml) : lu une fois au lancement (voir init), mis à jour immédiatement à
     // chaque changement via setAppLanguage(), sans attendre un redémarrage de l'app.
     val appLanguage: AppLanguage = AppLanguage.SYSTEM,
-    // Niveau minimal conservé dans le fichier de logs exportable (voir logging/AppLog.kt, revue
-    // technique point 50) -- collecté en continu (pas juste au lancement) : un changement
+    // Niveau minimal conservé dans le fichier de logs exportable (voir logging/AppLog.kt) --
+    // collecté en continu (pas juste au lancement) : un changement
     // s'applique immédiatement, contrairement à tierOverride/debugForce* ci-dessus.
     val logLevel: LogLevel = LogLevel.ERROR,
-    // Mode miroir (point 51) -- collecté en continu, effet immédiat (même patron que logLevel
+    // Mode miroir -- collecté en continu, effet immédiat (même patron que logLevel
     // ci-dessus) : mirrore ensemble tête + blendshapes gauche/droite avant envoi. Activé par
     // défaut (voir AppSettingsStore.mirrorModeEnabled pour le pourquoi), désactivable.
     val mirrorModeEnabled: Boolean = true,
-    // Détection expérimentale de la langue tirée (point 15) -- collecté en continu, effet immédiat.
+    // Détection expérimentale de la langue tirée -- collecté en continu, effet immédiat.
     // Désactivée par défaut, rangée dans "Fonctionnalités expérimentales" (voir
     // AppSettingsStore.tongueOutDetectionEnabled). Affichée dans le panneau de blendshapes local
-    // (si tongueOut est coché) ET, depuis le 13 août 2026 (revue technique, point 15/56), réellement
+    // (si tongueOut est coché) ET, depuis le 13 août 2026, réellement
     // injectée dans "finalToSend" et envoyée aux trois protocoles réseau une fois calibré -- ce
     // toggle gouverne donc désormais détection ET injection ensemble, plus de distinction entre les
     // deux comme avant l'activation.
     val tongueOutDetectionEnabled: Boolean = false,
-    // Étage 3 (point 15) : calibration personnelle par embedding. Phase de la machine à état
+    // Étage 3 : calibration personnelle par embedding. Phase de la machine à état
     // (IDLE hors calibration), poussée dans _uiState seulement aux transitions (pas à chaque
     // frame, même discipline que calibrationAnomalyFlagged) -- voir handleTrackingResult().
     val tongueCalibrationPhase: TongueCalibrationPhase = TongueCalibrationPhase.IDLE,
@@ -283,10 +281,10 @@ data class TrackingFrame(
     // restitué en pratique -- voir BlendshapeCatalog). MainScreen part de
     // [MainUiState.selectedBlendshapeNames], pas de cette liste, pour construire l'affichage --
     // un blendshape coché mais absent d'ici reste affiché figé à 0 plutôt que de disparaître.
-    // Valeur déjà pondérée (point 18) -- c'est ce qui est réellement envoyé, voir kdoc de
+    // Valeur déjà pondérée -- c'est ce qui est réellement envoyé, voir kdoc de
     // handleTrackingResult().
     val allBlendshapes: List<BlendshapeScore> = emptyList(),
-    // Même liste que [allBlendshapes], mais AVANT la pondération par blendshape (point 18) --
+    // Même liste que [allBlendshapes], mais AVANT la pondération par blendshape --
     // sert uniquement au panneau de debug pour afficher "brute -> corrigée" quand un poids
     // non-neutre est réglé (BlendshapePanel). Après calibrage/EAR/miroir comme allBlendshapes,
     // seule la pondération diffère entre les deux.
@@ -297,7 +295,7 @@ data class TrackingFrame(
     val faceLandmarks: List<Pair<Float, Float>> = emptyList(),
     // Dimensions de l'image analysée (espace de normalisation de [faceLandmarks]) -- nécessaires à
     // FaceMeshOverlay/LandmarkProjection pour un placement correct quel que soit le ratio écran vs
-    // caméra. 0 tant qu'aucune frame n'a été traitée. Voir point 27 de la revue technique.
+    // caméra. 0 tant qu'aucune frame n'a été traitée.
     val imageWidthPx: Int = 0,
     val imageHeightPx: Int = 0,
 )
@@ -307,14 +305,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private companion object {
         private const val TAG = "MainViewModel"
 
-        // Point 14 : throttle de la vérification de mise à jour, voir checkForUpdate().
+        // Throttle de la vérification de mise à jour, voir checkForUpdate().
         private const val UPDATE_CHECK_MIN_INTERVAL_MS = 24 * 60 * 60 * 1000L
 
-        // Diagnostic du point 28 (fiabilisation eyeBlink) -- logue EAR + blendshape brut/corrigé à
+        // Diagnostic de fiabilisation eyeBlink -- logue EAR + blendshape brut/corrigé à
         // chaque frame, lu via `adb logcat -s EarDiag`. A servi à diagnostiquer et confirmer trois
         // correctifs réels (fuite gauche/droite, effondrement en tenue longue, et à isoler qu'un
-        // éclairage inégal -- pas le logiciel -- expliquait la faiblesse de l'œil droit, voir revue
-        // technique). Désactivé par défaut maintenant que l'investigation est close : remettre à
+        // éclairage inégal -- pas le logiciel -- expliquait la faiblesse de l'œil droit). Désactivé
+        // par défaut maintenant que l'investigation est close : remettre à
         // `true` ponctuellement si un nouveau souci de clignement doit être diagnostiqué.
         private const val EAR_DIAGNOSTIC_LOGGING = false
         private const val EAR_DIAG_TAG = "EarDiag"
@@ -339,7 +337,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val ROTATION_DIAGNOSTIC_LOGGING = false
         private const val ROTATION_DIAG_TAG = "RotationDiag"
 
-        // Diagnostic ponctuel (12 août 2026, revue technique points 1/15/20) : pose de tête complète
+        // Diagnostic ponctuel (12 août 2026) : pose de tête complète
         // + échantillon de blendshapes, pour comparer la variance entre une tenue immobile en
         // portrait et en paysage. **Conclu** : la rotation caméra fixe (SENSOR_ORIENTATION, jamais
         // recalculée selon la tenue physique) n'est PAS en cause -- le vrai souci était une
@@ -352,20 +350,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val ROTATION_QUALITY_DIAGNOSTIC_LOGGING = false
         private const val ROTATION_QUALITY_DIAG_TAG = "RotationQualityDiag"
 
-        // Diagnostic de la cascade de détection de la langue tirée (revue technique, point 15) --
+        // Diagnostic de la cascade de détection de la langue tirée --
         // logue l'état des trois étages (porte jawOpen+mouthGeometric, ratio couleur brut/adaptatif,
         // classification par embedding simOut/simIn) à chaque frame quand tongueOutDetectionEnabled
         // est actif. Phase 1 (étages 1+2) close le 11 août 2026 : étage 1 confirmé fiable, étage 2
         // fonctionnel mécaniquement mais son classifieur couleur seul jugé non fiable. Étage 3
         // (embedding + calibration) implémenté le même jour, activement débogué (locale de
-        // calibration, faux positif "bouche pressée" -- voir points 15ter à 15quinquies) sur le
+        // calibration, faux positif "bouche pressée") sur le
         // moment, ce qui justifiait `true` -- **resté actif par erreur après coup** (laissé à `true`
         // dans un commit du 11 août sans lien avec ce flag, jamais repassé à `false` depuis, retrouvé
         // le 12 août en creusant une sensation de saccade sur le mesh ARCore -- ce log tourne à
         // chaque frame traitée quand le toggle langue tirée est actif, avec extraction de région +
         // formatage de chaîne + écriture logcat, un coût réel maintenant plus perceptible avec le
         // fond caméra live comme référence visuelle).
-        // Investigation complète du 13 août 2026 (revue technique, point 15/56) : ANR corrigé
+        // Investigation complète du 13 août 2026 : ANR corrigé
         // (contre-pression sur embed()), gate géométrique étage 1 retiré, gate couleur étage 2
         // retiré, seuil d'anti-rebond abaissé à 2 -- confirmé sur device (streak de 48 TONGUE_OUT
         // consécutifs sur une tenue continue, charge embed() mesurée ~9,6ms en moyenne, largement
@@ -416,7 +414,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val appSettingsStore = AppSettingsStore(application)
     private val tongueCalibrationStore = TongueCalibrationStore(application.filesDir)
 
-    // Étage 3 (point 15) : construit seulement quand tongueOutDetectionEnabled est actif (voir le
+    // Étage 3 : construit seulement quand tongueOutDetectionEnabled est actif (voir le
     // collecteur dans init{}), pas de façon inconditionnelle comme faceLandmarkerHelper -- éviter
     // de charger un second modèle/réserver un délégué GPU-CPU pour qui ne touche jamais cette
     // fonctionnalité expérimentale. @Volatile : écrit depuis le thread principal (collecteur de
@@ -437,8 +435,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var tongueCalibrationRecordingState = TongueCalibrationRecordingState()
     private var tongueCalibrationLastTimestampMs: Long? = null
     // Lissage/anti-rebond de tongueOut -- pilote à la fois le panneau de test LOCAL et, depuis le
-    // 13 août 2026, la valeur réellement injectée dans "final" envoyé au réseau (revue technique,
-    // point 15) : les deux utilisent désormais le même signal debouncé/lissé, plus de distinction
+    // 13 août 2026, la valeur réellement injectée dans "final" envoyé au réseau : les deux
+    // utilisent désormais le même signal debouncé/lissé, plus de distinction
     // entre "ce qu'on voit" et "ce qui part". tongueOutInjectionState (TongueOutInjectionGate.kt)
     // exige plusieurs classements TONGUE_OUT consécutifs avant de considérer l'état confirmé --
     // filtre le résidu d'erreurs isolées observé même après l'élargissement de la calibration au
@@ -466,15 +464,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // combien le téléphone a tourné TOUT SEUL depuis (mouvement du support/de la main, indépendant
     // du mouvement de la tête), pour l'annuler de la pose de tête envoyée.
     private var deviceRotationReference: FloatArray = RotationMath.IDENTITY_3X3.copyOf()
-    // Détection d'anomalie de calibrage (voir tracking/CalibrationAnomaly.kt, revue technique
-    // point 19) -- calculée à chaque frame dans handleTrackingResult, réinitialisée à chaque
+    // Détection d'anomalie de calibrage (voir tracking/CalibrationAnomaly.kt) -- calculée à
+    // chaque frame dans handleTrackingResult, réinitialisée à chaque
     // calibrage (performCalibration). previousBlendshapesForAnomaly sert uniquement à mesurer la
     // variance frame-à-frame (voir meanAbsoluteBlendshapeDelta), distinct de tout autre usage des
     // blendshapes dans cette classe.
     private var calibrationAnomalyState = CalibrationAnomalyState.INITIAL
     private var previousBlendshapesForAnomaly: List<BlendshapeScore> = emptyList()
-    // Correction eyeBlinkLeft/Right par EAR (tracking/EyeBlinkCorrection.kt, revue technique point
-    // 28) -- porte le OneEuroFilter (point 46) à coupure adaptative d'une frame à l'autre.
+    // Correction eyeBlinkLeft/Right par EAR (tracking/EyeBlinkCorrection.kt) -- porte le
+    // OneEuroFilter à coupure adaptative d'une frame à l'autre.
     // eyeBlinkCorrectionLastTimestampMs sert à calculer le temps réellement écoulé entre deux
     // frames (pas un compte de frames) : le lissage doit avoir la même durée réelle quel que soit
     // le palier/débit courant, voir kdoc d'OneEuroFilter.
@@ -491,11 +489,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // chaque sondage thermique (voir ThermalThrottleState.next), constant pour toute la session.
     private var nominalTargetFps: Int = 0
     private var thermalThrottleState = ThermalThrottleState.initial(nominalFps = 0)
-    // Moyenne mobile de inferenceTimeMs (voir InferenceLoadMonitor.kt, point 15) -- alimente
+    // Moyenne mobile de inferenceTimeMs (voir InferenceLoadMonitor.kt) -- alimente
     // MainUiState.inferenceRunningHigh, mise à jour à chaque frame dans handleTrackingResult().
     private var inferenceLoadState = InferenceLoadState()
-    // Référence "sans langue" du ratio couleur, suivie dynamiquement (voir TongueColorBaseline.kt,
-    // point 15) -- remplace un seuil absolu fixe qui s'est révélé instable d'une session à l'autre
+    // Référence "sans langue" du ratio couleur, suivie dynamiquement (voir TongueColorBaseline.kt)
+    // -- remplace un seuil absolu fixe qui s'est révélé instable d'une session à l'autre
     // sur device (11 août 2026).
     private var tongueColorBaselineState = TongueColorBaseline()
     // Contre-pression sur l'étage 3 (embed() natif, synchrone, coûteux -- MediaPipe ImageEmbedder),
@@ -514,7 +512,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var trackingInitialized = false
 
     init {
-        // Langue forcée (point 30) : lue une seule fois ici, pas de Flow à collecter -- AppCompat
+        // Langue forcée : lue une seule fois ici, pas de Flow à collecter -- AppCompat
         // gère lui-même la persistance (voir MainUiState.appLanguage), il n'y a rien à observer
         // d'autre que l'état déjà appliqué par le framework au moment où ce ViewModel est créé.
         // toLanguageTags() renvoie une chaîne vide (pas null) quand aucune langue n'est forcée --
@@ -575,8 +573,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             appSettingsStore.faceMeshOverlayEnabled.collect { enabled ->
                 // Ne pilote plus que l'affichage visuel de l'overlay (computeMeshOverlayVisible) --
-                // les landmarks sont extraits en permanence depuis le point 28 (correction eyeBlink
-                // par EAR), plus seulement quand ce réglage est actif.
+                // les landmarks sont extraits en permanence depuis l'ajout de la correction eyeBlink
+                // par EAR, plus seulement quand ce réglage est actif.
                 _uiState.update { it.copy(faceMeshOverlayEnabled = enabled) }
             }
         }
@@ -687,7 +685,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Vérification de mise à jour semi-automatique (point 14) : compare [BuildConfig.VERSION_NAME]
+     * Vérification de mise à jour semi-automatique : compare [BuildConfig.VERSION_NAME]
      * au dernier tag publié sur GitHub Releases (`GET /repos/guyiome/AndroidMoCap/releases/latest`,
      * qui exclut déjà lui-même les prereleases -- un tag `-beta` ne déclenche donc jamais cette
      * notification). Throttlé à une fois par [UPDATE_CHECK_MIN_INTERVAL_MS] (persisté,
@@ -726,7 +724,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // stade) -- pour que tous les logs de démarrage qui suivent (palier retenu ci-dessous,
         // démarrage de session ARCore...) respectent déjà le bon niveau. Même classe de bug que
         // celui trouvé sur le tout premier log ARCore, où le niveau par défaut (ERROR) était encore
-        // actif au moment du log (revue technique, point 50) -- corrigé une bonne fois ici plutôt
+        // actif au moment du log -- corrigé une bonne fois ici plutôt
         // que par patch au cas par cas.
         AppLog.setMinimumPersistedLevel(appSettingsStore.logLevel.first())
         AppLog.i(TAG, "Démarrage de l'app, version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
@@ -796,7 +794,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         // Palier OPTIMAL : ARCore Augmented Faces pilote sa propre caméra (frontale) et sert de
         // source de pose de tête, à la place de CameraX -- les deux ne peuvent pas se partager la
-        // caméra (voir revue technique, point 13). Sinon (STANDARD/COMPATIBLE, ou repli), CameraX
+        // caméra. Sinon (STANDARD/COMPATIBLE, ou repli), CameraX
         // comme avant. ArCoreHeadPoseTracker continue de nourrir MediaPipe (blendshapes) via le
         // même detectAsync que CameraController -- rien ne change côté FaceLandmarkerHelper.
         if (tierConfig.useArCorePose && !debugForceArCoreUnavailable) {
@@ -808,8 +806,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // Repli automatique et silencieux sur CameraX si Augmented Faces s'avère
                 // indisponible à l'usage malgré le palier OPTIMAL choisi (ARCore non installé,
                 // appareil incompatible, config caméra frontale refusée...) -- pas d'erreur
-                // affichée à l'utilisateur pour ce cas précis, cohérent avec le comportement
-                // documenté au point 13 : c'est un repli attendu, pas une panne.
+                // affichée à l'utilisateur pour ce cas précis : c'est un repli attendu, pas une panne.
                 // Le fallback ne démarre pas cameraController lui-même (pas de PreviewView
                 // disponible ici, elle vit côté MainScreen) : le construire suffit -- l'appel
                 // startCamera(previewView) déjà fait par MainScreen juste après
@@ -820,7 +817,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     AppLog.w(TAG, "ARCore indisponible, repli sur CameraX : $message")
                     // close() avant de nuller la référence -- sans ça, imageProcessingExecutor
                     // (thread dédié créé dès la construction, avant même start()) fuyait pour le
-                    // reste de la session (relecture du 7 août 2026, point 1).
+                    // reste de la session (relecture du 7 août 2026).
                     arCoreHeadPoseTracker?.close()
                     arCoreHeadPoseTracker = null
                     _uiState.update { it.copy(usingArCoreCameraSource = false) }
@@ -953,7 +950,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // En palier OPTIMAL avec ARCore actif, la pose de tête vient d'ArCoreHeadPoseTracker
         // (callback onHeadPoseRotationMatrix, thread GL séparé -- voir latestArCoreHeadRotationMatrix)
         // plutôt que de MediaPipe (facialTransformationMatrixes(), toujours calculée par
-        // FaceLandmarkerHelper mais ignorée ici dans ce cas) -- voir revue technique, point 13.
+        // FaceLandmarkerHelper mais ignorée ici dans ce cas).
         // Repli sur la matrice MediaPipe tant qu'ARCore n'a pas encore émis de pose (ex. tout
         // premier frame après le démarrage de la session).
         lastRawHeadRotationMatrix = if (_uiState.value.usingArCoreCameraSource) {
@@ -986,12 +983,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         val calibrated = result.copy(headEulerDegrees = calibratedEuler)
 
-        // Correction eyeBlinkLeft/Right par EAR (revue technique, point 28) : le blendshape brut
+        // Correction eyeBlinkLeft/Right par EAR : le blendshape brut
         // fuit d'un œil vers l'autre pendant un clin d'œil isolé (mesuré sur device -- pas
         // supposé), l'EAR (géométrique, indépendant du classifieur ML) fuit beaucoup moins dans
         // les mêmes conditions -- utilisé ici pour atténuer les fuites plutôt que remplacer le
         // blendshape. Temps écoulé depuis la frame précédente (pas un compte de frames) pour que le
-        // lissage du OneEuroFilter (point 46) ait la même durée réelle quel que soit le débit
+        // lissage du OneEuroFilter ait la même durée réelle quel que soit le débit
         // courant ; 0 par défaut pour la toute première frame (pas de remontée à lisser, rien à corriger).
         val elapsedMs = eyeBlinkCorrectionLastTimestampMs?.let { calibrated.timestampMs - it } ?: 0L
         eyeBlinkCorrectionLastTimestampMs = calibrated.timestampMs
@@ -1004,8 +1001,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         eyeBlinkCorrectionState = nextEyeBlinkCorrectionState
         val corrected = calibrated.copy(blendshapes = correctedBlendshapes)
 
-        // Détection d'anomalie de calibrage (voir tracking/CalibrationAnomaly.kt, revue technique
-        // point 19) -- gardée derrière isCalibrated : avant le tout premier calibrage, "proche de
+        // Détection d'anomalie de calibrage (voir tracking/CalibrationAnomaly.kt) -- gardée
+        // derrière isCalibrated : avant le tout premier calibrage, "proche de
         // zéro" n'a pas de sens et ferait remonter de faux positifs. previousBlendshapesForAnomaly
         // est mis à jour inconditionnellement plus bas, y compris avant le premier calibrage.
         if (_uiState.value.isCalibrated) {
@@ -1024,14 +1021,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         previousBlendshapesForAnomaly = result.blendshapes
 
-        // Mode miroir (point 51) : mirrore ensemble tête + blendshapes gauche/droite + regard par
+        // Mode miroir : mirrore ensemble tête + blendshapes gauche/droite + regard par
         // œil, appliqué après la correction EAR, jamais avant (EAR travaille sur l'identité
         // anatomique réelle des landmarks, indépendante de ce réglage). Activé par défaut (voir
         // AppSettingsStore.mirrorModeEnabled) -- désactiver ce réglage envoie "corrected" tel quel,
         // sortie native/anatomique.
         val mirrored = if (_uiState.value.mirrorModeEnabled) mirrorFaceTrackingResult(corrected) else corrected
 
-        // Poids par blendshape (point 18) : appliqué en tout dernier, après le mode miroir --
+        // Poids par blendshape : appliqué en tout dernier, après le mode miroir --
         // c'est un réglage sur ce qui est effectivement affiché/envoyé (les noms tels que
         // BlendshapesScreen les présente), pas une correction d'un signal anatomique comme EAR
         // ci-dessus. "final" porte donc déjà le résultat pondéré pour tout le reste de cette
@@ -1039,7 +1036,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // tracking/BlendshapeWeighting.kt.
         val final = mirrored.copy(blendshapes = applyBlendshapeWeights(mirrored.blendshapes, _uiState.value.blendshapeWeights))
 
-        // Charge d'inférence live (point 15) -- budget suit le débit courant, potentiellement déjà
+        // Charge d'inférence live -- budget suit le débit courant, potentiellement déjà
         // réduit par le throttling thermique (thermalThrottleState.currentFps), pour ne pas signaler
         // une fausse alerte de charge quand c'est juste le débit qui a été volontairement abaissé.
         inferenceLoadState = inferenceLoadState.next(final.inferenceTimeMs)
@@ -1060,8 +1057,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 imageHeightPx = final.imageHeightPx,
             )
         }
-        // Envoi réseau déplacé après la cascade de détection de la langue tirée plus bas (revue
-        // technique, point 15, 13 août 2026) -- permet d'y injecter tongueOut une fois confirmé
+        // Envoi réseau déplacé après la cascade de détection de la langue tirée plus bas
+        // (13 août 2026) -- permet d'y injecter tongueOut une fois confirmé
         // fiable, voir tongueOutValueForInjection et son utilisation en fin de fonction.
 
         // Diagnostic temporaire EAR (voir la constante EAR_DIAGNOSTIC_LOGGING ci-dessus) -- brut ET
@@ -1138,7 +1135,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
-        // Calibration de l'étage 3 (point 15) -- tourne indépendamment des étages 1/2 : l'utilisateur
+        // Calibration de l'étage 3 -- tourne indépendamment des étages 1/2 : l'utilisateur
         // tient le geste sur commande (TongueCalibrationScreen), gater sur jawOpen/couleur ici serait
         // contre-productif. Temps écoulé depuis le tick précédent (pas un compte de frames), même
         // discipline que eyeBlinkCorrectionLastTimestampMs plus haut.
@@ -1213,7 +1210,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // Cascade de détection de la langue tirée, phase 1+3 (revue technique, point 15) -- gatée
+        // Cascade de détection de la langue tirée, phase 1+3 -- gatée
         // par le réglage expérimental. Injectée dans "final" envoyé au réseau depuis le 13 août 2026
         // (voir tongueOutValueForInjection ci-dessous et son utilisation en fin de fonction) --
         // seulement après deux sessions de test device avec une calibration élargie au mouvement de
@@ -1230,10 +1227,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // perturbe le suivi des landmarks mâchoire) ou un vrai relâchement de la bouche.
             val mouthGeometric = mouthOpennessRatio(corrected.faceLandmarks)
             var tongueOutClassification: TongueEmbeddingClassification? = null
-            // ⚠️ mouthGeometricGateOpen retiré de la porte dure le 13 août 2026 (revue technique,
-            // point 15/56) -- gardé en jawOpen seul. Ajouté le 11 août pour bloquer un faux positif
-            // "bouche pressée" (jawOpen 0,3-0,5+ malgré une bouche géométriquement fermée, point
-            // 15quinquies), mais confirmé sur device qu'une VRAIE tenue "langue dehors" produit
+            // ⚠️ mouthGeometricGateOpen retiré de la porte dure le 13 août 2026 -- gardé en
+            // jawOpen seul. Ajouté le 11 août pour bloquer un faux positif
+            // "bouche pressée" (jawOpen 0,3-0,5+ malgré une bouche géométriquement fermée),
+            // mais confirmé sur device qu'une VRAIE tenue "langue dehors" produit
             // exactement la même signature (jawOpen 0,43-0,73 ET mouthGeo très bas, 0,005-0,199 --
             // la langue elle-même semble perturber le suivi des landmarks internes 13/14 utilisés
             // par mouthOpennessRatio) : chevauchement quasi total des deux plages, aucun seuil ne
@@ -1256,12 +1253,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 // Diagnostic seul (loggé plus bas, "etage2=") -- ne gate rien. Le seuil fixe
                 // (DEFAULT_COLOR_RATIO_THRESHOLD, MouthColorAnalysis.kt) qu'il utilise s'est montré
-                // pas assez stable d'une session à l'autre pour porter une vraie décision (revue
-                // technique, point 15bis) ; seul adaptiveFired ci-dessous, sur la référence
+                // pas assez stable d'une session à l'autre pour porter une vraie décision ;
+                // seul adaptiveFired ci-dessous, sur la référence
                 // adaptative, déclenche réellement l'étage 3. Gardé pour comparer les deux signaux
                 // dans les logs tant que l'étage 2 est encore sous investigation.
                 val colorFired = ratio != null && colorGateOpen(ratio)
-                // Comparaison avec la référence adaptative (TongueColorBaseline.kt, point 15) --
+                // Comparaison avec la référence adaptative (TongueColorBaseline.kt) --
                 // comparée AVANT mise à jour (sinon le ratio courant s'auto-compare à une référence
                 // qui vient de l'intégrer). Mise à jour juste après, avec ce même ratio, pour la
                 // frame suivante -- uniquement quand la bouche est déjà assez ouverte (ce bloc),
@@ -1272,7 +1269,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     tongueColorBaselineState = tongueColorBaselineState.next(ratio)
                 }
 
-                // Étage 3 (embedding + calibration personnelle, revue technique point 15) -- ne
+                // Étage 3 (embedding + calibration personnelle) -- ne
                 // dépend plus d'un indice positif de l'étage 2 depuis le 13 août 2026 (adaptiveFired
                 // retiré du gate, comme mouthGeometricGateOpen à l'étage 1 le même jour) : constaté
                 // sur device qu'il bloquait 63% des frames où la mâchoire était pourtant ouverte
@@ -1381,7 +1378,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             tongueOutValueForInjection = tongueOutDisplayValue
         }
 
-        // Envoi réseau (revue technique, point 15) : injecte tongueOut si le toggle expérimental est
+        // Envoi réseau : injecte tongueOut si le toggle expérimental est
         // actif (tongueOutValueForInjection non-null), sinon "final" part inchangé -- déplacé après
         // la cascade ci-dessus (auparavant plus haut dans cette fonction, avant que la cascade ait pu
         // calculer quoi que ce soit) pour rendre cette injection possible.
@@ -1391,7 +1388,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         vmcSender?.send(finalToSend)
         iFacialMocapSender?.send(finalToSend)
 
-        // Traduction VBridger (point 41) : "finalToSend" (déjà mirroré de façon uniforme par ce
+        // Traduction VBridger : "finalToSend" (déjà mirroré de façon uniforme par ce
         // fichier si mirrorModeEnabled, tête + tous les blendshapes gauche/droite confondus) sert de
         // base ici comme pour tous les autres envois -- un seul réglage, cohérent pour tous les
         // champs, y compris les yeux (voir kdoc de VBridgerFormulas : la tentative précédente de
@@ -1402,7 +1399,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Étage 2 de la cascade langue tirée (point 15) : recadre la région buccale à partir des
+     * Étage 2 de la cascade langue tirée : recadre la région buccale à partir des
      * landmarks puis calcule la fraction de pixels "couleur langue" ([tonguePixelRatio]). `null` si
      * le recadrage est impossible (landmarks insuffisants) ou si le bitmap du frame correspondant
      * n'est plus disponible. Essaie `cameraController` (palier CameraX) puis `arCoreHeadPoseTracker`
@@ -1429,7 +1426,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Calcule l'embedding du recadrage buccal courant pour l'étage 3 (point 15) -- réutilise le
+     * Calcule l'embedding du recadrage buccal courant pour l'étage 3 -- réutilise le
      * même accès bitmap synchrone que [sampleMouthTonguePixelRatio]. `null`
      * si le recadrage est impossible, si aucun bitmap n'est disponible, ou si
      * [tongueEmbeddingHelper] n'est pas prêt (toggle expérimental éteint, ou pas encore de frame
@@ -1477,8 +1474,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         headRotationReference = lastRawHeadRotationMatrix.copyOf()
         deviceRotationReference = deviceOrientationTracker?.snapshotRotationMatrix() ?: deviceRotationReference
         // Un recalibrage résout toujours l'anomalie signalée (voir tracking/CalibrationAnomaly.kt)
-        // -- c'est la seule façon de la réinitialiser, jamais automatique (voir revue technique,
-        // point 19). previousBlendshapesForAnomaly vidé pour ne jamais comparer une frame à
+        // -- c'est la seule façon de la réinitialiser, jamais automatique.
+        // previousBlendshapesForAnomaly vidé pour ne jamais comparer une frame à
         // travers la frontière du calibrage.
         calibrationAnomalyState = CalibrationAnomalyState.INITIAL
         previousBlendshapesForAnomaly = emptyList()
@@ -1542,7 +1539,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Poids appliqué à ce blendshape avant tout affichage/envoi (point 18, voir
+     * Poids appliqué à ce blendshape avant tout affichage/envoi (voir
      * `tracking/BlendshapeWeighting.kt` et son appel dans `handleTrackingResult()`). Amplitude
      * bornée [BLENDSHAPE_WEIGHT_MIN, BLENDSHAPE_WEIGHT_MAX] côté UI (le `Slider` de
      * `BlendshapesScreen` ne peut pas produire d'autre valeur) -- pas revérifiée ici, même
@@ -1555,7 +1552,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // --- Réglages généraux (persistés) ---
 
     /**
-     * Sélecteur de langue en-app (point 30) : force la langue de l'app indépendamment de la langue
+     * Sélecteur de langue en-app : force la langue de l'app indépendamment de la langue
      * système, sur toutes les versions d'Android (contrairement au sélecteur système natif, réglages
      * système > langues de l'app, réservé à Android 13+). Effet immédiat (AppCompat recrée les
      * Activity concernées) -- pas besoin de relancer l'app. Persistance automatique gérée par
@@ -1590,8 +1587,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Niveau minimal conservé dans le fichier de logs exportable (voir logging/AppLog.kt, revue
-     * technique point 50) -- persisté, réglable depuis AdvancedSettingsScreen, effet immédiat (voir
+     * Niveau minimal conservé dans le fichier de logs exportable (voir logging/AppLog.kt)
+     * -- persisté, réglable depuis AdvancedSettingsScreen, effet immédiat (voir
      * le collecteur `appSettingsStore.logLevel` dans init{}).
      */
     fun setLogLevel(level: LogLevel) {
@@ -1599,7 +1596,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Mode miroir (point 51) -- persisté, réglable dans les réglages, effet immédiat (voir le
+     * Mode miroir -- persisté, réglable dans les réglages, effet immédiat (voir le
      * collecteur `appSettingsStore.mirrorModeEnabled` dans init{}).
      */
     fun setMirrorModeEnabled(enabled: Boolean) {
@@ -1607,7 +1604,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Détection expérimentale de la langue tirée (point 15) -- persisté, réglable depuis
+     * Détection expérimentale de la langue tirée -- persisté, réglable depuis
      * `ExperimentalFeaturesScreen`, effet immédiat (voir le collecteur
      * `appSettingsStore.tongueOutDetectionEnabled` dans init{}). Désactivé par défaut.
      */
@@ -1709,7 +1706,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) { appSettingsStore.setTierOverride(tier) }
     }
 
-    // --- Mocks de debug (panneau caché de AdvancedSettingsScreen, voir revue technique point 35) ---
+    // --- Mocks de debug (panneau caché de AdvancedSettingsScreen) ---
 
     /**
      * Mock de debug : force le repli CameraX au palier OPTIMAL même si ARCore est supporté --
@@ -1845,7 +1842,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // --- VMC : connexion directe vers Blender / Unity (pas VTube Studio, voir revue technique point 39) ---
+    // --- VMC : connexion directe vers Blender / Unity (pas VTube Studio) ---
 
     /** Configure la cible VMC (IP du PC qui fait tourner Blender / Unity) et l'active. */
     fun connectVmcTarget(hostText: String, port: Int = VmcOscSender.DEFAULT_PORT) {
@@ -1856,7 +1853,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 vmcSender?.close()
                 lateinit var sender: VmcOscSender
                 sender = VmcOscSender(address, port, onConnectionLost = { onVmcConnectionLost(sender) })
-                // Vérifié explicitement (relecture globale du 7 août 2026, point 2) : le
+                // Vérifié explicitement (relecture globale du 7 août 2026) : le
                 // constructeur ne propage jamais d'exception même si l'ouverture du port UDP
                 // local échoue (voir VmcOscSender.connect()) -- sans cette vérification, l'UI
                 // affichait "connecté" même quand rien ne pouvait être envoyé.
@@ -1907,7 +1904,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         AppLog.i(TAG, "VMC déconnecté (cible injoignable)")
     }
 
-    // --- VTube Studio : intégration directe via l'API Plugin (point 39) ---
+    // --- VTube Studio : intégration directe via l'API Plugin ---
 
     /**
      * Configure la cible VTube Studio (IP du PC + port de son API Plugin, 8001 par défaut) et lance
@@ -1973,7 +1970,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Oublie le jeton d'authentification VTube Studio stocké -- la prochaine connexion redemande
      * une autorisation complète (nouveau popup) plutôt qu'une ré-authentification directe.
      * `VTubeStudioSender` retente déjà automatiquement une fois tout seul si le jeton stocké est
-     * refusé (voir revue technique, point 39) ; ce bouton reste utile pour un nouveau départ
+     * refusé ; ce bouton reste utile pour un nouveau départ
      * explicite (ex. l'utilisateur a lui-même révoqué le plugin depuis VTube Studio et le sait).
      */
     fun forgetVtsAuthToken() {

@@ -1,7 +1,7 @@
 package com.guyiome.androidmocap.tracking
 
 /**
- * Étage 1 de la cascade de détection de la langue tirée (revue technique, point 15) : porte
+ * Étage 1 de la cascade de détection de la langue tirée : porte
  * géométrique quasi gratuite, réutilise le score `jawOpen` déjà produit par MediaPipe à chaque
  * frame (aucun coût supplémentaire) pour éviter d'aller plus loin (recadrage caméra, analyse
  * couleur) tant que la bouche n'est pas assez ouverte pour qu'une langue tirée soit visuellement
@@ -18,8 +18,8 @@ internal fun jawOpenGateOpen(jawOpenScore: Float, threshold: Float = DEFAULT_JAW
 /**
  * Confirmation géométrique de l'étage 1 -- `jawOpen` (blendshape ML) seul peut être trompé : bouche
  * pressée/lèvre inférieure mordue/rentrée produit un `jawOpen` élevé (0,3-0,5+) alors que la bouche
- * est réellement fermée, reproduit deux fois sur device le 11 août 2026 (revue technique, point
- * 15quater/15quinquies) -- une fois en mordant délibérément la lèvre, une fois en position neutre.
+ * est réellement fermée, reproduit deux fois sur device le 11 août 2026 -- une fois en mordant
+ * délibérément la lèvre, une fois en position neutre.
  * [mouthOpennessRatio] (`LipLandmarks.kt`), normalisé par la largeur de bouche donc indépendant de
  * la distance/position par rapport à la caméra (contrairement à une taille de recadrage en pixels
  * absolus, dont un premier essai de garde-fou s'est révélé trop fragile -- voir kdoc de
@@ -27,7 +27,7 @@ internal fun jawOpenGateOpen(jawOpenScore: Float, threshold: Float = DEFAULT_JAW
  * jour-là : bouche pressée/fermée ≈ 0,001-0,12, bouche réellement ouverte (avec ou sans langue) ≈
  * 0,44+. Seuil choisi à mi-chemin avec une marge confortable des deux côtés, pas finement calé.
  *
- * ⚠️ **Retiré de la porte dure le 13 août 2026** (`MainViewModel`, revue technique point 15/56) :
+ * ⚠️ **Retiré de la porte dure le 13 août 2026** (`MainViewModel`) :
  * confirmé sur device qu'une VRAIE tenue "langue dehors" peut produire exactement la même
  * signature que "bouche pressée" (`jawOpen` confiant, `mouthGeometricRatio` très bas -- la langue
  * elle-même semble perturber le suivi des landmarks internes utilisés par [mouthOpennessRatio]) --

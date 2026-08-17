@@ -95,8 +95,8 @@ fun MainScreen(
     // pas de 90° selon que le téléphone est tenu à la verticale ou à l'horizontale. Délègue à
     // snapToRotationBucket() (RotationBucket.kt, même package) plutôt qu'à une logique ad hoc
     // locale -- l'ancienne version avait un trou (135°-225°, tête en bas, tombait à tort sur 0f au
-    // lieu de 180f), corrigé en même temps que le correctif de rotation caméra (revue technique,
-    // points 1/15/20). Reste en convention brute OrientationEventListener (horaire) -- rotation
+    // lieu de 180f), corrigé en même temps que le correctif de rotation caméra. Reste en
+    // convention brute OrientationEventListener (horaire) -- rotation
     // cosmétique Compose, sans rapport avec la convention Surface.ROTATION_* utilisée côté caméra.
     val panelRotationDegrees = when (snapToRotationBucket(iconRotationDegrees.toInt())) {
         90 -> -90f
@@ -186,8 +186,8 @@ fun MainScreen(
             LoadingScreen()
         } else if (hasCameraPermission) {
             // Aperçu caméra : PreviewView (CameraX) normalement, ou GLSurfaceView (ARCore) au
-            // palier OPTIMAL avec ARCore actif -- les deux ne coexistent jamais (voir revue
-            // technique, point 13). Le fond caméra live du GLSurfaceView est dessiné en interne par
+            // palier OPTIMAL avec ARCore actif -- les deux ne coexistent jamais. Le fond caméra
+            // live du GLSurfaceView est dessiné en interne par
             // ArCoreHeadPoseTracker.onDrawFrame (drawCameraBackground) -- le GLSurfaceView n'est
             // qu'un hôte AndroidView ici, comme previewView pour CameraX.
             if (uiState.usingArCoreCameraSource) {
@@ -249,11 +249,11 @@ fun MainScreen(
                 // 7 août 2026 : "elle devrait quand même apparaître à l'écran de debug, sans
                 // bouger si on la coche").
                 val blendshapeScoresByName = trackingFrame.allBlendshapes.associate { it.name to it.score }
-                // Valeur avant pondération par blendshape (point 18) -- sert uniquement à
+                // Valeur avant pondération par blendshape -- sert uniquement à
                 // l'affichage "brute -> corrigée" de BlendshapePanel quand les deux diffèrent.
                 val rawBlendshapeScoresByName = trackingFrame.rawBlendshapes.associate { it.name to it.score }
                 // Trié une fois par changement de sélection (vitesse humaine), pas à chaque frame
-                // (relecture globale du 7 août 2026, point 22) -- uiState.selectedBlendshapeNames
+                // (relecture globale du 7 août 2026) -- uiState.selectedBlendshapeNames
                 // ne change qu'à l'interaction utilisateur, contrairement à trackingFrame ci-dessus.
                 val sortedSelectedNames = remember(uiState.selectedBlendshapeNames) {
                     uiState.selectedBlendshapeNames.sorted()
@@ -293,7 +293,7 @@ fun MainScreen(
                     onOpenSettings = { showSettings = true },
                     onOpenExperimental = { showExperimentalFeatures = true },
                     // Lien direct vers la page de la Release GitHub -- jamais d'install silencieuse
-                    // possible hors store (voir MainViewModel.checkForUpdate, point 14).
+                    // possible hors store (voir MainViewModel.checkForUpdate).
                     onOpenUpdate = {
                         uiState.updateAvailableUrl?.let { url ->
                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
@@ -326,7 +326,7 @@ fun MainScreen(
                     uiState = uiState,
                     faceDetected = trackingFrame.faceDetected,
                     inferenceTimeMs = trackingFrame.inferenceTimeMs,
-                    // Diagnostic EAR (revue technique, point 28) -- voir kdoc dans
+                    // Diagnostic EAR -- voir kdoc dans
                     // AdvancedSettingsScreen. Recalculé seulement quand la liste de landmarks change
                     // réellement (elle est déjà stable/vide hors overlay du mesh activé), pas de
                     // remember nécessaire ici : trackingFrame change de toute façon à 20-60 Hz.

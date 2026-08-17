@@ -6,8 +6,8 @@ import kotlin.math.sqrt
  * Eye Aspect Ratio (EAR) -- Soukupová & Čech, 2016, "Real-Time Eye Blink Detection Using Facial
  * Landmarks". Mesure géométrique pure (position des paupières), indépendante de la texture de
  * l'œil -- piste explorée en complément du blendshape `eyeBlink` de MediaPipe (un classifieur ML,
- * sensible aux reflets de verres de lunettes) pour la fiabilisation du clignement avec lunettes
- * (revue technique, point 28). Ce fichier ne fait QUE le calcul géométrique -- diagnostic
+ * sensible aux reflets de verres de lunettes) pour la fiabilisation du clignement avec lunettes.
+ * Ce fichier ne fait QUE le calcul géométrique -- diagnostic
  * temporaire dans `AdvancedSettingsScreen` pour l'instant, pas encore branché à une vraie logique de
  * fusion/correction.
  *
@@ -42,7 +42,7 @@ private fun distance(a: Pair<Float, Float>, b: Pair<Float, Float>): Float {
  * Landmarker. Vérifiés croisés sur deux sources indépendantes au départ (blog sanderdesnaijer.com/
  * blog/mediapipe-face-mesh-landmarks + les indices communément repris dans les implémentations EAR
  * sur MediaPipe), puis **la correspondance gauche/droite confirmée par test réel sur device le
- * 9 août 2026** (revue technique, point 28) : clins d'œil isolés (gauche seul, droit seul, avec et
+ * 9 août 2026** : clins d'œil isolés (gauche seul, droit seul, avec et
  * sans lunettes) recoupés avec les blendshapes `eyeBlinkLeft`/`eyeBlinkRight` bruts sur plusieurs
  * segments indépendants, jamais contredit -- l'indice 263/362 correspond à l'œil gauche, 33/133 à
  * l'œil droit.

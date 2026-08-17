@@ -1,7 +1,7 @@
 package com.guyiome.androidmocap.tracking
 
 /**
- * Mode miroir (revue technique, point 51) : permute les scores des blendshapes gauche/droite entre
+ * Mode miroir : permute les scores des blendshapes gauche/droite entre
  * eux, à appliquer **toujours en même temps** que [RotationMath.mirrorEulerDegrees] sur la tête --
  * jamais l'un sans l'autre, c'est justement le déséquilibre entre les deux (tête mirrorée,
  * blendshapes pas mirrorés) qui causait l'incohérence découverte sur device le 10 août 2026.

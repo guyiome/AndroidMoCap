@@ -82,8 +82,7 @@ object BlendshapeCatalog {
      * qui les force lui aussi à zéro/quasi-zéro, un bon indice de ce que le modèle officiel gère
      * mal. Sert uniquement à afficher un avertissement discret dans l'écran de sélection
      * ([com.guyiome.androidmocap.ui.BlendshapesScreen]) -- n'affecte ni la détection ni
-     * l'envoi, juste l'information donnée à l'utilisateur avant qu'il coche. Voir
-     * `AndroidMoCap_revue_technique.md`, point 17.
+     * l'envoi, juste l'information donnée à l'utilisateur avant qu'il coche.
      */
     val unreliable: Set<String> = setOf(
         "jawForward",

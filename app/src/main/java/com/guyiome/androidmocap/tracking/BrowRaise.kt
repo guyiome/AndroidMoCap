@@ -4,7 +4,7 @@ import kotlin.math.sqrt
 
 /**
  * Mesure géométrique pure de la hauteur du sourcil, même principe que l'Eye Aspect Ratio
- * (`EyeAspectRatio.kt`, point 28) appliqué cette fois aux sourcils -- discussion du 9 août 2026,
+ * (`EyeAspectRatio.kt`) appliqué cette fois aux sourcils -- discussion du 9 août 2026,
  * suite à une comparaison avec le pipeline caméra RTX de VTube Studio (NVIDIA Broadcast/Maxine AR
  * SDK) : ce pipeline calcule lui aussi ses coefficients d'expression (yeux, sourcils) à partir des
  * landmarks détectés plutôt que de faire confiance à un classifieur direct -- même principe que

@@ -11,7 +11,7 @@ package com.guyiome.androidmocap.tracking
  * logs) -- lisse uniquement la valeur affichée.
  *
  * ⚠️ **Piloté à l'origine le panneau de test LOCAL uniquement, plus depuis le 13 août 2026** : une
- * fois l'injection réseau activée (revue technique, point 15/56), `MainViewModel.handleTrackingResult`
+ * fois l'injection réseau activée, `MainViewModel.handleTrackingResult`
  * réutilise directement la sortie de [TongueOutDisplayState.next] comme valeur `tongueOut` envoyée à
  * VMC/iFacialMocap/VTube Studio -- ce n'est plus un lissage purement cosmétique, une modification ici
  * change aussi ce qui part sur le réseau.

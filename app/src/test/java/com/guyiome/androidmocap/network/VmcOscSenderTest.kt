@@ -14,7 +14,7 @@ import java.nio.ByteBuffer
  * Couvre [VmcOscSender.buildBundle] (rendue `internal`, pure -- aucune dépendance socket/réseau) :
  * regroupe les messages `/VMC/Ext/Blend/Val` + `/Apply` dans un seul `OSCBundle` envoyé en un seul
  * paquet UDP, au lieu d'un envoi séparé par blendshape (jusqu'à une cinquantaine par frame avant ce
- * changement -- voir le rapport technique, point 4). Couvre aussi [VmcOscSender.serializeToBytes]
+ * changement). Couvre aussi [VmcOscSender.serializeToBytes]
  * (correctif du 8 août 2026, voir le kdoc de tête de `VmcOscSender.kt`) : preuve en JVM, sans device,
  * que le remplacement d'`OSCPortOut` sérialise vraiment sans planter et produit des octets valides,
  * pas seulement que le code compile.

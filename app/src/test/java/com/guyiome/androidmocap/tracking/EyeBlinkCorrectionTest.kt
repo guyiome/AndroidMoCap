@@ -123,7 +123,7 @@ class EyeBlinkCorrectionTest {
     }
 
     // --- AdaptiveEarFloor intégré : régression du clignement droit écrasé à angle de caméra
-    //     inhabituel (revue technique, cas mesuré sur device le 9 août 2026) ---
+    //     inhabituel (cas mesuré sur device le 9 août 2026) ---
 
     private fun rightEyeLandmarksWithGap(openFraction: Float): List<Pair<Float, Float>> {
         val landmarks = MutableList(500) { 0f to 0f }

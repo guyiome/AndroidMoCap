@@ -10,7 +10,7 @@ import org.junit.Test
  * avec effet miroir optionnel pour correspondre à l'aperçu caméra (mirroré par CameraX). Fonction
  * pure (aucune dépendance Android/Compose), testable en JVM.
  *
- * Depuis le point 27 (voir `AndroidMoCap_revue_technique.md`), la projection reproduit le
+ * La projection reproduit le
  * recadrage centré "FILL_CENTER" de `PreviewView` quand le ratio de l'image analysée diffère de
  * celui du canvas -- avant, un étirement naïf par axe donnait un mesh écrasé/décalé sur les
  * appareils dont l'écran a un ratio différent de celui de l'image caméra (constaté sur ASUS ROG

@@ -63,7 +63,7 @@
     <string name="connection_udp_status">Connexion UDP : %1$s</string>
     <string name="connection_choose_type_hint">Choisis un type de connexion ci-dessus pour voir ses réglages.</string>
 
-    <!-- VTube Studio (API Plugin, connexion directe, point 39) -->
+    <!-- VTube Studio (API Plugin, connexion directe) -->
     <string name="connection_vts_section_title">VTube Studio (API Plugin)</string>
     <string name="connection_vts_ip_label">IP du PC</string>
     <string name="connection_vts_port_label">Port</string>
@@ -79,7 +79,7 @@
     <string name="connection_vts_translation_hint">Envoie les paramètres par défaut de VTube Studio (FaceAngleX, MouthSmile…) à la place des blendshapes ARKit bruts, calculés de la même façon que VBridger -- pour qu\'un modèle déjà riggé pour VBridger/les paramètres par défaut de VTS réagisse sans faire tourner VBridger. La position de tête n\'est pas incluse (jamais calculée par cette app).</string>
     <string name="connection_vts_view_formulas_button">Voir les paramètres envoyés</string>
 
-    <!-- Liste des paramètres VTube Studio (point 41) -->
+    <!-- Liste des paramètres VTube Studio -->
     <string name="vts_formulas_title">Paramètres VTube Studio</string>
     <string name="vts_formulas_group_raw">Blendshapes ARKit bruts</string>
     <string name="vts_formulas_group_vbridger">Formules VBridger</string>
@@ -96,9 +96,9 @@
     <string name="diagnostics_delegate">Délégué : %1$s</string>
     <string name="diagnostics_face_detected">Visage détecté : %1$s</string>
     <string name="diagnostics_inference_latency">Latence inférence : %1$d ms</string>
-    <!-- Diagnostic temporaire (point 28, yeux/clignement/lunettes), voir kdoc des paramètres
+    <!-- Diagnostic temporaire (yeux/clignement/lunettes), voir kdoc des paramètres
          eyeAspectRatioGroupA/B de DiagnosticsScreen. Pas destiné à rester tel quel durablement. -->
-    <string name="diagnostics_ear_debug_label">Diagnostic Eye Aspect Ratio (point 28)</string>
+    <string name="diagnostics_ear_debug_label">Diagnostic Eye Aspect Ratio</string>
     <string name="diagnostics_ear_debug_value">Groupe A : %1$s · Groupe B : %2$s</string>
     <string name="diagnostics_ear_debug_hint">Nécessite l\'overlay du mesh de tracking activé (Affichage &amp; confort) pour des valeurs non nulles.</string>
     <string name="diagnostics_calibrated">Pose neutre : calibrée</string>
@@ -146,7 +146,7 @@
     <string name="display_power_save_description">Après le délai ci-dessous sans toucher l\'écran : écran assombri, aperçu caméra masqué (le tracking et l\'envoi continuent normalement). Un simple toucher de l\'écran en ressort.</string>
     <string name="display_power_save_delay">Délai d\'inactivité : %1$d s</string>
     <string name="display_low_battery_threshold">Seuil d\'alerte batterie faible : %1$d%%</string>
-    <!-- Sélecteur de langue en-app (point 30), fonctionne sur toutes les versions d'Android,
+    <!-- Sélecteur de langue en-app, fonctionne sur toutes les versions d'Android,
          contrairement au sélecteur système natif (Réglages > Applis > Langues des applis), qui
          n'existe que depuis Android 13. -->
     <string name="display_language_label">Langue de l\'app</string>

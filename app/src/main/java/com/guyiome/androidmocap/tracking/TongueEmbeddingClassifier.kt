@@ -3,13 +3,12 @@ package com.guyiome.androidmocap.tracking
 import kotlin.math.sqrt
 
 /**
- * Étage 3 de la cascade de détection de la langue tirée (revue technique, point 15) : classement
+ * Étage 3 de la cascade de détection de la langue tirée : classement
  * par comparaison à deux embeddings de référence enregistrés lors d'une calibration personnelle
  * ("langue dehors" / "langue rentrée") -- plus proche voisin à 2 classes via similarité cosinus.
  * Construit après 7 sessions de test device ayant confirmé que l'étage 2 (couleur seule) ne
- * discrimine pas de façon fiable, sur aucun des deux chemins caméra -- voir section "15bis" de la
- * revue technique. Pur -- ne connaît ni `ImageEmbedder` ni `Bitmap`, prend un `FloatArray` déjà
- * calculé en entrée.
+ * discrimine pas de façon fiable, sur aucun des deux chemins caméra. Pur -- ne connaît ni
+ * `ImageEmbedder` ni `Bitmap`, prend un `FloatArray` déjà calculé en entrée.
  */
 internal enum class TongueEmbeddingClassification { TONGUE_OUT, TONGUE_IN, UNDECIDED }
 

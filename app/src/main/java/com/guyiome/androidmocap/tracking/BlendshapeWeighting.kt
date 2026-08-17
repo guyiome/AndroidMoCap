@@ -8,8 +8,8 @@ const val BLENDSHAPE_WEIGHT_MAX = 2f
 const val BLENDSHAPE_WEIGHT_DEFAULT = 1f
 
 /**
- * Applique un poids par blendshape (réglage utilisateur, `AppSettingsStore.blendshapeWeights`,
- * point 18) -- multiplie chaque score par son poids ([BLENDSHAPE_WEIGHT_DEFAULT] pour toute entrée
+ * Applique un poids par blendshape (réglage utilisateur, `AppSettingsStore.blendshapeWeights`)
+ * -- multiplie chaque score par son poids ([BLENDSHAPE_WEIGHT_DEFAULT] pour toute entrée
  * absente de [weights]), puis borne à `[0,1]` pour rester dans la plage documentée d'un
  * blendshape ARKit : un poids > 1 sur un score déjà élevé dépasserait sinon 1 sans cette borne.
  * Appelée dans `MainViewModel.handleTrackingResult()` juste après le mode miroir -- le panneau de

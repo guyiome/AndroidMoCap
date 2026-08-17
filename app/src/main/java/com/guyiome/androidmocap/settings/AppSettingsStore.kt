@@ -107,7 +107,7 @@ class AppSettingsStore(private val context: Context) {
     }
 
     /**
-     * Désactivé par défaut (voir rapport technique, point 18) : la sélection de blendshapes
+     * Désactivé par défaut : la sélection de blendshapes
      * affichés ([persistedBlendshapeSelectionNames]) n'est mémorisée que si ce réglage est activé
      * -- ne change rien au comportement historique tant que l'utilisateur ne l'active pas lui-même.
      */
@@ -174,7 +174,7 @@ class AppSettingsStore(private val context: Context) {
     }
 
     /**
-     * Mock de debug (panneau caché de `AdvancedSettingsScreen`, voir revue technique point 35) : force
+     * Mock de debug (panneau caché de `AdvancedSettingsScreen`) : force
      * le repli CameraX au palier `OPTIMAL` même sur un appareil qui supporte réellement ARCore --
      * permet de vérifier `ArCoreHeadPoseTracker.onUnavailable` sans dépendre d'un appareil
      * incompatible. Désactivé par défaut. Persisté mais lu une seule fois au lancement
@@ -217,8 +217,8 @@ class AppSettingsStore(private val context: Context) {
     }
 
     /**
-     * Niveau minimal conservé dans le fichier de logs exportable (voir `logging/AppLog.kt`, revue
-     * technique point 50) -- `ERROR` par défaut, réglable jusqu'à `WARN`/`INFO` depuis
+     * Niveau minimal conservé dans le fichier de logs exportable (voir `logging/AppLog.kt`)
+     * -- `ERROR` par défaut, réglable jusqu'à `WARN`/`INFO` depuis
      * `AdvancedSettingsScreen`. `VERBOSE`/`DEBUG` ne sont volontairement pas des valeurs valides ici
      * (convention Android officielle -- jamais persistés, voir kdoc de `LogLevel`) ; une valeur
      * stockée invalide ou absente retombe sur `ERROR` plutôt que de planter.
@@ -232,7 +232,7 @@ class AppSettingsStore(private val context: Context) {
     }
 
     /**
-     * Mode miroir (revue technique, point 51) : mirrore ensemble la tête et tous les blendshapes
+     * Mode miroir : mirrore ensemble la tête et tous les blendshapes
      * gauche/droite avant envoi ([com.guyiome.androidmocap.tracking.mirrorFaceTrackingResult]) --
      * **activé par défaut** : l'aperçu caméra/mesh à l'écran est déjà mirroré en permanence
      * (indépendant de ce réglage, voir `FaceMeshOverlay`), donc avoir la donnée réseau mirorée par
@@ -249,7 +249,7 @@ class AppSettingsStore(private val context: Context) {
     }
 
     /**
-     * Détection expérimentale de la langue tirée (revue technique, point 15) -- **désactivée par
+     * Détection expérimentale de la langue tirée -- **désactivée par
      * défaut**, rangée dans "Fonctionnalités expérimentales". Active la cascade à 3 étages (porte
      * `jawOpen`+`mouthOpennessRatio`, analyse couleur, classification par embedding calibrée) et le
      * logging de diagnostic (`TONGUE_DIAGNOSTIC_LOGGING`, `MainViewModel`).
@@ -260,7 +260,7 @@ class AppSettingsStore(private val context: Context) {
      * mâchoire, `TongueCalibrationRecordingState.kt`) et un anti-rebond dédié
      * (`TongueOutInjectionGate.kt`) filtrant le résidu d'erreurs isolées encore observé. Risque
      * résiduel faible mais non nul, assumé -- fonctionnalité rangée dans "Expérimental" précisément
-     * pour cette raison, voir revue technique point 15 pour le détail des deux sessions.
+     * pour cette raison.
      */
     val tongueOutDetectionEnabled: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
         prefs[Keys.TONGUE_OUT_DETECTION] ?: false
@@ -271,7 +271,7 @@ class AppSettingsStore(private val context: Context) {
     }
 
     /**
-     * Miroir UI-only de l'état réel de la calibration de l'étage 3 (revue technique, point 15) --
+     * Miroir UI-only de l'état réel de la calibration de l'étage 3 --
      * la source de vérité reste `TongueCalibrationStore.load() != null` (fichier `filesDir`, pas
      * DataStore : deux vecteurs de floats n'ont pas leur place dans des préférences scalaires).
      * Ce flag évite juste une lecture disque réactive à chaque recomposition de l'écran de
@@ -291,7 +291,7 @@ class AppSettingsStore(private val context: Context) {
      * `TongueCalibrationRecordingState.DEFAULT_CALIBRATION_RECORDING_DURATION_MS`) : les étages 1/2
      * ont demandé sept sessions de réglage sur device, éviter le même cycle rebuild+reinstall pour
      * chaque essai ici. Les deux phases ("langue dehors"/"langue rentrée") en dérivent chacune par
-     * leur propre multiplicateur depuis le 13 août 2026 (point 56) -- voir
+     * leur propre multiplicateur depuis le 13 août 2026 -- voir
      * `TONGUE_OUT_RECORDING_MULTIPLIER`/`TONGUE_IN_RECORDING_MULTIPLIER`, pas la valeur brute
      * directement.
      */
@@ -314,7 +314,7 @@ class AppSettingsStore(private val context: Context) {
     }
 
     /**
-     * Horodatage (epoch ms) de la dernière vérification de mise à jour réussie (point 14) -- `0L`
+     * Horodatage (epoch ms) de la dernière vérification de mise à jour réussie -- `0L`
      * par défaut (jamais vérifié). Sert uniquement de seuil de rafraîchissement
      * (`MainViewModel.checkForUpdate`, throttle 24h) pour éviter un appel réseau à chaque
      * lancement ; mis à jour seulement après un appel réussi, pas après un échec réseau, pour

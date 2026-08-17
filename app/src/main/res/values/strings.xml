@@ -1,6 +1,6 @@
 <resources>
-    <!-- Défaut/repli (langues système non reconnues -> anglais, plus universel que le français ;
-         voir AndroidMoCap_revue_technique.md, point 23). Version française : res/values-fr/. -->
+    <!-- Défaut/repli (langues système non reconnues -> anglais, plus universel que le français).
+         Version française : res/values-fr/. -->
     <string name="app_name">AndroidMoCap</string>
 
     <!-- Shared across screens -->
@@ -65,7 +65,7 @@
     <string name="connection_udp_status">UDP connection: %1$s</string>
     <string name="connection_choose_type_hint">Choose a connection type above to see its settings.</string>
 
-    <!-- VTube Studio (Plugin API, direct connection, point 39) -->
+    <!-- VTube Studio (Plugin API, direct connection) -->
     <string name="connection_vts_section_title">VTube Studio (Plugin API)</string>
     <string name="connection_vts_ip_label">PC IP address</string>
     <string name="connection_vts_port_label">Port</string>
@@ -81,7 +81,7 @@
     <string name="connection_vts_translation_hint">Sends VTube Studio\'s default parameters (FaceAngleX, MouthSmile…) instead of the raw ARKit blendshapes, computed the same way VBridger does -- so a model already rigged for VBridger/VTS defaults reacts without running VBridger. Head position is not included (never computed by this app).</string>
     <string name="connection_vts_view_formulas_button">View sent parameters</string>
 
-    <!-- VTube Studio parameter list (point 41) -->
+    <!-- VTube Studio parameter list -->
     <string name="vts_formulas_title">VTube Studio parameters</string>
     <string name="vts_formulas_group_raw">Raw ARKit blendshapes</string>
     <string name="vts_formulas_group_vbridger">VBridger formulas</string>
@@ -98,9 +98,9 @@
     <string name="diagnostics_delegate">Delegate: %1$s</string>
     <string name="diagnostics_face_detected">Face detected: %1$s</string>
     <string name="diagnostics_inference_latency">Inference latency: %1$d ms</string>
-    <!-- Temporary diagnostic (point 28, eye/blink/glasses), see kdoc on DiagnosticsScreen's
+    <!-- Temporary diagnostic (eye/blink/glasses), see kdoc on DiagnosticsScreen's
          eyeAspectRatioGroupA/B parameters. Not meant to stay as-is long term. -->
-    <string name="diagnostics_ear_debug_label">Eye Aspect Ratio diagnostic (point 28)</string>
+    <string name="diagnostics_ear_debug_label">Eye Aspect Ratio diagnostic</string>
     <string name="diagnostics_ear_debug_value">Group A: %1$s · Group B: %2$s</string>
     <string name="diagnostics_ear_debug_hint">Needs the tracking mesh overlay enabled (Display &amp; comfort) for non-zero values.</string>
     <string name="diagnostics_calibrated">Neutral pose: calibrated</string>
@@ -148,7 +148,7 @@
     <string name="display_power_save_description">After the delay below without touching the screen: dimmed screen, hidden camera preview (tracking and sending keep running normally). A single tap exits it.</string>
     <string name="display_power_save_delay">Idle delay: %1$d s</string>
     <string name="display_low_battery_threshold">Low battery alert threshold: %1$d%%</string>
-    <!-- In-app language selector (point 30), works on all Android versions, unlike the native
+    <!-- In-app language selector, works on all Android versions, unlike the native
          system per-app language picker (Settings > Apps > App languages), which only exists since
          Android 13. -->
     <string name="display_language_label">App language</string>

@@ -16,8 +16,8 @@ import androidx.compose.ui.unit.dp
 import com.guyiome.androidmocap.R
 
 /**
- * Une ligne du panneau -- [rawScore] est la valeur avant pondération par blendshape (point 18,
- * `AppSettingsStore.blendshapeWeights`), [correctedScore] après. Égales pour tout blendshape
+ * Une ligne du panneau -- [rawScore] est la valeur avant pondération par blendshape
+ * (`AppSettingsStore.blendshapeWeights`), [correctedScore] après. Égales pour tout blendshape
  * réglé à son poids neutre (l'immense majorité) -- voir kdoc de [BlendshapePanel] pour l'affichage
  * conditionnel qui en découle.
  */
@@ -43,7 +43,7 @@ data class BlendshapePanelEntry(val name: String, val rawScore: Float, val corre
  * côté [MainScreen] (marge de sécurité pour ce qui reste), pas revérifié visuellement sur device
  * (aucun device dans ce sandbox).
  *
- * **Brute -> corrigée** (point 18, 16 août 2026) : affichée seulement quand un poids non-neutre
+ * **Brute -> corrigée** (16 août 2026) : affichée seulement quand un poids non-neutre
  * fait réellement diverger les deux valeurs d'une [BlendshapePanelEntry] -- pour la grande majorité
  * des blendshapes (poids resté à 1.0, jamais touché), une seule valeur reste affichée comme avant.
  * Décision délibérée pour ne pas doubler l'affichage des ~52 lignes possibles alors que seuls
