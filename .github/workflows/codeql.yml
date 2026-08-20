@@ -49,7 +49,10 @@ jobs:
           build-mode: manual
 
       - name: Build debug (nécessaire pour l'extraction CodeQL en build-mode manuel)
-        run: ./gradlew assembleDebug
+        # --no-build-cache : sans ça, si build-and-test a déjà tourné sur ce même commit,
+        # compileDebugKotlin ressort UP-TO-DATE/FROM-CACHE, aucun compilateur n'est réellement
+        # invoqué et CodeQL échoue avec "could not process any code written in Java/Kotlin".
+        run: ./gradlew clean assembleDebug --no-build-cache
 
       - name: Exécuter l'analyse CodeQL
         uses: github/codeql-action/analyze@v3
