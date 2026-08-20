@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest an idea for this project
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+
+  - type: markdown
+    attributes:
+      value: |
+        Per `docs/CONTRIBUTING.md`, please open this issue before working on a pull request for
+        anything non-trivial -- this project is maintained by one person, and an upfront
+        discussion avoids duplicated work on either side.
