@@ -1,0 +1,77 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Tracking behavior can vary a lot by device and
+        configuration, so the fields below help narrow it down quickly.
+
+  - type: input
+    id: device
+    attributes:
+      label: Phone model
+      placeholder: e.g. Pixel 8, Samsung Galaxy S23
+    validations:
+      required: true
+
+  - type: input
+    id: android-version
+    attributes:
+      label: Android version
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Tracking tier (Settings > Advanced > Diagnostics)
+      options:
+        - COMPATIBLE
+        - STANDARD
+        - OPTIMAL
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: target
+    attributes:
+      label: Network target
+      options:
+        - Blender/Unity (VMC/OSC)
+        - VBridger (UDP)
+        - VTube Studio (Plugin API)
+        - Not applicable
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >
+        Export logs from Settings > Advanced > Logging and attach the file here (drag & drop) --
+        more reliable than describing behavior from memory. IP addresses are masked automatically
+        outside debug builds, no face-tracking data is ever logged.
+
+  - type: checkboxes
+    id: security-confirmation
+    attributes:
+      label: Confirmation
+      options:
+        - label: This is not a security vulnerability report (those go through [private reporting](https://github.com/guyiome/AndroidMoCap/security/advisories/new) instead)
+          required: true
