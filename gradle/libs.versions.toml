@@ -5,7 +5,7 @@ junit = "4.13.2"
 coreKtx = "1.19.0"
 lifecycleRuntimeKtx = "2.11.0"
 activityCompose = "1.13.0"
-composeBom = "2026.06.01"
+composeBom = "2026.08.00"
 camerax = "1.5.1"
 arcore = "1.54.0"
 mediapipeTasksVision = "1.0.0"
@@ -13,9 +13,10 @@ javaosc = "0.9"
 datastorePreferences = "1.1.7"
 nvWebsocketClient = "2.14"
 kotlinxSerializationJson = "1.11.0"
-# 1.7.1 : dernière version stable au moment de l'ajout (1.8.0-rc01 est une pré-version, exclue --
-# vérifié via dl.google.com/android/maven2, search.maven.org n'indexe pas les artefacts AndroidX).
-appcompat = "1.7.1"
+# 1.8.0 : releve le minSdk par defaut de la lib a 23 (sans impact, minSdk du projet deja a 30) et
+# corrige un bug de dispatch de configuration dans AppCompatActivity lie aux locales par-app (b/321896385),
+# pertinent pour le selecteur de langue in-app (point 30/43 de la revue technique).
+appcompat = "1.8.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
