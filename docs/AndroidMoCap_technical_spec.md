@@ -339,7 +339,11 @@ in-app selector covers the same need (`ComfortSettingsScreen`, "App language" se
 across launches on every version (AppCompat's own storage under API 33, delegated to the platform
 `LocaleManager` beyond that) -- no DataStore or custom persistence code needed for this project.
 Changing the language recreates the Activity (documented AppCompat behavior): a settings screen open
-at that moment closes and returns to the main screen, a minor cosmetic effect rather than a bug. The
+at that moment closes and returns to the main screen, a minor cosmetic effect rather than a bug.
+`MainViewModel.rebindTrackingPipeline()` rebinds the camera source and its lifecycle-driven
+companions to the new Activity's `LifecycleOwner` when this happens (the ViewModel itself survives
+the recreate) -- without it, the preview/mesh overlay froze for good (see revue technique point 63).
+The
 52 ARKit blendshape names (`jawOpen`, `mouthSmileLeft`...) and technical protocol identifiers
 (`ConnectionType.IFACIALMOCAP`...) are deliberately not translated -- protocol vocabulary, not
 display text. Error messages emitted outside `@Composable` code (`MainViewModel`,
