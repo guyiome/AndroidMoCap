@@ -161,6 +161,11 @@ mais pas librement redistribuable comme produit concurrent.
 Voir `docs/CONTRIBUTING_FR.md` avant d'ouvrir une pull request -- toute contribution
 suppose l'acceptation de l'accord de licence contributeur (`docs/CLA_FR.md`).
 
+## Sécurité
+
+Trouvé une faille ? Voir `docs/SECURITY_FR.md` -- merci de la signaler en privé plutôt que via une
+issue publique.
+
 ## Publier une version (mainteneur)
 
 Signature configurée via des variables d'environnement (`RELEASE_KEYSTORE_BASE64`,

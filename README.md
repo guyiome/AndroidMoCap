@@ -153,6 +153,11 @@ competing product.
 See `docs/CONTRIBUTING.md` before opening a pull request -- any contribution implies
 acceptance of the contributor license agreement (`docs/CLA.md`).
 
+## Security
+
+Found a vulnerability? See `docs/SECURITY.md` -- please report it privately rather than as a
+public issue.
+
 ## Publishing a release (maintainer)
 
 Signing configured via environment variables (`RELEASE_KEYSTORE_BASE64`,
