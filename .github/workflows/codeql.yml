@@ -1,0 +1,57 @@
+name: CodeQL
+
+# Analyse de sécurité statique (build-mode manuel : l'auto-build de CodeQL gère mal ce Gradle
+# multi-module, et le modèle MediaPipe doit être présent avant toute compilation, comme dans
+# ci.yml). Se déclenche sur push/PR vers main (mêmes garde-fous que ci.yml) et une fois par
+# semaine pour attraper les nouvelles règles CodeQL même sans changement de code. Résultats dans
+# l'onglet Security > Code scanning, pas dans les logs de ce workflow.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: "17 3 * * 1"
+
+jobs:
+  analyze:
+    name: Analyze (java-kotlin)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v7
+
+      - name: Installer le JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Configurer Gradle (cache "enhanced", gratuit sur repo public)
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Télécharger le modèle MediaPipe (voir README, non versionné)
+        run: |
+          mkdir -p app/src/main/assets
+          curl -fL -o app/src/main/assets/face_landmarker.task \
+            https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task
+
+      - name: Initialiser CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java-kotlin
+          build-mode: manual
+
+      - name: Build debug (nécessaire pour l'extraction CodeQL en build-mode manuel)
+        run: ./gradlew assembleDebug
+
+      - name: Exécuter l'analyse CodeQL
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:java-kotlin"
