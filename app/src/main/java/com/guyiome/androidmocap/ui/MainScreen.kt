@@ -73,7 +73,9 @@ fun MainScreen(
     // le fond caméra live y est dessiné en interne (drawCameraBackground), ce Compose AndroidView
     // n'est qu'un hôte. Toujours créé (même coût que previewView ci-dessus, symétrique) mais
     // seulement attaché à ArCoreHeadPoseTracker quand uiState.usingArCoreCameraSource est actif,
-    // voir plus bas.
+    // voir plus bas -- attachArCoreSurface() doit rester appelé depuis le factory de l'AndroidView
+    // (avant l'attachement à la fenêtre, contrainte GLSurfaceView.setRenderer()), jamais depuis un
+    // LaunchedEffect asynchrone, voir le kdoc de MainViewModel.attachArCoreSurface.
     val glSurfaceView = remember { GLSurfaceView(context) }
     // Menu des réglages + ses six catégories (refonte des menus, regroupement par intention
     // utilisateur) -- un booléen par écran conditionnel, chacun ouvert directement depuis

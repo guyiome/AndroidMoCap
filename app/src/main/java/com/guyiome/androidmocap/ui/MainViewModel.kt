@@ -427,6 +427,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // variable locale d'initializeTracking(), jamais stocké ailleurs jusqu'ici).
     private var currentTierConfig: TierConfig? = null
     private var currentDebugForceGpuUnavailable: Boolean = false
+    // Même besoin que currentDebugForceGpuUnavailable ci-dessus, pour la même raison : consulté à
+    // nouveau depuis rebindTrackingPipeline() (voir plus bas) sans repasser par le DataStore.
+    private var currentDebugForceArCoreUnavailable: Boolean = false
     // Chargée une fois (paresseusement, au premier besoin) puis gardée en mémoire -- pas relue à
     // chaque frame, seulement mise à jour après un enregistrement de calibration réussi. @Volatile :
     // écrite sur Dispatchers.IO (chargement initial, sauvegarde de calibration) mais lue depuis le
@@ -510,6 +513,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // FaceLandmarkerHelper et un CameraController complets par-dessus les précédents, sans jamais
     // fermer/arrêter ceux-là (fuite du FaceLandmarker natif et du thread caméra dédié).
     private var trackingInitialized = false
+    // Le lifecycleOwner effectivement utilisé pour lier la source caméra actuelle -- comparé par
+    // identité (pas juste trackingInitialized) à chaque appel d'initializeTracking(), voir son
+    // usage plus bas et le kdoc de rebindTrackingPipeline().
+    private var trackingLifecycleOwner: LifecycleOwner? = null
 
     init {
         // Langue forcée : lue une seule fois ici, pas de Flow à collecter -- AppCompat
@@ -716,7 +723,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * `MainScreen`, déjà une coroutine.
      */
     suspend fun initializeTracking(lifecycleOwner: LifecycleOwner) {
-        if (trackingInitialized) return
+        if (trackingInitialized) {
+            // Un lifecycleOwner différent de celui déjà lié signifie que l'Activity a été recréée
+            // (changement de langue via setApplicationLocales(), mais aussi tout autre changement
+            // de configuration non déclaré dans android:configChanges -- taille de police,
+            // thème sombre/clair, redimensionnement multi-fenêtre...) alors que ce ViewModel, lui,
+            // a survécu (comportement normal d'AndroidX). Sans ce rebind, la source caméra restait
+            // liée à l'ancien lifecycle, désormais DESTROYED : CameraX se délie tout seul dessus, et
+            // côté ARCore la session restait indéfiniment en pause faute d'un nouvel appel à
+            // start() (l'observer ON_START/ON_STOP n'existait que sur l'ancien lifecycleOwner).
+            // Confirmé sur device (palier OPTIMAL) : aperçu et overlay figés pour de bon après un
+            // changement de langue, seul un redémarrage complet de l'app s'en remettait.
+            if (lifecycleOwner !== trackingLifecycleOwner) {
+                rebindTrackingPipeline(lifecycleOwner)
+            }
+            return
+        }
         trackingInitialized = true
 
         // Synchronisé ici de façon anticipée/bloquante (pas seulement via le collecteur réactif de
@@ -747,6 +769,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         thermalThrottleState = ThermalThrottleState.initial(nominalFps = tierConfig.targetFps)
         currentTierConfig = tierConfig
         currentDebugForceGpuUnavailable = debugForceGpuUnavailable
+        currentDebugForceArCoreUnavailable = debugForceArCoreUnavailable
         // Course d'initialisation corrigée le 11 août 2026, confirmée sur device : le collecteur
         // tongueOutDetectionEnabled (init{}) se déclenche dès la création du ViewModel, AVANT que
         // initializeTracking() (suspend fun, appelée depuis un LaunchedEffect côté UI donc après
@@ -792,51 +815,97 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         _uiState.update { it.copy(activeDelegateIsGpu = helper.activeDelegateIsGpu) }
 
-        // Palier OPTIMAL : ARCore Augmented Faces pilote sa propre caméra (frontale) et sert de
-        // source de pose de tête, à la place de CameraX -- les deux ne peuvent pas se partager la
-        // caméra. Sinon (STANDARD/COMPATIBLE, ou repli), CameraX
-        // comme avant. ArCoreHeadPoseTracker continue de nourrir MediaPipe (blendshapes) via le
-        // même detectAsync que CameraController -- rien ne change côté FaceLandmarkerHelper.
-        if (tierConfig.useArCorePose && !debugForceArCoreUnavailable) {
-            val arCoreTracker = ArCoreHeadPoseTracker(
-                context = context,
-                onFrame = { image, timestampMs -> faceLandmarkerHelper?.detectAsync(image, timestampMs) },
-                onHeadPoseRotationMatrix = { matrix -> latestArCoreHeadRotationMatrix = matrix },
-                onError = ::handleError,
-                // Repli automatique et silencieux sur CameraX si Augmented Faces s'avère
-                // indisponible à l'usage malgré le palier OPTIMAL choisi (ARCore non installé,
-                // appareil incompatible, config caméra frontale refusée...) -- pas d'erreur
-                // affichée à l'utilisateur pour ce cas précis : c'est un repli attendu, pas une panne.
-                // Le fallback ne démarre pas cameraController lui-même (pas de PreviewView
-                // disponible ici, elle vit côté MainScreen) : le construire suffit -- l'appel
-                // startCamera(previewView) déjà fait par MainScreen juste après
-                // initializeTracking() (même LaunchedEffect) le démarrera normalement, puisque
-                // ce repli est synchrone (tryCreateSession() ne fait aucun appel asynchrone) et
-                // se termine donc avant que MainScreen n'appelle startCamera().
-                onUnavailable = { message ->
-                    AppLog.w(TAG, "ARCore indisponible, repli sur CameraX : $message")
-                    // close() avant de nuller la référence -- sans ça, imageProcessingExecutor
-                    // (thread dédié créé dès la construction, avant même start()) fuyait pour le
-                    // reste de la session (relecture du 7 août 2026).
-                    arCoreHeadPoseTracker?.close()
-                    arCoreHeadPoseTracker = null
-                    _uiState.update { it.copy(usingArCoreCameraSource = false) }
-                    cameraController = createCameraController(context, lifecycleOwner, tierConfig)
-                },
-                initialTargetFps = tierConfig.targetFps,
-            )
-            arCoreHeadPoseTracker = arCoreTracker
-            _uiState.update { it.copy(usingArCoreCameraSource = true) }
-            // Tenté tout de suite (pas seulement sur ON_START ci-dessous) : appelé une seconde
-            // fois sans risque quand l'observer ON_START se déclenche (Session.resume() sur une
-            // session déjà reprise est un no-op documenté côté ARCore) -- le but ici est de
-            // détecter tout de suite une indisponibilité (onUnavailable ci-dessus) pendant qu'on
-            // est encore dans initializeTracking(), plutôt que de découvrir le repli plus tard.
-            arCoreTracker.start()
+        rebindTrackingPipeline(lifecycleOwner)
+
+        // Dernière étape : tout ce qui précède est fait (palier choisi, modèle MediaPipe chargé,
+        // source caméra construite) -- MainScreen peut remplacer l'écran de chargement par l'aperçu
+        // caméra/HUD. startCamera(), appelé juste après par MainScreen dans le même LaunchedEffect,
+        // n'est pas suspend et retourne avant la toute première frame -- simplification acceptée
+        // (écran de chargement volontairement simple) plutôt que d'attendre un signal plus tardif
+        // comme la première frame réellement traitée.
+        _uiState.update { it.copy(isInitializing = false) }
+    }
+
+    /**
+     * (Re)lie tout ce qui est spécifiquement porté par [lifecycleOwner] : la source caméra CameraX
+     * (`CameraController`, qui se lie à un lifecycle une fois pour toutes via `bindToLifecycle` et
+     * ne peut donc pas être réutilisée pour un autre owner, voir son kdoc `stop()`), et l'observer
+     * ON_START/ON_STOP (gyroscope, sondage thermique, reprise/pause d'ARCore). Appelée une première
+     * fois depuis [initializeTracking] à l'initialisation, puis à nouveau chaque fois qu'un
+     * *nouveau* lifecycleOwner apparaît plus tard (voir le garde dans [initializeTracking]).
+     *
+     * **`arCoreHeadPoseTracker`, volontairement, n'est jamais recréé ici.** Contrairement à
+     * `CameraController`, il est construit avec `getApplication()` (jamais l'Activity) et ne tient
+     * donc aucune référence à un lifecycle -- rien à reconstruire pour un nouveau lifecycleOwner. Le
+     * reconstruire ici casserait aussi une contrainte de `GLSurfaceView` : `setRenderer()` (dans
+     * `attachTo()`, appelé depuis le `factory` de l'`AndroidView` côté `MainScreen`, *avant* que la
+     * vue ne soit attachée à la fenêtre) doit précéder la création de la surface -- si `factory`
+     * tourne (comme c'est le cas ici) avant que ce rebind asynchrone n'ait eu la main, une nouvelle
+     * instance n'existerait pas encore pour lui. Confirmé sur device : la première tentative de ce
+     * correctif reconstruisait `arCoreHeadPoseTracker` ici, provoquant un
+     * `NullPointerException: GLSurfaceView$GLThread.surfaceCreated() on a null object reference`
+     * (`setRenderer()` jamais appelé sur la bonne instance) -- aperçu et overlay figés comme avant,
+     * mais pour une raison différente du bug d'origine.
+     */
+    private fun rebindTrackingPipeline(lifecycleOwner: LifecycleOwner) {
+        val context = getApplication<Application>()
+        val tierConfig = currentTierConfig ?: return
+        // Distingue l'appel d'initialisation (log silencieux, déjà couvert par "Palier retenu" juste
+        // avant) d'un vrai rebind post-recréation d'Activity, pour que ce dernier laisse une trace
+        // dans les logs exportables plutôt que d'être un événement invisible.
+        val isRebind = trackingLifecycleOwner != null
+
+        thermalPollingJob?.cancel()
+        trackingLifecycleOwner = lifecycleOwner
+        if (isRebind) {
+            AppLog.i(TAG, "Activity recréée (changement de langue ou autre config), rattachement du pipeline de tracking")
+        }
+
+        if (tierConfig.useArCorePose && !currentDebugForceArCoreUnavailable) {
+            // Construit une seule fois (premier appel, tier OPTIMAL) -- voir le kdoc ci-dessus pour
+            // pourquoi un rebind ultérieur ne doit PAS recréer cette instance.
+            if (arCoreHeadPoseTracker == null) {
+                val arCoreTracker = ArCoreHeadPoseTracker(
+                    context = context,
+                    onFrame = { image, timestampMs -> faceLandmarkerHelper?.detectAsync(image, timestampMs) },
+                    onHeadPoseRotationMatrix = { matrix -> latestArCoreHeadRotationMatrix = matrix },
+                    onError = ::handleError,
+                    // Repli automatique et silencieux sur CameraX si Augmented Faces s'avère
+                    // indisponible à l'usage malgré le palier OPTIMAL choisi (ARCore non installé,
+                    // appareil incompatible, config caméra frontale refusée...) -- pas d'erreur
+                    // affichée à l'utilisateur pour ce cas précis : c'est un repli attendu, pas une panne.
+                    onUnavailable = { message ->
+                        AppLog.w(TAG, "ARCore indisponible, repli sur CameraX : $message")
+                        // close() avant de nuller la référence -- sans ça, imageProcessingExecutor
+                        // (thread dédié créé dès la construction, avant même start()) fuyait pour le
+                        // reste de la session (relecture du 7 août 2026).
+                        arCoreHeadPoseTracker?.close()
+                        arCoreHeadPoseTracker = null
+                        _uiState.update { it.copy(usingArCoreCameraSource = false) }
+                        // trackingLifecycleOwner (champ, toujours à jour) plutôt que le paramètre
+                        // lifecycleOwner capturé ici : ce callback peut se déclencher bien après un
+                        // rebind ultérieur, l'owner capturé à la construction serait alors périmé.
+                        cameraController = createCameraController(context, trackingLifecycleOwner!!, tierConfig)
+                    },
+                    initialTargetFps = tierConfig.targetFps,
+                )
+                arCoreHeadPoseTracker = arCoreTracker
+                _uiState.update { it.copy(usingArCoreCameraSource = true) }
+                // Tenté tout de suite (pas seulement sur ON_START ci-dessous) : appelé une seconde
+                // fois sans risque quand l'observer ON_START se déclenche (Session.resume() sur une
+                // session déjà reprise est un no-op documenté côté ARCore) -- le but ici est de
+                // détecter tout de suite une indisponibilité (onUnavailable ci-dessus) pendant qu'on
+                // est encore dans initializeTracking(), plutôt que de découvrir le repli plus tard.
+                arCoreTracker.start()
+            }
         } else {
-            if (tierConfig.useArCorePose && debugForceArCoreUnavailable) {
+            if (tierConfig.useArCorePose && currentDebugForceArCoreUnavailable) {
                 AppLog.w(TAG, "Mock de debug : ARCore forcé indisponible, repli CameraX simulé.")
             }
+            // CameraController, lui, EST lié au lifecycleOwner (bindToLifecycle) et doit donc être
+            // reconstruit à chaque nouvel owner -- stop() arrête un executor non redémarrable
+            // (voir son kdoc), l'ancienne instance ne peut donc pas être réutilisée telle quelle.
+            cameraController?.stop()
             cameraController = createCameraController(context, lifecycleOwner, tierConfig)
         }
 
@@ -846,6 +915,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // ON_START et ON_STOP, comme le fait CameraX pour la caméra -- même principe étendu ici à
         // ArCoreHeadPoseTracker, qui doit lui aussi être explicitement pausé/repris (contrairement
         // à CameraController, dont le cycle de vie est déjà géré par CameraX via bindToLifecycle).
+        // Reconstruit à chaque rebind (contrairement à arCoreHeadPoseTracker) : pas de contrainte
+        // GLSurfaceView ici, et l'ancien était de toute façon déjà arrêté par l'observer précédent
+        // sur l'ancien lifecycleOwner (ON_STOP, lors de la destruction de l'ancienne Activity).
         val tracker = DeviceOrientationTracker(context)
         deviceOrientationTracker = tracker
         lifecycleOwner.lifecycle.addObserver(LifecycleEventObserver { _, event ->
@@ -863,14 +935,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 else -> Unit
             }
         })
-
-        // Dernière étape : tout ce qui précède est fait (palier choisi, modèle MediaPipe chargé,
-        // source caméra construite) -- MainScreen peut remplacer l'écran de chargement par l'aperçu
-        // caméra/HUD. startCamera(), appelé juste après par MainScreen dans le même LaunchedEffect,
-        // n'est pas suspend et retourne avant la toute première frame -- simplification acceptée
-        // (écran de chargement volontairement simple) plutôt que d'attendre un signal plus tardif
-        // comme la première frame réellement traitée.
-        _uiState.update { it.copy(isInitializing = false) }
     }
 
     /**
@@ -934,6 +998,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * [MainUiState.usingArCoreCameraSource] est actif -- requis par ARCore, qui ne peut piloter la
      * caméra qu'à travers une texture GL (voir [ArCoreHeadPoseTracker.attachTo]). No-op si ARCore
      * n'est pas la source active (ex. repli CameraX déjà effectué).
+     *
+     * Doit être appelé depuis le `factory` de l'`AndroidView` qui héberge ce `glSurfaceView`, pas
+     * depuis un effet asynchrone (`LaunchedEffect`) -- `attachTo()` appelle
+     * `GLSurfaceView.setRenderer()`, qui **doit** précéder l'attachement de la vue à la fenêtre
+     * (contrainte du framework), et `factory` est le seul point qui s'exécute avant cet attachement.
+     * [arCoreHeadPoseTracker] survit lui-même à une recréation d'Activity (voir le kdoc de
+     * [rebindTrackingPipeline]), donc `factory` retrouve toujours une instance valide, y compris
+     * juste après un changement de langue.
      */
     fun attachArCoreSurface(glSurfaceView: GLSurfaceView) {
         arCoreHeadPoseTracker?.attachTo(glSurfaceView)

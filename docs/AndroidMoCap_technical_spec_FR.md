@@ -355,7 +355,10 @@ automatiquement d'un lancement à l'autre sur toutes les versions (stockage prop
 API 33, délégué au `LocaleManager` plateforme au-delà) -- sans DataStore ni code de persistance
 propre à ce projet. Changer la langue recrée l'Activity (comportement AppCompat documenté) : un
 écran de réglages ouvert au moment du changement se ferme et revient à l'écran principal, cosmétique
-mineur plutôt qu'un bug. Les 52 noms de blendshapes ARKit (`jawOpen`, `mouthSmileLeft`...) et les
+mineur plutôt qu'un bug. `MainViewModel.rebindTrackingPipeline()` relie la source caméra et ses
+compagnons pilotés par le cycle de vie au nouveau `LifecycleOwner` de l'Activity quand ça arrive (le
+ViewModel, lui, survit à la recréation) -- sans ça, l'aperçu/l'overlay de mesh gelait pour de bon
+(voir revue technique, point 63). Les 52 noms de blendshapes ARKit (`jawOpen`, `mouthSmileLeft`...) et les
 identifiants techniques de protocole (`ConnectionType.IFACIALMOCAP`...) ne sont volontairement pas
 traduits -- vocabulaire de protocole, pas texte d'affichage. Les messages d'erreur émis hors
 `@Composable` (`MainViewModel`, `CameraController`, `FaceLandmarkerHelper`) sont résolus via
