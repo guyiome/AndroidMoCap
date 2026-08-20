@@ -32,5 +32,5 @@ jobs:
           curl -fL -o app/src/main/assets/face_landmarker.task \
             https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task
 
-      - name: Tests unitaires + build debug
-        run: ./gradlew testDebugUnitTest assembleDebug
+      - name: Tests unitaires + build debug + lint
+        run: ./gradlew testDebugUnitTest assembleDebug lintDebug
