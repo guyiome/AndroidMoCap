@@ -45,7 +45,7 @@
     <string name="camera_permission_rationale">The front camera is required for facial capture.</string>
     <string name="action_grant_camera_permission">Allow camera access</string>
     <string name="loading_message">Loading…</string>
-    <string name="loading_logo_credit">Logo by Nyacchii (Placeholder)</string>
+    <string name="loading_logo_credit">Logo by @clem_dreaw</string>
 
     <!-- Connection screen -->
     <string name="connection_title">Connection</string>
