@@ -10,12 +10,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -30,19 +32,32 @@ import com.guyiome.androidmocap.R
  * progression réelle exploitable (un seul appel bloquant, `FaceLandmarkerHelper.setup()`, domine le
  * temps total), une barre déterminée inventerait une précision qui n'existe pas.
  *
- * Réutilise l'illustration de l'icône de lancement ([R.drawable.ic_launcher_foreground_source],
- * déjà versionnée pour générer l'icône adaptative) comme logo -- pas de doublon d'asset à
- * maintenir, cohérent avec ce que l'utilisateur voit déjà sur son écran d'accueil. Toujours un
- * placeholder (en attente d'un logo dessiné par un.e artiste) -- crédit en bas à gauche par
- * discrétion/honnêteté envers l'auteurice de l'image actuelle, sans revendiquer un logo final.
+ * Réutilise l'illustration de l'icône de lancement ([R.drawable.ic_launcher_foreground], déjà
+ * versionnée pour l'icône adaptative) comme logo -- pas de doublon d'asset à maintenir, cohérent
+ * avec ce que l'utilisateur voit déjà sur son écran d'accueil. Depuis le 28 août 2026, ce n'est
+ * plus un placeholder mais le logo définitif, par @clem_dreaw (voir mipmap-anydpi-v26/
+ * ic_launcher.xml pour le détail du choix de cadrage et de format) -- le crédit en bas à gauche
+ * reste, désormais comme attribution d'artiste et non plus comme réserve sur un placeholder.
+ *
+ * Contrairement aux placeholders précédents (sujet détouré sur fond transparent), cette
+ * illustration est plein cadre : affichée telle quelle, elle formerait un carré à bords nets
+ * tranchant sur le fond sombre. D'où le [clip] en coins arrondis, qui rappelle la forme sous
+ * laquelle l'utilisateur vient de voir cette même image sur son écran d'accueil. Le fond
+ * rose/magenta de l'illustration, que le masque du launcher supprime sur l'icône, est en revanche
+ * bien visible ici : aucun masque n'est appliqué, c'est le seul endroit de l'app où l'artwork
+ * s'affiche dans son cadrage complet.
  */
 @Composable
 fun LoadingScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            // Même couleur que le fond de l'icône adaptative (ic_launcher_background.xml) --
-            // continuité visuelle avec l'icône affichée juste avant que cet écran apparaisse.
+            // Même valeur que ic_launcher_background.xml, mais la justification d'origine
+            // ("continuité visuelle avec l'icône") ne tient plus depuis le logo plein cadre du
+            // 28 août 2026 : cette couche de fond de l'icône est désormais intégralement
+            // recouverte par l'artwork, donc jamais visible sur l'écran d'accueil. Ce gris-bleu
+            // sombre reste néanmoins le bon choix ici -- il laisse ressortir le logo et sa
+            // dominante rose sans jurer avec, là où un noir pur durcirait le contraste.
             .background(Color(0xFF1B1F27)),
     ) {
         Column(
@@ -50,10 +65,14 @@ fun LoadingScreen() {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Image(
-                painter = painterResource(R.drawable.ic_launcher_foreground_source),
+                painter = painterResource(R.drawable.ic_launcher_foreground),
                 // Décoratif -- le message texte juste en dessous porte déjà l'information d'état.
                 contentDescription = null,
-                modifier = Modifier.size(140.dp),
+                // 20.dp sur 140.dp : même proportion de rayon que le squircle appliqué par les
+                // launchers à l'icône, pour que les deux se répondent (voir kdoc de tête).
+                modifier = Modifier
+                    .size(140.dp)
+                    .clip(RoundedCornerShape(20.dp)),
             )
             Spacer(Modifier.height(24.dp))
             Text(
@@ -75,9 +94,10 @@ fun LoadingScreen() {
             )
         }
 
-        // Crédit du placeholder actuel -- discret, coin bas-gauche, jamais confondu
-        // avec le contenu central (message/progression). Pas un habillage permanent : à retirer
-        // quand un vrai logo d'artiste remplace ce placeholder.
+        // Attribution de l'artiste -- discrète, coin bas-gauche, jamais confondue avec le contenu
+        // central (message/progression). Contrairement à la version placeholder de cette ligne,
+        // elle a désormais vocation à rester : c'est le crédit du logo définitif, pas une réserve
+        // temporaire.
         Text(
             stringResource(R.string.loading_logo_credit),
             color = Color.White.copy(alpha = 0.4f),

@@ -1,4 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+     Logo par @clem_dreaw (28 août 2026), premier vrai logo d'artiste du projet : il remplace la
+     succession de placeholders précédents (visage mi-mesh, puis chiot husky par Nyacchii) et clôt
+     le point 62 du brouillon todo. Le personnage porte le mesh de tracking cyan sur une moitié de
+     visage, soit exactement le sujet de l'app.
+
+     Contrairement aux placeholders, cette illustration est PLEIN CADRE (fond peint intégré, opaque
+     jusqu'aux bords à un fondu de 1 à 2 % près) et non un sujet détouré sur fond transparent. D'où
+     la disparition du wrapper drawable/ic_launcher_foreground.xml et de son inset de 12 % : sur une
+     image plein cadre, un inset produirait un rectangle d'artwork flottant au milieu d'une bordure
+     sombre. Le bitmap est donc référencé directement, et c'est le masque du launcher (cercle,
+     squircle…) qui recadre, comme pour toute icône illustrative.
+
+     Conséquence assumée du masquage, vérifiée en composant les variantes avant de trancher : le
+     masque ne laisse voir que les 72 dp centraux sur 108, soit environ deux tiers du canevas. Le
+     fond rose/magenta de l'illustration, cantonné aux coins extrêmes, ne survit à aucun cadrage
+     possible ici. C'est le cadrage complet du visage qui a été retenu (tête entière, silhouette de
+     la chevelure lisible en petit) plutôt qu'un recadrage plus serré sur les yeux. Le fond rose
+     reste visible, lui, sur l'écran de chargement (LoadingScreen.kt), qui n'applique aucun masque.
+
+     WebP (qualité 92) plutôt que PNG, premier asset de ce format dans le dépôt : sur une
+     illustration peinte, le PNG pèse 544 Ko contre 112 Ko ici, à rendu indiscernable (comparaison
+     à 2x sur les lignes fines du mesh cyan, l'élément le plus exposé au ringing ; écart moyen de
+     2,7/255 sur les pixels opaques, aucun écart sur le canal alpha). 768 px couvre les deux usages
+     avec de la marge : 432 px pour la couche d'icône en xxxhdpi, 560 px pour l'écran de chargement.
+     Les références @drawable/... étant indépendantes de l'extension, ce changement de format
+     n'impacte aucun appelant.
+-->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@drawable/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />

@@ -43,7 +43,9 @@
     <string name="camera_permission_rationale">La caméra frontale est nécessaire pour la capture faciale.</string>
     <string name="action_grant_camera_permission">Autoriser la caméra</string>
     <string name="loading_message">Chargement…</string>
-    <string name="loading_logo_credit">Logo par Nyacchii (Placeholder)</string>
+    <!-- Volontairement non traduit (identique à la version anglaise) : c'est une attribution
+         d'artiste avec son pseudonyme, pas une phrase à localiser. -->
+    <string name="loading_logo_credit">Logo by @clem_dreaw</string>
 
     <!-- Écran Connexion -->
     <string name="connection_title">Connexion</string>
