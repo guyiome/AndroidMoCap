@@ -1693,17 +1693,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun ensureTongueEmbeddingHelper() {
         if (tongueEmbeddingHelper != null) return
         val tierConfig = currentTierConfig ?: return
-        tongueEmbeddingHelper = TongueEmbeddingHelper(
+        val helper = TongueEmbeddingHelper(
             context = getApplication(),
             tierConfig = tierConfig,
             forceGpuUnavailable = currentDebugForceGpuUnavailable,
             onError = { message -> AppLog.w(TAG, "Échec d'initialisation de TongueEmbeddingHelper : $message") },
-        ).also { it.setup() }
+        )
+        // Le champ n'est renseigné qu'en cas de succès. Avant ce correctif (16 septembre 2026),
+        // l'instance était affectée quoi qu'il arrive : un échec de setup() restait alors verrouillé
+        // pour toute la durée du processus, puisque le garde d'entrée ci-dessus voit un champ
+        // non-null et abandonne -- rebasculer le toggle ne retentait jamais rien. Laisser le champ
+        // à null rend au contraire une nouvelle tentative possible, ce qui a du sens pour un échec
+        // circonstanciel (mémoire, délégué GPU) même si l'échec le plus courant, un asset de modèle
+        // absent, se reproduira à l'identique.
+        if (!helper.setup()) {
+            helper.close()
+            return
+        }
+        tongueEmbeddingHelper = helper
         // Log toujours actif (pas gaté par TONGUE_DIAGNOSTIC_LOGGING) : confirmer que le helper
         // s'est bien construit était justement ce qui manquait pour diagnostiquer la course
         // d'initialisation corrigée juste au-dessus -- un simple silence ne dit pas "jamais tenté"
-        // de "tenté et réussi".
-        AppLog.i(TAG, "TongueEmbeddingHelper initialisé (délégué GPU=${tongueEmbeddingHelper?.activeDelegateIsGpu})")
+        // de "tenté et réussi". Désormais placé APRÈS le contrôle de succès : il annonçait
+        // auparavant "initialisé" juste après un avertissement d'échec, à la milliseconde près,
+        // ce qui rendait les journaux contradictoires (constaté sur device le 16 septembre 2026).
+        AppLog.i(TAG, "TongueEmbeddingHelper initialisé (délégué GPU=${helper.activeDelegateIsGpu})")
     }
 
     /**

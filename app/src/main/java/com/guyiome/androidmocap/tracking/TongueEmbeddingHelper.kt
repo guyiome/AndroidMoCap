@@ -49,12 +49,21 @@ class TongueEmbeddingHelper(
     var activeDelegateIsGpu: Boolean = false
         private set
 
-    fun setup() {
+    /**
+     * Renvoie `true` si un embedder utilisable a été créé (GPU ou CPU), `false` si les deux ont
+     * échoué -- cas typique : [MODEL_ASSET_PATH] absent des assets.
+     *
+     * Ce retour existe parce que l'appelant DOIT pouvoir distinguer succès et échec : signaler
+     * l'échec uniquement via [onError] ne suffisait pas, et `MainViewModel` mémorisait puis
+     * annonçait comme initialisée une instance qui ne l'était pas (voir son
+     * `ensureTongueEmbeddingHelper()`).
+     */
+    fun setup(): Boolean {
         if (tierConfig.preferGpuDelegate && !forceGpuUnavailable) {
             val gpuOk = tryCreateEmbedder(Delegate.GPU)
             if (gpuOk) {
                 activeDelegateIsGpu = true
-                return
+                return true
             }
             AppLog.w(TAG, "Délégué GPU indisponible sur cet appareil, repli sur CPU.")
         }
@@ -63,6 +72,7 @@ class TongueEmbeddingHelper(
         if (!cpuOk) {
             onError(context.getString(R.string.error_tongue_embedder_init_failed))
         }
+        return cpuOk
     }
 
     private fun tryCreateEmbedder(delegate: Delegate): Boolean {
