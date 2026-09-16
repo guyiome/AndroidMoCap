@@ -23,11 +23,18 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Télécharger le modèle MediaPipe (voir README, non versionné)
+      # Les DEUX modèles, contrairement à ci.yml et codeql.yml qui n'ont besoin que du premier :
+      # c'est cet APK-ci qui est publié, et sans image_embedder.tflite l'étage 3 de la détection de
+      # langue tirée (point 15/56) ne peut pas s'initialiser du tout. Constaté sur device le
+      # 16 septembre 2026 sur la v0.3.1 publiée : la fonctionnalité n'avait jamais fonctionné que
+      # sur des APK construits en local, où le modèle est présent dans les assets.
+      - name: Télécharger les modèles MediaPipe (voir README, non versionnés)
         run: |
           mkdir -p app/src/main/assets
           curl -fL -o app/src/main/assets/face_landmarker.task \
             https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task
+          curl -fL -o app/src/main/assets/image_embedder.tflite \
+            https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_small/float32/latest/mobilenet_v3_small.tflite
 
       - name: Reconstituer la clé de signature depuis le secret
         run: echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > "${{ runner.temp }}/release.keystore"
