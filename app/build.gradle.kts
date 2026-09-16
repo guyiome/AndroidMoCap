@@ -34,8 +34,8 @@ android {
         // et ARCore/CameraX/MediaPipe filtrent de toute façon les appareils trop anciens.
         minSdk = 30
         targetSdk = 37
-        versionCode = 4
-        versionName = "0.3.1"
+        versionCode = 5
+        versionName = "0.3.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
