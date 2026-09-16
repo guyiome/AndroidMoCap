@@ -26,11 +26,17 @@ jobs:
       - name: Configurer Gradle (cache "enhanced", gratuit sur repo public -- desormais le cas)
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Telecharger le modele MediaPipe (voir README, non versionne)
+      # Les deux modeles, comme release.yml : l'APK de CI n'est pas publie, mais l'y garder
+      # identique a celui qui l'est evite qu'un probleme d'empaquetage n'apparaisse qu'au moment de
+      # la publication. codeql.yml, lui, ne telecharge que le premier a dessein : il ne fait
+      # qu'analyser du code, un asset n'a aucun effet sur l'analyse -- asymetrie voulue, pas un oubli.
+      - name: Telecharger les modeles MediaPipe (voir README, non versionnes)
         run: |
           mkdir -p app/src/main/assets
           curl -fL -o app/src/main/assets/face_landmarker.task \
             https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task
+          curl -fL -o app/src/main/assets/image_embedder.tflite \
+            https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_small/float32/latest/mobilenet_v3_small.tflite
 
       - name: Tests unitaires + build debug + lint
         run: ./gradlew testDebugUnitTest assembleDebug lintDebug
