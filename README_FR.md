@@ -42,7 +42,9 @@ Projet personnel, développé et maintenu par une seule personne, en évolution 
 
 ## Prérequis
 
-- Android 11 (API 30) ou plus.
+- Android 11 (API 30) ou plus. Sur **Android 17 (API 37) ou plus**, l'app demande la permission
+  d'accès au réseau local à la première connexion : Android l'exige pour tout trafic sur ton
+  réseau, et sans elle aucun protocole ne peut atteindre ton PC.
 - Un **appareil physique** avec caméra frontale -- l'émulateur Android ne fournit pas de flux
   caméra exploitable pour le tracking.
 - Téléphone et PC receveur sur le **même réseau Wi-Fi local**.
@@ -75,6 +77,10 @@ connecter à l'app, aucune IP à saisir côté téléphone pour ce chemin.
 L'app ne communique qu'avec la cible choisie dans les réglages, sur le réseau local -- aucun
 service tiers, aucune télémétrie, aucune donnée envoyée en dehors de ce flux volontaire vers le
 PC receveur.
+
+C'est garanti et pas seulement voulu : la dépendance MediaPipe embarque le transport de télémétrie
+de Google, et l'app en désenregistre explicitement le backend dans le manifeste, de sorte que rien
+ne puisse partir. Voir la spécification technique pour le mécanisme.
 
 **Logs** : conservés localement (fichier privé à l'app, jamais transmis automatiquement), niveau
 "Erreur" par défaut, réglable dans Réglages > Journalisation. Peuvent contenir des informations

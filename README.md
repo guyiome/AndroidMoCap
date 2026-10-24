@@ -37,7 +37,9 @@ Personal project, developed and maintained by a single person, in active develop
 
 ## Requirements
 
-- Android 11 (API 30) or later.
+- Android 11 (API 30) or later. On **Android 17 (API 37) or later**, the app asks for the local
+  network permission the first time you connect: Android requires it for any traffic on your LAN,
+  and without it no protocol can reach your PC.
 - A **physical device** with a front camera -- the Android emulator doesn't provide a usable camera
   feed for tracking.
 - Phone and receiving PC on the **same local Wi-Fi network**.
@@ -68,6 +70,10 @@ IP to enter on the phone side for this path.
 
 The app only communicates with the target chosen in settings, on the local network -- no
 third-party service, no telemetry, no data sent outside this voluntary stream to the receiving PC.
+
+This is enforced rather than merely intended: the MediaPipe dependency ships Google's telemetry
+transport, and the app explicitly unregisters its backend in the manifest so that nothing can be
+sent. See the technical specification for the mechanism.
 
 **Logs**: kept locally (a file private to the app, never transmitted automatically), "Error" level
 by default, adjustable in Settings > Logging. May contain technical information (errors, connection

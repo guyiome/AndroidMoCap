@@ -160,10 +160,14 @@ chaque tag de version). Pas de vérification de mise à jour intégrée à l'app
 ## 4. Contraintes fonctionnelles transverses
 
 - **Vie privée / réseau** : aucune communication autre que le flux volontaire vers la cible choisie
-  par l'utilisateur, sur le réseau local -- pas de télémétrie, pas de service tiers.
+  par l'utilisateur, sur le réseau local -- pas de télémétrie, pas de service tiers. Garanti et pas
+  seulement voulu : la dépendance MediaPipe embarque le transport de télémétrie de Google, dont
+  l'app désenregistre le backend dans le manifeste, de sorte que rien ne puisse partir.
 - **Matériel requis** : un appareil physique avec caméra frontale ; l'émulateur Android ne fournit
   pas de flux caméra exploitable pour le tracking.
-- **Version Android minimale** : Android 11 (API 30).
+- **Version Android minimale** : Android 11 (API 30). À partir d'**Android 17 (API 37)**, l'accès
+  au réseau local est une permission d'exécution : l'app la demande au premier démarrage d'une
+  connexion, et aucun protocole ne peut atteindre le PC tant qu'elle n'est pas accordée.
 - **Licence** : usage libre du logiciel, y compris commercial, à l'exception de la construction
   d'un produit concurrent -- voir `../LICENSE`.
 

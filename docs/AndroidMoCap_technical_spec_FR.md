@@ -133,6 +133,22 @@ d'`ArCoreHeadPoseTracker.kt`) ; pas de pool de bitmaps pour le chemin ARCore (co
 
 ## 5. Protocoles réseau
 
+### Permission d'accès au réseau local (Android 17+)
+
+Android 17 (API 37) a fait de l'accès au réseau local une permission d'exécution,
+`ACCESS_LOCAL_NETWORK`, obligatoire pour les apps ciblant l'API 37 -- ce qui est le cas ici. Les
+apps ciblant l'API 36 ou moins continuent de l'obtenir implicitement via `INTERNET`. La restriction
+couvre les connexions TCP entrantes et sortantes **ainsi que l'envoi *et* la réception UDP** : elle
+concerne donc les trois protocoles ci-dessous, pas un seul. Seule la vérification de mise à jour y
+échappe, car elle sort sur Internet et non sur le réseau local.
+
+`LocalNetworkPermission` porte le seuil de version (`isEnforcedOn`, pure et testée en JVM) et le
+contrôle d'octroi. Le filtre vit dans `MainViewModel`, en tête des trois fonctions de connexion, et
+non dans l'UI : chaque connexion a plusieurs points d'entrée, et seule la *connexion* doit être
+filtrée -- se déconnecter n'a jamais besoin de la permission, distinction que l'UI ne peut pas
+faire sans dupliquer la logique de `toggleActiveConnection()`. Une tentative refusée est mémorisée
+puis rejouée à l'identique une fois la permission accordée.
+
 ### VMC/OSC (`VmcOscSender`)
 
 Cible : Blender, Unity -- pas VTube Studio (qui ne reçoit pas le protocole VMC/OSC en entrée). Un
@@ -267,6 +283,18 @@ reconstruire. La racine plein écran de chaque écran superposé consomme les é
 sous-écran retombait sur l'écran empilé en dessous.
 
 ## 8. Dépendances externes et limites connues
+
+**Télémétrie MediaPipe, neutralisée** -- `com.google.mediapipe:tasks-vision` tire
+`com.google.android.datatransport`, qui enregistre un backend « cct » (Google Cloud Client
+Telemetry) et envoie des événements d'usage à Google. Le manifeste retire le `meta-data` qui
+*enregistre* ce backend : le runtime ne sait plus résoudre ce nom, les événements sont abandonnés
+avant tout appel réseau, et rien ne disparaît du classpath. Exclure la dépendance Gradle a été
+écarté (cela retirerait des classes que MediaPipe référence, troquant un appel réseau contre un
+`NoClassDefFoundError`), de même que retirer les composants d'ordonnancement
+(`IllegalArgumentException: No such service`). **Tout cela repose sur un nom de backend : si une
+montée de version de `tasks-vision` le change, le retrait devient silencieusement inopérant.** À
+revérifier à chaque bump en cherchant `CctTransportBackend` dans le logcat -- rien ne doit
+apparaître.
 
 **MediaPipe Face Landmarker** -- modèle `.task` téléchargé manuellement (non versionné, trop
 volumineux), mode `LIVE_STREAM`, sortie de 52 blendshapes ARKit. Limitation structurelle du modèle :
