@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Caméra frontale : capture du visage -->
     <uses-permission android:name="android.permission.CAMERA" />
@@ -52,6 +53,40 @@
              qui n'ont pas Google Play Services for AR, conformément au pipeline adaptatif par paliers.
         -->
         <meta-data android:name="com.google.ar.core" android:value="optional" />
+
+        <!--
+             Télémétrie MediaPipe neutralisée. `com.google.mediapipe:tasks-vision` embarque
+             `com.google.android.datatransport`, qui enregistre ici un backend « cct » (Google Cloud
+             Client Telemetry) et envoie des événements aux serveurs Google. Constaté sur appareil le
+             24 octobre 2026, journal à l'appui : `TransportRuntime.CctTransportBackend: Status Code:
+             200`. Cela contredit frontalement la promesse du README, « No cloud, no third-party app
+             dependency », et le soin pris ailleurs à masquer les IP dans les journaux.
+
+             Ce `meta-data` EST le registre des backends disponibles : il déclare que le backend
+             nommé « cct » est fourni par cette fabrique. Le retirer fait que le runtime ne sait plus
+             résoudre ce nom, et les événements sont abandonnés avant tout appel réseau.
+
+             Pourquoi cette voie plutôt que les deux autres envisagées. Exclure la dépendance Gradle
+             supprimerait des classes que MediaPipe référence : on troquerait un appel réseau contre
+             un risque de `NoClassDefFoundError`, mauvais échange. Retirer les composants
+             d'ordonnancement (`JobInfoSchedulerService`, `AlarmManagerSchedulerBroadcastReceiver`)
+             exposerait à un `IllegalArgumentException: No such service` si du code tente encore de
+             planifier un job. Couper l'enregistrement du backend se situe en amont des deux, sans
+             rien retirer du classpath.
+
+             À revérifier après toute montée de version de `tasks-vision` : si le nom du backend ou
+             de la fabrique change, ce retrait deviendrait silencieusement inopérant. Le contrôle
+             tient en une ligne, chercher `CctTransportBackend` dans le logcat, plus rien ne doit
+             apparaître.
+        -->
+        <service
+            android:name="com.google.android.datatransport.runtime.backends.TransportBackendDiscovery"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="backend:com.google.android.datatransport.cct.CctBackendFactory"
+                tools:node="remove" />
+        </service>
 
         <activity
             android:name=".MainActivity"
