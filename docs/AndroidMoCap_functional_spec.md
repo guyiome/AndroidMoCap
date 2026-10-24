@@ -150,10 +150,14 @@ every version tag). No in-app update check.
 ## 4. Cross-cutting functional constraints
 
 - **Privacy / network**: no communication other than the voluntary stream to the target chosen by
-  the user, on the local network -- no telemetry, no third-party service.
+  the user, on the local network -- no telemetry, no third-party service. Enforced rather than
+  merely intended: the MediaPipe dependency ships Google's telemetry transport, and the app
+  unregisters its backend in the manifest so that nothing can be sent.
 - **Required hardware**: a physical device with a front camera; the Android emulator doesn't
   provide a usable camera feed for tracking.
-- **Minimum Android version**: Android 11 (API 30).
+- **Minimum Android version**: Android 11 (API 30). From **Android 17 (API 37)**, local network
+  access is a runtime permission: the app requests it the first time a connection is started, and
+  no protocol can reach the PC until it is granted.
 - **License**: free use of the software, including commercial use, except building a competing
   product -- see `../LICENSE`.
 

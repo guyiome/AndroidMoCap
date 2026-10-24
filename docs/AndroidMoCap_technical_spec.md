@@ -128,6 +128,20 @@ never applied to the image sent to MediaPipe, only to the display, same conventi
 
 ## 5. Network protocols
 
+### Local network permission (Android 17+)
+
+Android 17 (API 37) made local network access a runtime permission, `ACCESS_LOCAL_NETWORK`,
+mandatory for apps targeting API 37 -- which this one does. Apps targeting 36 or lower keep it
+implicitly through `INTERNET`. The restriction covers outgoing and incoming TCP **and both sending
+and receiving UDP**, so it applies to all three protocols below, not just one; only the GitHub
+update check escapes it, being internet rather than LAN traffic.
+
+`LocalNetworkPermission` holds the SDK threshold (`isEnforcedOn`, pure and unit-tested) and the
+grant check. The gate lives in `MainViewModel`, at the head of the three connect functions, rather
+than in the UI: each connection has several entry points, and only *connecting* may be gated --
+disconnecting never needs the permission, a distinction the UI cannot make without duplicating
+`toggleActiveConnection()`'s logic. A refused attempt is stored and replayed verbatim once granted.
+
 ### VMC/OSC (`VmcOscSender`)
 
 Target: Blender, Unity -- not VTube Studio (which doesn't accept the VMC/OSC protocol as input). A
@@ -254,6 +268,16 @@ consumes touch events via `Modifier.blockClicksBehind()` (`ui/ClickBlocking.kt`)
 on an empty area of a sub-screen fell through to whatever screen was stacked underneath.
 
 ## 8. External dependencies and known limitations
+
+**MediaPipe telemetry, neutralized** -- `com.google.mediapipe:tasks-vision` pulls in
+`com.google.android.datatransport`, which registers a "cct" backend (Google Cloud Client Telemetry)
+and sends usage events to Google. The manifest removes the `meta-data` that *registers* that
+backend, so the runtime cannot resolve the name and events are dropped before any network call,
+while nothing disappears from the classpath. Excluding the Gradle dependency was rejected (it would
+remove classes MediaPipe references, trading a network call for a `NoClassDefFoundError`), as was
+removing the scheduling components (`IllegalArgumentException: No such service`). **This hangs on a
+backend name: if a `tasks-vision` upgrade changes it, the removal goes silently inert.** Re-check on
+every bump by grepping logcat for `CctTransportBackend` -- nothing should appear.
 
 **MediaPipe Face Landmarker** -- `.task` model downloaded manually (not versioned, too large),
 `LIVE_STREAM` mode, output of 52 ARKit blendshapes. Structural model limitation: `tongueOut` is
