@@ -210,6 +210,7 @@
     <string name="error_vts_ip_missing">Enter a VTube Studio IP address in settings first.</string>
     <string name="error_vts_invalid_address">Invalid or unreachable IP address: %1$s</string>
     <string name="error_vts_connection_failed">VTube Studio connection failed: %1$s</string>
+    <string name="error_local_network_permission_denied">Local network access is required to connect. You can grant it in the system app settings.</string>
     <string name="local_ip_unavailable">unavailable</string>
 
     <!-- Camera errors (CameraController, non-@Composable) -->

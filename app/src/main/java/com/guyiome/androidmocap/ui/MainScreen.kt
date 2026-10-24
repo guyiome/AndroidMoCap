@@ -5,6 +5,8 @@ import android.content.Intent
 import android.net.Uri
 import android.opengl.GLSurfaceView
 import android.view.WindowManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +44,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.guyiome.androidmocap.R
+import com.guyiome.androidmocap.network.LocalNetworkPermission
 import com.guyiome.androidmocap.sensors.BatteryMonitor
 import com.guyiome.androidmocap.sensors.IconOrientationTracker
 import com.guyiome.androidmocap.tracking.EyeLandmarkIndices
@@ -69,6 +72,29 @@ fun MainScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
     val previewView = remember { PreviewView(context) }
+    // Permission d'accès au réseau local (Android 17+, voir LocalNetworkPermission). La demande
+    // n'est jamais déclenchée depuis ici directement : c'est le ViewModel qui lève le drapeau, lui
+    // seul sachant si l'action en cours est une connexion (soumise à permission) ou une
+    // déconnexion (qui ne l'est pas). En cas d'accord, la tentative interrompue est rejouée avec
+    // ses paramètres d'origine, pour que l'utilisateur n'ait pas à ressaisir une IP ni à retoucher
+    // le bouton.
+    val localNetworkPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) viewModel.onLocalNetworkPermissionGranted() else viewModel.onLocalNetworkPermissionDenied()
+    }
+    LaunchedEffect(uiState.localNetworkPermissionRequest) {
+        if (uiState.localNetworkPermissionRequest) {
+            localNetworkPermissionLauncher.launch(LocalNetworkPermission.NAME)
+            // Consommé seulement après le lancement, et dans cet ordre précis : remettre le
+            // drapeau à false change la clé de ce LaunchedEffect, donc annule sa coroutine. Tant
+            // qu'aucune suspension ne sépare les deux lignes l'ordre inverse marcherait aussi,
+            // mais il dépendrait de ce détail -- celui-ci n'en dépend pas. Le drapeau ne vaut
+            // qu'un coup : sans cette remise à zéro, un changement de configuration (rotation,
+            // langue) rejouerait la demande.
+            viewModel.onLocalNetworkPermissionRequested()
+        }
+    }
     // Hébergement de la texture caméra ARCore (palier OPTIMAL, voir ArCoreHeadPoseTracker) --
     // le fond caméra live y est dessiné en interne (drawCameraBackground), ce Compose AndroidView
     // n'est qu'un hôte. Toujours créé (même coût que previewView ci-dessus, symétrique) mais

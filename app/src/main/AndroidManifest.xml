@@ -16,6 +16,18 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
     <!--
+         Android 17 (API 37) : permission d'exécution devenue obligatoire pour toute communication
+         sur le réseau local dès lors que l'app cible l'API 37, ce qui est notre cas. Elle couvre
+         les trois transports (VMC/OSC, UDP/VBridger, VTube Studio), car la restriction porte aussi
+         bien sur l'envoi que sur la réception UDP. Sans elle, rien ne passe et aucune erreur
+         exploitable ne remonte : les paquets UDP sont refusés ou jamais délivrés, les connexions
+         TCP expirent. Ignorée par les versions antérieures d'Android, qui l'accordent
+         implicitement via INTERNET. Demandée à l'exécution, voir LocalNetworkPermission.kt et
+         l'issue #41.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+
+    <!--
          Visibilité de package (Android 11+, API 30+) pour com.google.ar.core, recommandée par la
          doc officielle ARCore pour fiabiliser ArCoreApk.checkAvailability()/Session() sous les
          restrictions de visibilité de packages. Sans impact aujourd'hui : le repli sur CameraX est
