@@ -23,6 +23,7 @@ import com.guyiome.androidmocap.capabilities.DeviceCapabilityDetector
 import com.guyiome.androidmocap.logging.AppLog
 import com.guyiome.androidmocap.logging.LogLevel
 import com.guyiome.androidmocap.network.IFacialMocapSender
+import com.guyiome.androidmocap.network.LocalNetworkPermission
 import com.guyiome.androidmocap.network.UpdateChecker
 import com.guyiome.androidmocap.network.VTubeStudioConnectionState
 import com.guyiome.androidmocap.network.VTubeStudioSender
@@ -266,6 +267,10 @@ data class MainUiState(
     // AppSettingsStore.tongueCalibrationRecordingDurationMs/tongueClassificationMargin.
     val tongueCalibrationRecordingDurationMs: Long = DEFAULT_CALIBRATION_RECORDING_DURATION_MS,
     val tongueClassificationMargin: Float = DEFAULT_CLASSIFICATION_MARGIN,
+    // Drapeau à un seul coup : passé à true quand une tentative de connexion a été refusée faute
+    // de permission d'accès au réseau local (Android 17+), observé par MainScreen qui déclenche la
+    // demande système puis le remet à false. Voir MainViewModel.ensureLocalNetworkPermission().
+    val localNetworkPermissionRequest: Boolean = false,
     val errorMessage: String? = null,
 )
 
@@ -1877,6 +1882,65 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         schedulePowerSaveTimer()
     }
 
+    // --- Permission d'accès au réseau local (Android 17+, voir LocalNetworkPermission) ---
+
+    /**
+     * Action de connexion mise en attente le temps que l'utilisateur réponde à la demande système.
+     * Rejouée telle quelle par [onLocalNetworkPermissionGranted] : les trois connexions ont des
+     * paramètres différents (IP et port saisis pour VMC/VTube Studio, rien pour UDP/VBridger), donc
+     * mémoriser l'appel complet est plus sûr que de tenter de le reconstruire après coup.
+     */
+    private var pendingLocalNetworkAction: (() -> Unit)? = null
+
+    /**
+     * À appeler en tête de chaque fonction qui ouvre un socket vers le réseau local. Renvoie `true`
+     * quand la connexion peut continuer ; sinon mémorise [retry], lève le drapeau que [MainUiState]
+     * expose à l'UI pour déclencher la demande système, et refuse la tentative.
+     *
+     * Ce contrôle est ici plutôt que dans l'UI pour deux raisons. D'abord, chaque connexion a
+     * plusieurs points d'entrée (le bouton unique de l'écran principal via [toggleActiveConnection],
+     * mais aussi l'écran de réglages de connexion) : un filtre côté UI en oublierait. Ensuite et
+     * surtout, seule la *connexion* doit être filtrée -- se déconnecter n'a jamais besoin de la
+     * permission, et c'est une distinction que l'UI ne peut pas faire sans dupliquer la logique de
+     * [toggleActiveConnection].
+     */
+    private fun ensureLocalNetworkPermission(retry: () -> Unit): Boolean {
+        if (LocalNetworkPermission.isGranted(getApplication())) return true
+        AppLog.e(
+            TAG,
+            "Connexion au réseau local refusée : permission ${LocalNetworkPermission.NAME} non " +
+                "accordée (imposée depuis Android 17). Demande système déclenchée.",
+        )
+        pendingLocalNetworkAction = retry
+        _uiState.update { it.copy(localNetworkPermissionRequest = true) }
+        return false
+    }
+
+    /** Consommé par l'UI dès que la demande système est affichée : le drapeau ne vaut qu'un coup. */
+    fun onLocalNetworkPermissionRequested() {
+        _uiState.update { it.copy(localNetworkPermissionRequest = false) }
+    }
+
+    /** Permission accordée : la tentative de connexion interrompue est rejouée à l'identique. */
+    fun onLocalNetworkPermissionGranted() {
+        val action = pendingLocalNetworkAction
+        pendingLocalNetworkAction = null
+        AppLog.i(TAG, "Permission d'accès au réseau local accordée, reprise de la connexion")
+        action?.invoke()
+    }
+
+    /**
+     * Permission refusée : on le dit explicitement. Sans ce message, l'app retomberait dans le
+     * défaut qui a motivé ce correctif (issue #41) -- une connexion qui n'aboutit jamais, sans
+     * que rien n'explique pourquoi.
+     */
+    fun onLocalNetworkPermissionDenied() {
+        pendingLocalNetworkAction = null
+        val message = getApplication<Application>().getString(R.string.error_local_network_permission_denied)
+        AppLog.w(TAG, "Permission d'accès au réseau local refusée par l'utilisateur")
+        _uiState.update { it.copy(errorMessage = message) }
+    }
+
     // --- Type de connexion (réglages) : pilote le bouton unique de l'écran principal ---
 
     /** Choix persisté depuis l'écran réglages (VMC ou iFacialMocap) -- lu au prochain lancement aussi. */
@@ -1932,6 +1996,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Configure la cible VMC (IP du PC qui fait tourner Blender / Unity) et l'active. */
     fun connectVmcTarget(hostText: String, port: Int = VmcOscSender.DEFAULT_PORT) {
+        if (!ensureLocalNetworkPermission { connectVmcTarget(hostText, port) }) return
         _uiState.update { it.copy(vmcConnecting = true) }
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -2000,6 +2065,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * d'autorisation utilisateur, création des paramètres).
      */
     fun connectVtsTarget(hostText: String, port: Int = VTubeStudioSender.DEFAULT_PORT) {
+        if (!ensureLocalNetworkPermission { connectVtsTarget(hostText, port) }) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val address = InetAddress.getByName(hostText)
@@ -2068,6 +2134,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Se met à l'écoute du handshake iFacialMocap sur le port 49983 -- c'est le PC qui initie. */
     fun startIFacialMocapListening() {
+        if (!ensureLocalNetworkPermission { startIFacialMocapListening() }) return
         val sender = iFacialMocapSender ?: IFacialMocapSender { connectedTo ->
             _uiState.update { it.copy(iFacialMocapConnectedTo = connectedTo) }
             // connectedTo non-nul = handshake reçu (voir IFacialMocapSender) ; nul = déconnexion,

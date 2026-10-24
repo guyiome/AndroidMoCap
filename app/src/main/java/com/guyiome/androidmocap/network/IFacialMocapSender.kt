@@ -30,6 +30,15 @@ class IFacialMocapSender(
         private const val STOP_HANDSHAKE = "iFacialMocap_UDPTCPSTOP_sahuasouryya9218sauhuiayeta91555dy3719"
 
         /**
+         * Temporisation entre deux tentatives après un échec de réception. Sans elle, un échec
+         * immédiat et répété (le système refuse le socket au lieu de laisser [DatagramSocket.receive]
+         * bloquer -- cas de figure introduit par la permission réseau local d'Android 17, voir
+         * [LocalNetworkPermission]) ferait tourner le thread d'écoute à vide à pleine vitesse,
+         * pour rien et au détriment de la batterie.
+         */
+        private const val RECEIVE_RETRY_DELAY_MS = 500L
+
+        /**
          * Construit le message texte du protocole iFacialMocap à partir d'un résultat de tracking
          * -- extrait en fonction pure (aucune dépendance socket/réseau) pour être testable en JVM,
          * voir [send] qui en dépend pour construire le paquet UDP envoyé.
@@ -150,12 +159,35 @@ class IFacialMocapSender(
                 val sock = DatagramSocket(PORT)
                 socket = sock
                 val buffer = ByteArray(4096)
+                var consecutiveReceiveFailures = 0
                 while (running.get()) {
                     val packet = DatagramPacket(buffer, buffer.size)
                     try {
                         sock.receive(packet)
+                        consecutiveReceiveFailures = 0
                     } catch (e: Exception) {
-                        if (running.get()) AppLog.w(TAG, "Erreur de réception UDP sur le port $PORT", e)
+                        if (!running.get()) continue
+                        consecutiveReceiveFailures++
+                        // Première erreur en ERROR, pas en WARN : le niveau de journalisation par
+                        // défaut de l'app est ERROR, donc un WARN ici n'atteignait jamais le
+                        // fichier de logs. C'est précisément ce qui a rendu l'issue #41
+                        // indiagnosticable -- l'utilisateur ne pouvait rapporter que "Share logs"
+                        // répondant qu'il n'y avait rien à ce niveau. Les suivantes sont tues :
+                        // une panne de réception se répète, elle n'a pas à noyer le fichier.
+                        if (consecutiveReceiveFailures == 1) {
+                            AppLog.e(
+                                TAG,
+                                "Erreur de réception UDP sur le port $PORT (erreurs suivantes " +
+                                    "silencieuses jusqu'au retour à la normale)",
+                                e,
+                            )
+                        }
+                        try {
+                            Thread.sleep(RECEIVE_RETRY_DELAY_MS)
+                        } catch (interrupted: InterruptedException) {
+                            Thread.currentThread().interrupt()
+                            break
+                        }
                         continue
                     }
                     val text = String(packet.data, 0, packet.length, Charsets.UTF_8)
