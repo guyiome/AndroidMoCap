@@ -12,7 +12,7 @@ mediapipeTasksVision = "1.0.0"
 javaosc = "0.9"
 datastorePreferences = "1.1.7"
 nvWebsocketClient = "2.14"
-kotlinxSerializationJson = "1.11.0"
+kotlinxSerializationJson = "1.12.0"
 # 1.8.0 : releve le minSdk par defaut de la lib a 23 (sans impact, minSdk du projet deja a 30) et
 # corrige un bug de dispatch de configuration dans AppCompatActivity lie aux locales par-app (b/321896385),
 # pertinent pour le selecteur de langue in-app (point 30/43 de la revue technique).
